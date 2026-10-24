@@ -181,7 +181,12 @@ const STATUS_BAR_STYLE = (process.platform === 'win32')
   : { bg: 'gray', fg: 'black' };
 
 function createScreen() {
-  return blessed.screen({ smartCSR: true, title: 'taskmgr', fullUnicode: true, mouse: true });
+  const screen = blessed.screen({ smartCSR: true, title: 'taskmgr', fullUnicode: true, mouse: true });
+  // Windows: without TERM, blessed falls back to the 8-color 'windows-ansi' terminfo and reduces
+  // the orange selected row to plain red. Windows Terminal and conhost (Win10+) accept 256-color
+  // SGR sequences, so let blessed emit them.
+  if (process.platform === 'win32' && screen.tput && screen.tput.colors < 256) screen.tput.colors = 256;
+  return screen;
 }
 
 function quit(screen) {
