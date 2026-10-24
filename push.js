@@ -378,7 +378,7 @@ async function pushSpace(space, { entries, blobs }) {
   return `pushed ${label(space)} (${n(files, 'file')}${dirs ? `, ${n(dirs, 'empty folder')}` : ''}${uploaded ? `, ${n(uploaded, 'attachment')} uploaded` : ''})`;
 }
 
-module.exports = { SERVER, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace, fileHash, saveHashCache };
+module.exports = { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace, fileHash, saveHashCache };
 
 // ---------- tm push ----------
 

@@ -7,7 +7,9 @@ import styles from "./run.module.css";
 // The run of Claude Code on a task, in a dialog sized as the task preview's: opened by the run button
 // beside the task's prompt, for `task` (null: closed), it shows the task's run (`run`, null while
 // the run is being started; see useRuns) as it goes. The header says "Claude: <task>" with the run's
-// state (starting, running, waiting for an answer, done...) at its right end, and carries, at its
+// state (starting, running, waiting for an answer, done...) at its right end, followed by the machine
+// the run is on when it is another (`run.machine`: a task pushed from there runs there, and is queued
+// until that machine starts it), and carries, at its
 // left as the preview's buttons, the stop button while the run goes (onStop(run)), else run again
 // (onRunAgain(task)) and clear (onDismiss(run)). The body is the transcript, followed as it grows:
 // Claude's text, the tools it calls (a click shows the output), and what it asks, answered right
@@ -16,18 +18,22 @@ import styles from "./run.module.css";
 // onClose) leaves the run going.
 export default function RunModal({ task, run, onClose, onStop, onAnswer, onRunAgain, onDismiss }) {
   const { t } = useTranslation();
-  const running = run?.status === "running";
+  const queued = run?.status === "queued";
+  const running = run?.status === "running" || queued;
   const state = !run
     ? t("ai.starting")
-    : run.pending
-      ? t("ai.waiting")
-      : running
-        ? t("ai.running")
-        : run.status === "done"
-          ? t("ai.done", { time: duration(run.endedAt - run.startedAt) })
-          : run.status === "stopped"
-            ? t("ai.stopped")
-            : t("ai.failed");
+    : queued
+      ? t("ai.queued", { machine: run.machine })
+      : run.pending
+        ? t("ai.waiting")
+        : running
+          ? t("ai.running")
+          : run.status === "done"
+            ? t("ai.done", { time: duration(run.endedAt - run.startedAt) })
+            : run.status === "stopped"
+              ? t("ai.stopped")
+              : t("ai.failed");
+  const where = run?.machine && !queued ? ` · ${run.machine}` : "";
 
   const button = (label, icon, onClick, disabled = false) => (
     <button
@@ -57,6 +63,7 @@ export default function RunModal({ task, run, onClose, onStop, onAnswer, onRunAg
   const stateTag = (
     <span className={`muted ${styles.state}`} data-pending={!!run?.pending} title={run?.error || ""}>
       {state}
+      {where}
     </span>
   );
 
@@ -95,7 +102,7 @@ function Transcript({ run, onAnswer }) {
       {(items || []).map((item, i) => (
         <Item key={i} item={item} pending={run.pending?.i === i} billed={run.billed} onAnswer={onAnswer} />
       ))}
-      {(!run || (run.status === "running" && !run.pending)) && <div className={`muted ${styles.working}`}>…</div>}
+      {(!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <div className={`muted ${styles.working}`}>…</div>}
     </div>
   );
 }

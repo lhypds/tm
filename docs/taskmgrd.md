@@ -49,7 +49,7 @@ that fails (the server is down) is retried, with growing waits, until it goes th
 
 `.env` says what the daemon does: `PUSHING` and `POLLING`. `PUSHING=1` (on when it is not set) is all of  
 the above; `PUSHING=0` turns it off: nothing is watched, nothing pushed, and `tm push` is the way to push.  
-With both off the daemon has nothing to do and does not start.  
+With both off, and `AI_RUNNER` off too (below), the daemon has nothing to do and does not start.  
 
 Polling: with `POLLING=1` in `.env`, the daemon pulls too. Every `POLLING_INTERVAL`  
 seconds (600, ten minutes, when it is not set) it runs the pull of `tm pull` (see the README: the server's  
@@ -71,6 +71,22 @@ it went through and, if not, the last line of the pull's error), and the web UI 
 after the server's host at the right end of its status bar: green while the last pull went through within twice  
 `POLLING_INTERVAL` (three minutes at least), red when it failed or when none came in time, which means the daemon is  
 not running. The tooltip says which, with the time and the error (see `GET /api/polling` in [Server.md](Server.md)).  
+
+Running Claude Code for the server: with `AI_RUNNER=1` in `.env`, the daemon keeps one connection open to the server  
+(`GET /api/sync/ai/commands`, see [Server.md](Server.md)) and runs Claude Code here when the server's web UI asks: the  
+run button beside the prompt of a task pushed from here starts the run on this machine, where the tasks, the source  
+code (a repository's task runs in its `source_path`, as `tm run` does) and the claude login are, with this machine's  
+`AI_PERMISSION_MODE`. The transcript goes back to the server as it grows and shows in its dialog as a run of this  
+machine does there, with the machine's name; what Claude asks (a permission, a question) is answered in the server's  
+browser and comes back the same way. Before the run, the task's `task.txt` and `prompt.txt` as the server has them are  
+written here when they differ (a prompt typed in the server's web UI is only in its copy until then; the push that  
+follows sends them back), and a task the server has that is not here yet is made here, at the same path. Without the  
+daemon, or with `AI_RUNNER` off, the server's run button for this machine's tasks is greyed out and says so; a run  
+asked for shows as "waiting for <machine>" until this machine starts it. The runs are kept in this daemon's memory  
+(the server shows them again after its own restart, from here): the web UI on this machine, another process, does  
+not list them. What claude writes to stderr goes to `logs/ai.log`, as for the web UI's own runs. Anyone logged in to  
+the server's web UI can so run code on this machine, with the permissions above: turn the runner on only for a server  
+you trust.  
 
 On the server: set `SYNC_SERVER_TOKEN` in `.env` to a secret of your choice and restart the web UI  
 (`./start.sh`); its startup lines then say `sync : receiving from taskmgrd`. Without the token the  

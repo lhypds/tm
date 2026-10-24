@@ -331,6 +331,9 @@
     "hideOutput": "出力を隠す",
     "noOutput": "（出力なし）",
     "turns_one": "{{count}} ターン",
-    "turns_other": "{{count}} ターン"
+    "turns_other": "{{count}} ターン",
+    "queued": "{{machine}} を待っています",
+    "noRunner": "{{machine}} で実行しますが、接続されていません：そのマシンの .env で AI_RUNNER=1 にして taskmgrd を起動してください",
+    "noMachine": "このコピーはマシン名なしで送られたため、Claude Code を実行できません"
   }
 }

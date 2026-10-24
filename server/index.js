@@ -34,7 +34,7 @@ const { getEditor } = require('../utils/editorUtils');
 const { resolveConfig, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
-const { createAiApp } = require('./ai');
+const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
 const { trimLogs } = require('../utils/logfile');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -193,13 +193,22 @@ function crumbsFor(root, abs) {
   return crumbs;
 }
 
+// A machine as the web UI shows it: syncApp.machineInfo plus `runner`, whether its taskmgrd is
+// connected to run Claude Code for this server (AI_RUNNER=1 there, see ai/remote.js); a machine so
+// connected is in touch.
+function withRunner(m) {
+  if (!m) return null;
+  const runner = isRunnerConnected(m.name);
+  return { ...m, runner, online: m.online || runner };
+}
+
 // The machine a mirror folder (see isMirrored) was pushed from, as the last push of the space said:
-// { name, seenAt, online } (see syncApp.machineInfo), or null (shown as plain "remote"). A space is
+// { name, seenAt, online, runner } (see withRunner), or null (shown as plain "remote"). A space is
 // found by work and repository; the origin comes from the config, as a work is in one origin only.
 function machineOf({ work, repository, root }) {
   if (!isMirrored(config.dataDir, root)) return null;
   const w = config.getWorks().find(x => x.work === work);
-  return w ? syncApp.machineInfo({ origin: w.origin, work: w.work, repository: repository || '' }) : null;
+  return w ? withRunner(syncApp.machineInfo({ origin: w.origin, work: w.work, repository: repository || '' })) : null;
 }
 
 // How many tasks are todo, done, pending and aborted, subtasks included.
@@ -271,7 +280,7 @@ function listSpaces() {
       root,
       exists: !root || (fs.existsSync(root) && fs.statSync(root).isDirectory()),
       remote,
-      machine: remote ? syncApp.machineInfo(space) : null
+      machine: remote ? withRunner(syncApp.machineInfo(space)) : null
     };
   };
   return config.getWorks().map(w => ({
@@ -339,6 +348,9 @@ const syncToken = process.env.SYNC_SERVER_TOKEN;
 trimLogs(path.join(PROJECT_ROOT, 'logs'));
 const syncApp = createSyncApp({ dataDir: config.dataDir, logsDir: path.join(PROJECT_ROOT, 'logs'), token: syncToken, readConfig: config.readText, writeConfig: config.writeText });
 app.use(syncApp);
+// The runners of those machines (their taskmgrd with AI_RUNNER=1), which run Claude Code there for
+// the tasks pushed from there (see server/ai.js): the same token.
+app.use(createAiRunnerApp({ auth: syncApp.auth }));
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -775,8 +787,13 @@ app.put('/api/file', (req, res) => {
   res.json({ files: listFiles(root, taskDir) });
 });
 
-// Running Claude Code on a task from the panel, and answering what it asks (see ai.js).
-app.use(createAiApp({ config, logFile: path.join(PROJECT_ROOT, 'logs', 'ai.log') }));
+// Running Claude Code on a task from the panel, and answering what it asks (see ai.js): here, or on
+// the machine a pushed copy came from.
+app.use(createAiApp({
+  config,
+  logFile: path.join(PROJECT_ROOT, 'logs', 'ai.log'),
+  locate: (space) => ({ remote: isMirrored(config.dataDir, space.root), machine: machineOf(space) })
+}));
 
 app.use('/api', (req, res) => { throw new HttpError(404, 'Unknown API route.'); });
 

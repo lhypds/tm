@@ -331,6 +331,9 @@
     "hideOutput": "隐藏输出",
     "noOutput": "（无输出）",
     "turns_one": "{{count}} 轮",
-    "turns_other": "{{count}} 轮"
+    "turns_other": "{{count}} 轮",
+    "queued": "等待 {{machine}}",
+    "noRunner": "需在 {{machine}} 上运行，但它未连接：在那台机器的 .env 里设 AI_RUNNER=1 并启动 taskmgrd",
+    "noMachine": "这个副本推送时没有机器名，无法运行 Claude Code"
   }
 }

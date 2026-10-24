@@ -191,7 +191,10 @@ AI
 --
 
 Defined in `server/ai.js`: runs of Claude Code on a task, started from the Task panel and followed in the browser, through  
-the Claude Agent SDK (the runs themselves live in `ai/session.js`). A run, as answered:  
+the Claude Agent SDK (the runs themselves live in `ai/session.js`). A task of a folder pushed from another machine by its  
+taskmgrd (see Sync below) runs on that machine instead, through the runner of its daemon (`AI_RUNNER=1` there, see  
+[taskmgrd.md](taskmgrd.md); `ai/remote.js` keeps those runs here): the routes below serve both kinds of run alike, and such  
+a run carries `machine`, the machine's `MACHINE_ID`, and is `queued` until that machine starts it. A run, as answered:  
 ```
 { "id": "b6f397354f17", "task": { "work": "acme", "repository": "alpha", "rel": "202610241655 Fix mail", "id": "202610241655", "title": "Fix mail", "key": "acme/alpha/202610241655 Fix mail" },
   "cwd": "/home/me/acme/alpha", "taskDir": "/home/me/acme/alpha/tasks/202610241655 Fix mail",
@@ -199,7 +202,8 @@ the Claude Agent SDK (the runs themselves live in `ai/session.js`). A run, as an
   "pending": { "id": "c8990b3bf3b2", "kind": "question", "i": 2 }, "model": "claude-fable-5-1", "sessionId": "...", "cost": null, "billed": false,
   "items": [ ... ] }
 ```
-`status` is `running`, `done`, `failed` or `stopped`; `pending` is what Claude waits for an answer to (`null` otherwise):  
+`status` is `running`, `done`, `failed` or `stopped` (and `queued` for a run on another machine that has not started it yet);  
+`pending` is what Claude waits for an answer to (`null` otherwise):  
 `kind` `permission` or `question`, `i` the index of its item. `cost` is what the run's tokens would cost at API prices (from the  
 result; `null` before), `billed` whether that is paid: Claude Code used with an API key, not a claude.ai login (the web UI shows  
 the cost only then). `items` is the transcript, each item by `type`:  
@@ -221,7 +225,10 @@ Every run the server has, with its transcript: `{ runs }`.
 `POST /api/ai/run` `{ work, repository?, rel }`  
 Start Claude Code on that task: in the repository's source folder (`source_path`) for a repository's task, else in the task  
 folder, with the task folder readable either way, and the same first prompt as `tm run`. 201 `{ run }`, with its transcript;  
-409 while the task has a run going, 400 when the source folder is missing.  
+409 while the task has a run going, 400 when the source folder is missing. For a task of a pushed folder, the run is asked of  
+that machine's runner, with the task's `task.txt` and `prompt.txt` as they are here (written there before the run when  
+they differ), and answered once the machine has started it (201) or refused (its error and status); 409 when the machine's  
+runner is not connected, or the folder was pushed without a machine id; 504 when the machine does not answer in 15 seconds.  
 
 `POST /api/ai/runs/:id/answer` `{ pending, decision }` or `{ pending, answers }`  
 Answer the run's pending question `pending` (its id): `decision` `allow` or `deny` for a permission, `answers` for a  
@@ -233,6 +240,21 @@ Stop a run: Claude Code is interrupted and a pending question refused. `{ run }`
 
 `DELETE /api/ai/runs/:id`  
 Forget a finished run, transcript and all. `{ ok: true }`; 409 while it runs.  
+
+The routes of a runner (the taskmgrd of another machine with `AI_RUNNER=1`, see [taskmgrd.md](taskmgrd.md)), authorized  
+as the sync routes are (`Authorization: Bearer <SYNC_SERVER_TOKEN>` and `X-Machine-Id`, which names the machine; 400 without  
+one), so a runner connected counts as its machine being in touch:  
+
+`GET /api/sync/ai/commands`  
+The commands for that machine, live: a `text/event-stream` of `command` events, each `{ id, type, ... }`: `run` `{ run, work,  
+repository, rel, files }` (start Claude Code on that task as run `run`, `files` being `{ "task.txt": text, "prompt.txt": text | null }`  
+as the server has them), `answer` `{ run, pending, body }`, `stop` `{ run }` and `dismiss` `{ run }`, with a comment every 25 seconds  
+to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
+
+`POST /api/sync/ai/events` `{ events }`  
+The events of the machine's session, in order, each `{ event, data }` as `GET /api/ai/events` sends them (`snapshot` first,  
+whenever the machine connects, then `run`, `item`, `delta`, `remove`), and `ack` `{ id, ok, status?, error? }` for each command,  
+`id` the command's. `{ ok: true }`. The server keeps the runs so sent and passes them on to its browsers.  
 
 
 Sync

@@ -1,5 +1,5 @@
-// The web UI's API for running Claude Code on a task (the runs themselves live in ai/session.js),
-// mounted by index.js under /api after the login guard, so every route needs a session:
+// The web UI's API for running Claude Code on a task, mounted by index.js under /api after the login
+// guard, so every route needs a session:
 //
 //   GET    /api/ai/events            the runs, live: a text/event-stream (SSE) of events (see below)
 //   GET    /api/ai/runs              the runs, with their transcripts: { runs }
@@ -12,10 +12,25 @@
 // `run` (a run's state: status, pending question...), `item` { run, i, item } (one item of a run's
 // transcript, new or changed), `delta` { run, i, text } (text appended to a transcript item) and
 // `remove` { run } as they happen, with a comment every 25 seconds to keep the connection.
+//
+// A task of this machine runs here (ai/session.js). A task of a copy pushed from another machine by
+// its taskmgrd (server/sync.js) runs on that machine, where the tasks, the source code and the claude
+// login are, through its runner (ai/runner.js; ai/remote.js keeps those runs here): the run says so
+// in `machine`, is `queued` until the machine starts it, and needs the machine's runner connected
+// (409 otherwise). The runner's own routes, with the sync token rather than a login (createAiRunnerApp):
+//
+//   GET    /api/sync/ai/commands     the commands for this machine, live: a text/event-stream of `command` events
+//   POST   /api/sync/ai/events       { events: [{ event, data }] }: the events of its session, and its acks
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 
-const { isDirectory, spaceOf, taskDirIn } = require('../ai/task');
+const { TASK_FILE, PROMPT_FILE, readPrompt, readTaskDir } = require('../utils/taskUtils');
+const { isDirectory, spaceOf, taskDirIn, titleOf } = require('../ai/task');
 const session = require('../ai/session');
+const remote = require('../ai/remote');
+
+const KEEP_MS = 25 * 1000;  // a comment this often keeps an event stream open
 
 function httpError(status, message) {
   const e = new Error(message);
@@ -23,7 +38,28 @@ function httpError(status, message) {
   return e;
 }
 
-function createAiApp({ config, logFile }) {
+// Open an event stream on res: returns the way to send an event. Comments keep it open; `onClose`
+// is called when the client goes.
+function eventStream(req, res, onClose) {
+  res.status(200).set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-store',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.flushHeaders();
+  const beat = setInterval(() => res.write(': keep\n\n'), KEEP_MS);
+  req.on('close', () => {
+    clearInterval(beat);
+    onClose();
+  });
+  return (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+// `locate(space)` says where a space's tasks are: { remote, machine }, `remote` whether the folder is
+// a copy pushed from another machine and `machine` that machine as the web UI shows it ({ name,
+// online, runner }, see index.js), null when unknown.
+function createAiApp({ config, logFile, locate = () => ({ remote: false, machine: null }) }) {
   session.configure({ logFile });
   const app = express.Router();
 
@@ -39,54 +75,92 @@ function createAiApp({ config, logFile }) {
     return space;
   }
 
+  // Every run, this machine's and the other machines', transcripts included.
+  const allRuns = () => [...session.listRuns(true), ...remote.listRuns(true)];
+
   app.get('/api/ai/events', (req, res) => {
-    res.status(200).set({
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-store',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no'
-    });
-    res.flushHeaders();
-    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    send('snapshot', { runs: session.listRuns(true) });
-    const off = session.subscribe(send);
-    const beat = setInterval(() => res.write(': keep\n\n'), 25 * 1000);
-    req.on('close', () => {
-      clearInterval(beat);
-      off();
-    });
+    const offs = [];
+    const send = eventStream(req, res, () => offs.forEach(off => off()));
+    send('snapshot', { runs: allRuns() });
+    offs.push(session.subscribe(send), remote.subscribe(send));
   });
 
   app.get('/api/ai/runs', (req, res) => {
-    res.json({ runs: session.listRuns(true) });
+    res.json({ runs: allRuns() });
   });
 
-  app.post('/api/ai/run', (req, res) => {
+  app.post('/api/ai/run', async (req, res) => {
     const body = req.body || {};
     const space = spaceFrom(body);
     const rel = String(body.rel || '');
     const taskDir = taskDirIn(space, rel);
-    const run = session.startRun({ space, taskDir, taskRef: { work: space.work, repository: space.repository, rel } });
-    res.status(201).json({ run: session.publicRun(run, true) });
+    const taskRef = { work: space.work, repository: space.repository, rel };
+    const where = locate(space) || {};
+    if (!where.remote) {
+      const run = session.startRun({ space, taskDir, taskRef });
+      return res.status(201).json({ run: session.publicRun(run, true) });
+    }
+    // A copy pushed from another machine: run there, with the task's text as it is here.
+    if (!where.machine) throw httpError(409, 'This folder is a copy pushed without a machine id; Claude Code cannot run on it.');
+    const t = readTaskDir(taskDir);
+    const task = { ...taskRef, id: t.id, title: titleOf(t, taskDir), key: `${space.work}/${space.repository || ''}/${rel}` };
+    let text = null;
+    try { text = fs.readFileSync(path.join(taskDir, TASK_FILE), 'utf8'); } catch (e) { /* a bare folder: the title stands */ }
+    const files = { [TASK_FILE]: text, [PROMPT_FILE]: readPrompt(taskDir) };
+    const run = await remote.startRun({ machine: where.machine.name, task, taskDir, files });
+    res.status(201).json({ run: remote.publicRun(run, true) });
   });
 
-  app.post('/api/ai/runs/:id/answer', (req, res) => {
+  app.post('/api/ai/runs/:id/answer', async (req, res) => {
+    const id = String(req.params.id);
     const body = req.body || {};
-    const run = session.answerRun(String(req.params.id), String(body.pending || ''), body);
-    res.json({ run: session.publicRun(run) });
+    const pending = String(body.pending || '');
+    if (remote.has(id)) return res.json({ run: remote.publicRun(await remote.answerRun(id, pending, body)) });
+    res.json({ run: session.publicRun(session.answerRun(id, pending, body)) });
   });
 
-  app.post('/api/ai/runs/:id/stop', (req, res) => {
-    const run = session.stopRun(String(req.params.id));
-    res.json({ run: session.publicRun(run) });
+  app.post('/api/ai/runs/:id/stop', async (req, res) => {
+    const id = String(req.params.id);
+    if (remote.has(id)) return res.json({ run: remote.publicRun(await remote.stopRun(id)) });
+    res.json({ run: session.publicRun(session.stopRun(id)) });
   });
 
   app.delete('/api/ai/runs/:id', (req, res) => {
-    session.dismissRun(String(req.params.id));
+    const id = String(req.params.id);
+    if (remote.has(id)) remote.dismissRun(id);
+    else session.dismissRun(id);
     res.json({ ok: true });
   });
 
   return app;
 }
 
-module.exports = { createAiApp };
+// The routes of the runners (ai/runner.js), mounted before the login guard: `auth` is the sync
+// app's check of the token and the machine id (server/sync.js), so a runner counts as its machine
+// being in touch, as a push does.
+function createAiRunnerApp({ auth }) {
+  const app = express.Router();
+  app.use('/api/sync/ai', auth, (req, res, next) => {
+    if (!req.machine) throw httpError(400, 'Missing X-Machine-Id.');
+    next();
+  });
+
+  // The commands for the machine, as the browsers give them, for as long as the stream is open.
+  app.get('/api/sync/ai/commands', (req, res) => {
+    let off = () => {};
+    const send = eventStream(req, res, () => off());
+    off = remote.connect(req.machine, (command) => send('command', command), () => res.end());
+  });
+
+  // The events of the machine's session, and its acks, in order.
+  app.post('/api/sync/ai/events', express.json({ limit: '50mb' }), (req, res) => {
+    const events = (req.body || {}).events;
+    if (!Array.isArray(events)) throw httpError(400, 'Missing events.');
+    remote.receive(req.machine, events);
+    res.json({ ok: true });
+  });
+
+  return app;
+}
+
+module.exports = { createAiApp, createAiRunnerApp, isRunnerConnected: remote.isConnected };

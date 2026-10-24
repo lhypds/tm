@@ -146,11 +146,14 @@ const taskKey = (t) => `${t.work}/${t.repository || ''}/${t.rel}`;
 
 // Start Claude Code on the task at taskDir in the space, for the browser to follow. `taskRef` is
 // { work, repository, rel } as the task APIs name the task. 409 while the task has a run going.
-function startRun({ space, taskDir, taskRef }) {
+// `id` names the run when the caller has a name for it already (a run asked for by another tm server,
+// see ai/runner.js); else one is made up.
+function startRun({ space, taskDir, taskRef, id = null }) {
   const key = taskKey(taskRef);
   for (const r of runs.values()) {
     if (r.status === 'running' && r.key === key) throw httpError(409, 'Claude Code is already running on this task.');
   }
+  if (id && runs.has(id)) throw httpError(409, `There is a run ${id} already.`);
   let d;
   try {
     d = describeRun(space, taskDir);
@@ -158,7 +161,7 @@ function startRun({ space, taskDir, taskRef }) {
     throw httpError(400, e.message);
   }
   const run = {
-    id: newId(),
+    id: id || newId(),
     key,
     task: { ...taskRef, id: d.task.id, title: d.title, key },
     cwd: d.cwd,

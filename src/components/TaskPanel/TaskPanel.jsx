@@ -14,9 +14,11 @@ import styles from "./panel.module.css";
 // prompt.txt (`promptOpen`): the text is then split in two, the prompt under a divider that says
 // "Prompt" and carries the prompt's own delete (onDeletePrompt(task) asks first).
 // Typing a prompt creates the file, onSavePrompt(task, text) writing it; a blank one deletes it.
-// The divider also carries the run button (RunButton), greyed out until the task has a prompt:
-// onRun(task) starts Claude Code on the task and opens the run's dialog, or opens the dialog of the
-// run the task has (`run`, see useRuns), which the button shows with a dot while it goes.
+// The divider also carries the run button (RunButton), greyed out until the task has a prompt, or
+// while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
+// text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
+// or opens the dialog of the run the task has (`run`, see useRuns), which the button shows with a dot
+// while it goes.
 // `section` is the text the keyboard is on, "task" or "prompt" (null while an attachment is), shown
 // by which head is highlighted; onSection(area) is called when a text is clicked into.
 // Under the texts, the task's attachments; files dropped anywhere on the panel are uploaded into
@@ -40,6 +42,7 @@ export default function TaskPanel({
   onSavePrompt,
   onDeletePrompt,
   run,
+  noRunner,
   onRun,
 }) {
   const { t } = useTranslation();
@@ -140,7 +143,7 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  <RunButton run={run} disabled={!hasPrompt} onClick={() => onRun(task)} />
+                  <RunButton run={run} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
                   <button
                     type="button"
                     className="btn"

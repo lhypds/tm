@@ -16,10 +16,12 @@
 // .env says what the daemon does. PUSHING=1 (the default) is all of the above; PUSHING=0 turns it
 // off. With POLLING=1 the daemon also pulls: once when it starts, before its first push, and then
 // every POLLING_INTERVAL seconds (600, ten minutes, when not set), it runs pull.js as `tm pull`
-// does, so a change made on the server, or pushed to it by another machine, comes here. With both
-// off, or without SYNC_SERVER, it has nothing to do, and with a POLLING_INTERVAL that is not a
-// number of seconds it cannot poll: it says so and exits with 0 (pm2 then leaves it stopped rather
-// than starting it again and again, see ecosystem.config.cjs).
+// does, so a change made on the server, or pushed to it by another machine, comes here. With
+// AI_RUNNER=1 it also runs Claude Code for the server: a task pushed from here can be run from the
+// server's web UI, and runs here, where the tasks, the source code and the claude login are (see
+// ai/runner.js). With all three off, or without SYNC_SERVER, it has nothing to do, and with a
+// POLLING_INTERVAL that is not a number of seconds it cannot poll: it says so and exits with 0 (pm2
+// then leaves it stopped rather than starting it again and again, see ecosystem.config.cjs).
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -34,14 +36,16 @@ loadDotenv();
 const isOn = (v) => /^(1|true|yes|on)$/i.test(String(v || '').trim());
 const PUSHING = String(process.env.PUSHING || '').trim() === '' || isOn(process.env.PUSHING);
 const POLLING = isOn(process.env.POLLING);
+const AI_RUNNER = isOn(process.env.AI_RUNNER);
 function notRunning(why) {
   console.log(`taskmgrd: ${why}; not running.`);
   process.exit(0);
 }
 if (!String(process.env.SYNC_SERVER || '').trim()) notRunning('SYNC_SERVER is not set in .env, no server to sync with');
-if (!PUSHING && !POLLING) notRunning('PUSHING=0 and POLLING=0 in .env, nothing to do');
+if (!PUSHING && !POLLING && !AI_RUNNER) notRunning('PUSHING=0, POLLING=0 and no AI_RUNNER=1 in .env, nothing to do');
 
-const { SERVER, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace } = require('./push');
+const { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace } = require('./push');
+const { startRunner } = require('./ai/runner');
 
 // The daemon's pushes (and the pulls it runs) are logged apart from those made by hand (`tm push`,
 // `tm pull`: logs/taskmgr.log).
@@ -399,6 +403,7 @@ log(`  server     : ${SERVER}`);
 log(`  machine    : ${MACHINE_ID}`);
 log(`  pushing    : ${PUSHING ? 'on' : 'off (PUSHING=0 in .env)'}`);
 log(`  polling    : ${POLLING ? `tm pull every ${POLLING_INTERVAL_S % 60 === 0 ? `${POLLING_INTERVAL_S / 60} min` : `${POLLING_INTERVAL_S}s`}` : 'off (POLLING=1 in .env turns it on)'}`);
+log(`  ai runner  : ${AI_RUNNER ? 'on: runs Claude Code here for the server' : 'off (AI_RUNNER=1 in .env turns it on)'}`);
 
 const first = readConfig();
 if (!first) die(`${CONFIG_PATH} could not be read, or is invalid (see above).`);
@@ -410,11 +415,16 @@ for (const s of spacesOf(first.works)) log(`  ${s.repository ? 'repository' : 'w
 // machine's changes, say) is taken in first, and the push that follows sends the folders as merged.
 if (PUSHING) watchConfig();
 if (POLLING) poll();
-else rescan();
+else if (PUSHING) rescan();
 if (PUSHING) setInterval(rescan, RESCAN_MS);
+
+// The runner: Claude Code run here for the server (ai/runner.js), logging what claude writes to
+// stderr where the web UI's runs do.
+const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log') }) : null;
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
+    if (runner) runner.stop();
     if (pollTimer) clearTimeout(pollTimer);
     if (rescanRetry) clearTimeout(rescanRetry);
     for (const r of [...roots.values()]) forgetRoot(r);

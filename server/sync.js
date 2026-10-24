@@ -456,7 +456,10 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   // is in touch again at its next push or poll.
   const seen = new Map();
 
-  app.use('/api/sync', (req, res, next) => {
+  // The token and the machine id of a request from taskmgrd, checked and read into req.machine. Also
+  // app.auth, for the other routes taskmgrd calls (the runner's, see server/ai.js): the same token, and
+  // the machine counts as in touch by them too.
+  const auth = (req, res, next) => {
     if (!enabled) return res.status(503).json({ error: 'Sync is off on this server: set SYNC_SERVER_TOKEN in its .env.', code: 'SYNC_OFF' });
     const m = /^Bearer\s+(.+)$/.exec(String(req.headers.authorization || ''));
     if (!m || !tokensMatch(m[1].trim(), token.trim())) return res.status(401).json({ error: 'Wrong sync token.', code: 'INVALID_TOKEN' });
@@ -466,7 +469,9 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     if (id) seen.set(id, Date.now());
     req.machine = id;
     next();
-  });
+  };
+  app.use('/api/sync', auth);
+  app.auth = auth;
 
   // One line to logs/<MACHINE_ID>.log, the log of what that machine pushes and polls here, in the form
   // of the daemon's own log (see syncLog in push.js): the time, SUCCESS / FAILED / INFO, the message.

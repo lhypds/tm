@@ -261,10 +261,12 @@ module.exports = {
   spaceArg,
   resolveSpace,
   spaceOf,
+  taskDirsUnder,
   findTaskDir,
   taskDirIn,
   listFiles,
   buildPrompt,
   cwdOf,
+  titleOf,
   describeRun
 };

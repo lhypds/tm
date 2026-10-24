@@ -393,6 +393,17 @@ export default function Home({ all = false }) {
   // shows there too. A question Claude asks, on whatever task, shows as a toast.
   const ai = useRuns({ onAsk: (run) => showToast(t("ai.asks", { title: run.task.title }), 6000) });
   const selectedRun = ai.runFor(selected);
+  // Where the selected task would run: here, or, for a copy pushed from another machine, on that
+  // machine (see server/ai.js), which needs its taskmgrd connected as a runner (AI_RUNNER=1 there).
+  // The reason it cannot now, for the run button; null when it can, or nothing is known yet.
+  const noRunner = useMemo(() => {
+    const sp = selected?.space;
+    const w = sp && works?.find((x) => x.work === sp.work);
+    const s = w && (sp.repository ? w.repositories.find((p) => p.name === sp.repository) : w);
+    if (!s?.remote) return null;
+    if (!s.machine) return t("ai.noMachine");
+    return s.machine.runner ? null : t("ai.noRunner", { machine: s.machine.name });
+  }, [selected, works, t]);
   const [runKey, setRunKey] = useState(null);
   const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
   const openRun = (task) => {
@@ -1356,6 +1367,7 @@ export default function Home({ all = false }) {
               onSavePrompt={(task, text) => savePrompt(attachments, task, text)}
               onDeletePrompt={(task) => deletePrompt(attachments, task, () => showPrompt(false))}
               run={selectedRun}
+              noRunner={noRunner}
               onRun={openRun}
             />
           )}
