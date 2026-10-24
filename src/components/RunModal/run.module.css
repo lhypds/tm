@@ -57,7 +57,7 @@
   letter-spacing: 2px;
 }
 
-/* A tool call: a muted line with a mark (…, ✓, ✗), the tool's name and what it is about; opened, the
+/* A tool call: a muted line with a mark (..., ✓, ✗), the tool's name and what it is about; opened, the
    whole of it and the output under it. */
 .tool {
   padding-left: 8px;
@@ -81,9 +81,10 @@
   line-height: inherit;
 }
 
+/* as wide as the three dots, so the names line up whatever the mark */
 .toolMark {
   flex: none;
-  width: 1ch;
+  width: 3ch;
 }
 
 .tool[data-error="true"] .toolMark {

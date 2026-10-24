@@ -79,7 +79,7 @@ function httpError(status, message) {
   return e;
 }
 
-const clip = (s, max) => (s.length > max ? `${s.slice(0, max)}…` : s);
+const clip = (s, max) => (s.length > max ? `${s.slice(0, max)}...` : s);
 
 // What a tool call is about, in a line or a few: the command of Bash, the file of an edit, the pattern
 // of a search, the plan of ExitPlanMode... else the input as JSON.

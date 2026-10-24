@@ -1,6 +1,6 @@
 {
   "common": {
-    "loading": "Loading…",
+    "loading": "Loading...",
     "retry": "Retry",
     "untitled": "(untitled)",
     "cancel": "Cancel",
@@ -109,7 +109,7 @@
     "remove": "Remove {{name}}",
     "deleteConfirm": "Delete {{name}}?",
     "deleteTitle": "Delete file",
-    "uploading": "Uploading…",
+    "uploading": "Uploading...",
     "drop": "Drop files here or",
     "choose": "choose files"
   },
@@ -117,7 +117,7 @@
     "newTask": "New task",
     "saveHint": "⌘S / Ctrl+S saves",
     "save": "Save",
-    "saving": "Saving…",
+    "saving": "Saving...",
     "newSubtask": "New subtask of “{{name}}”"
   },
   "config": {

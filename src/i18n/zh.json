@@ -1,6 +1,6 @@
 {
   "common": {
-    "loading": "加载中…",
+    "loading": "加载中...",
     "retry": "重试",
     "untitled": "（无标题）",
     "cancel": "取消",
@@ -109,7 +109,7 @@
     "remove": "移除 {{name}}",
     "deleteConfirm": "删除 {{name}}？",
     "deleteTitle": "删除文件",
-    "uploading": "上传中…",
+    "uploading": "上传中...",
     "drop": "将文件拖放到此处，或",
     "choose": "选择文件"
   },
@@ -117,7 +117,7 @@
     "newTask": "新建任务",
     "saveHint": "⌘S / Ctrl+S 保存",
     "save": "保存",
-    "saving": "保存中…",
+    "saving": "保存中...",
     "newSubtask": "为“{{name}}”添加子任务"
   },
   "config": {

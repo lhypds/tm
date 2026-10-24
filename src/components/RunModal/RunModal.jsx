@@ -102,7 +102,7 @@ function Transcript({ run, onAnswer }) {
       {(items || []).map((item, i) => (
         <Item key={i} item={item} pending={run.pending?.i === i} billed={run.billed} onAnswer={onAnswer} />
       ))}
-      {(!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <div className={`muted ${styles.working}`}>…</div>}
+      {(!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <div className={`muted ${styles.working}`}>...</div>}
     </div>
   );
 }
@@ -131,7 +131,7 @@ function Item({ item, pending, billed, onAnswer }) {
 function ToolItem({ item }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const mark = !item.done ? "…" : item.isError ? "✗" : "✓";
+  const mark = !item.done ? "..." : item.isError ? "✗" : "✓";
   return (
     <div className={styles.tool} data-error={!!item.isError} data-open={open}>
       <button

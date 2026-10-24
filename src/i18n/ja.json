@@ -1,6 +1,6 @@
 {
   "common": {
-    "loading": "読み込み中…",
+    "loading": "読み込み中...",
     "retry": "再試行",
     "untitled": "（無題）",
     "cancel": "キャンセル",
@@ -109,7 +109,7 @@
     "remove": "{{name}} を削除",
     "deleteConfirm": "{{name}} を削除しますか？",
     "deleteTitle": "ファイルを削除",
-    "uploading": "アップロード中…",
+    "uploading": "アップロード中...",
     "drop": "ここにファイルをドロップ、または",
     "choose": "ファイルを選択"
   },
@@ -117,7 +117,7 @@
     "newTask": "新規タスク",
     "saveHint": "⌘S / Ctrl+S で保存",
     "save": "保存",
-    "saving": "保存中…",
+    "saving": "保存中...",
     "newSubtask": "「{{name}}」のサブタスクを追加"
   },
   "config": {
