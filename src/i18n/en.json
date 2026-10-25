@@ -165,7 +165,7 @@
       "desc": "edit the selected task"
     },
     "open": {
-      "keys": "enter in progress",
+      "keys": "o; enter in progress",
       "desc": "open the task folder"
     },
     "copy": {

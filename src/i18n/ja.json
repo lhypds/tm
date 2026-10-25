@@ -165,7 +165,7 @@
       "desc": "選択中のタスクを編集"
     },
     "open": {
-      "keys": "進捗で enter",
+      "keys": "o；進捗で enter",
       "desc": "タスクフォルダを開く"
     },
     "copy": {

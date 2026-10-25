@@ -235,7 +235,7 @@ Mark a task as done.
 Space  
 Show task details.  
 
-Enter  
+Enter / o  
 Open a task folder to view details and attachments.  
 
 d  

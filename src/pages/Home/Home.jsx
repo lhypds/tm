@@ -976,6 +976,10 @@ export default function Home({ all = false }) {
         openFile(peekFile, peek);
         return true;
       }
+      if (name === "o") {
+        openFolder(peekTask);
+        return true;
+      }
       if (!["q", "enter", "space"].includes(name)) return false;
       closePeek();
       return true;
@@ -1114,6 +1118,10 @@ export default function Home({ all = false }) {
           if (view === "list") openEditor(t);
           else openFolder(t);
         }
+        return true;
+      case "o":
+        // the selected task's folder, in the list, the progress view and the Task panel alike
+        if (t) openFolder(t);
         return true;
       case "x":
         if (t) toggleDone(t);

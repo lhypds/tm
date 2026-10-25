@@ -933,7 +933,7 @@ function createTaskView(screen, onBack) {
     '  shift+a            add a subtask of the selected task',
     '  e / i              edit the selected task',
     '  space              preview task details',
-    '  enter              open the task folder',
+    '  enter / o          open the task folder',
     '  x                  mark done / undone',
     '  p                  mark pending / todo',
     '  w                  mark aborted / todo',
@@ -1067,7 +1067,7 @@ function createTaskView(screen, onBack) {
     toggleStatus('aborted');
   });
 
-  // 7. Open current task folder (enter or a left click on the row)
+  // 7. Open current task folder (enter, o, or a left click on the row)
   function openSelected() {
     // do not open if preview is open
     if (isPreviewing) return;
@@ -1076,7 +1076,7 @@ function createTaskView(screen, onBack) {
     const t = tasks[list.selected];
     if (t) { openTask(t); }
   }
-  taskKey('enter', openSelected);
+  taskKey(['enter', 'o'], openSelected);
   clickToOpen(list, openSelected);
 
   // 8. Delete a task

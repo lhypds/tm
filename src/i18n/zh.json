@@ -165,7 +165,7 @@
       "desc": "编辑选中的任务"
     },
     "open": {
-      "keys": "Progress 中按 enter",
+      "keys": "o；Progress 中按 enter",
       "desc": "打开任务文件夹"
     },
     "copy": {
