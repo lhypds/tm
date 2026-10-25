@@ -62,14 +62,54 @@ export function formatStamp(s) {
 export const ALL_MONTHS = "all";
 export const taskMonth = (task) => (/^\d{6}/.test(task.id) ? `${task.id.slice(0, 4)}-${task.id.slice(4, 6)}` : "");
 
-// The month filter's entries: all months, then the months the tasks were created in, newest first.
-export function taskMonths(tasks) {
-  const keys = [...new Set(tasks.map(taskMonth).filter(Boolean))].sort((a, b) => (a > b ? -1 : 1));
-  return [{ key: ALL_MONTHS }, ...keys.map((key) => ({ key }))];
+// The periods of the time filter besides the months: last week and this week (Monday to Sunday),
+// as of today.
+export const LAST_WEEK = "last-week";
+export const THIS_WEEK = "this-week";
+const PERIODS = [LAST_WEEK, THIS_WEEK];
+
+const monthKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+// The time filter's entries: all, the periods, then the months, newest first: this month always
+// (it stands for "this month", tasks or not), and every month the tasks were created in.
+export function taskMonths(tasks, now = new Date()) {
+  const keys = [...new Set([monthKeyOf(now), ...tasks.map(taskMonth).filter(Boolean)])].sort((a, b) => (a > b ? -1 : 1));
+  return [{ key: ALL_MONTHS }, ...PERIODS.map((key) => ({ key })), ...keys.map((key) => ({ key }))];
 }
 
-// "2026-10" as "2026 - 10", as fin writes a month.
-export const monthLabel = (key, t) => (key === ALL_MONTHS ? t("month.all") : key.replace("-", " - "));
+// The day a task was created, from its id ("202610251200": 2026-10-25), local; null for an id that
+// is not a date.
+function taskDay(task) {
+  const m = /^(\d{4})(\d{2})(\d{2})/.exec(task.id || "");
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+
+// The Monday that starts the week `d` is in, at 0:00.
+function weekStart(d) {
+  const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  s.setDate(s.getDate() - ((s.getDay() + 6) % 7));
+  return s;
+}
+
+const plusDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+
+// Whether the task was created in the period `key` names (an entry of taskMonths), as of `now`.
+// A task whose id is not a date is in none but "all".
+export function inPeriod(task, key, now = new Date()) {
+  if (key === ALL_MONTHS) return true;
+  if (key === THIS_WEEK || key === LAST_WEEK) {
+    const day = taskDay(task);
+    if (!day) return false;
+    const start = weekStart(now);
+    const from = key === THIS_WEEK ? start : plusDays(start, -7);
+    return day >= from && day < plusDays(from, 7);
+  }
+  return taskMonth(task) === key;
+}
+
+// An entry's name: "all tasks", a period, or the month as it is ("2026-10", as every time reads).
+const PERIOD_TEXT = { [ALL_MONTHS]: "month.all", [LAST_WEEK]: "month.lastWeek", [THIS_WEEK]: "month.thisWeek" };
+export const monthLabel = (key, t) => (PERIOD_TEXT[key] ? t(PERIOD_TEXT[key]) : key);
 
 export function formatSize(n) {
   if (n < 1024) return `${n} B`;

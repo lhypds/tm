@@ -3,10 +3,11 @@ import { useTranslation } from "react-i18next";
 import { ChevronLeftIcon, ChevronRightIcon } from "@components/icons";
 import styles from "./monthPicker.module.css";
 
-// The month the tasks are filtered by, as in fin: a step back, the month itself, a step forward.
-// Newest month first in `months`, so "previous" steps down the list and "next" steps up. The month
-// opens a list: Up and Down walk it (and open it from the month), Enter or Space pick, Escape or a
-// press outside closes it. `label` writes a month.
+// The time the tasks are filtered by, as in fin: a step back, the entry itself, a step forward.
+// `months` are the entries (all, last / this week, then the months, newest first; see taskMonths),
+// so "previous" steps down the list and "next" steps up. The entry opens a list: Up
+// and Down walk it (and open it from the entry), Enter or Space pick, Escape or a press outside
+// closes it. `label` writes an entry.
 export default function MonthPicker({ months, index, label, onChange }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);

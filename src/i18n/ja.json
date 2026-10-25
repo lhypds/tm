@@ -46,10 +46,12 @@
     "boardView": "進捗表示"
   },
   "month": {
-    "all": "すべての月",
+    "all": "全タスク",
     "title": "月",
     "prev": "前の月",
-    "next": "次の月"
+    "next": "次の月",
+    "lastWeek": "先週",
+    "thisWeek": "今週"
   },
   "home": {
     "onlyDone": "ここのタスクはすべて完了しています。",

@@ -46,10 +46,12 @@
     "boardView": "Progress view"
   },
   "month": {
-    "all": "All months",
+    "all": "All tasks",
     "title": "Month",
     "prev": "Previous month",
-    "next": "Next month"
+    "next": "Next month",
+    "lastWeek": "Last week",
+    "thisWeek": "This week"
   },
   "home": {
     "onlyDone": "Every task here is done.",

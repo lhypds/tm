@@ -36,7 +36,7 @@ import { BOARD_STATUSES, boardStatus } from "@components/TaskBoard";
 import { showToast, Checkbox } from "@ui";
 import { useAuth } from "@store";
 import * as api from "@utils/api";
-import { ALL_MONTHS, taskMonth, taskMonths, monthLabel, previewKind, flattenTasks, filterTasks, formatDateTime } from "@utils/task";
+import { ALL_MONTHS, inPeriod, taskMonths, monthLabel, previewKind, flattenTasks, filterTasks, formatDateTime } from "@utils/task";
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
@@ -165,7 +165,7 @@ export default function Home({ all = false }) {
   const [showHidden, setShowHidden] = useState(() => readFlag("tree.showHidden", false)); // the tree shows hidden works too
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [view, setView] = useState(readView);
-  const [month, setMonth] = useState(ALL_MONTHS); // the month the tasks were created in, or all
+  const [month, setMonth] = useState(ALL_MONTHS); // when the tasks were created: all, last / this week, or a month
   const [showDone, setShowDone] = useState(() => readFlag("tasks.showDone", true)); // the list shows done tasks too
   const [showPending, setShowPending] = useState(() => readFlag("tasks.showPending", true)); // and pending ones
   const [showAbort, setShowAbort] = useState(() => readFlag("tasks.showAbort", true)); // and aborted ones (the board's aborted column too)
@@ -353,7 +353,8 @@ export default function Home({ all = false }) {
   );
   const tasks = useMemo(() => flattenTasks(tree), [tree]);
 
-  // The month filter's entries; a month that this list has no task from shows every month.
+  // The time filter's entries (all, last / this week, then the months, this one first); a month
+  // that this list has no task from shows every task.
   const months = useMemo(() => taskMonths(tasks), [tasks]);
   const monthIndex = Math.max(
     0,
@@ -367,7 +368,7 @@ export default function Home({ all = false }) {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const keep = (t) =>
-      (monthKey === ALL_MONTHS || taskMonth(t) === monthKey) &&
+      inPeriod(t, monthKey) &&
       (!q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.from.toLowerCase().includes(q)) &&
       (showAbort || t.status !== "aborted") &&
       (view === "board" || ((showDone || t.status !== "done") && (showPending || t.status !== "pending")));

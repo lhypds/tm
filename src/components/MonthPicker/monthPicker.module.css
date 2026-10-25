@@ -45,9 +45,9 @@
   margin: 0 calc(-1 * var(--line));
 }
 
-/* One width whatever it says, so the strip does not shift between a month ("2026 - 09", nine
-   characters) and "all months" or "no date", and the list under it is as wide either way. 10ch
-   fits "All months", the widest entry in any language; the rest sit centred in it. */
+/* One width whatever it says, so the strip does not shift between a month ("2026-09", seven
+   characters) and "All tasks" or "This week", and the list under it is as wide either way. 10ch
+   fits "All tasks", the widest entry in any language; the rest sit centred in it. */
 .month {
   height: 22px;
   min-width: calc(10ch + 16px + 2 * var(--line));

@@ -46,10 +46,12 @@
     "boardView": "进度视图"
   },
   "month": {
-    "all": "全部月份",
+    "all": "全部任务",
     "title": "月份",
     "prev": "上个月",
-    "next": "下个月"
+    "next": "下个月",
+    "lastWeek": "上周",
+    "thisWeek": "本周"
   },
   "home": {
     "onlyDone": "这里的任务都已完成。",
