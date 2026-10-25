@@ -3,8 +3,9 @@
 // tasks, the source code and the claude login are. On with AI_RUNNER=1 in .env (see taskmgrd.js).
 //
 // It keeps one connection open to the server, GET /api/sync/ai/commands (a text/event-stream, see
-// server/ai.js), reads the commands the server's browsers give (run, answer, stop, dismiss; see
-// ai/remote.js), carries each out on this machine's session (ai/session.js) and acknowledges it (an
+// server/ai.js), reads the commands the server's browsers give (run, answer, stop, dismiss, and forget,
+// which removes a run's record from the task folder here, see ai/record.js; see ai/remote.js), carries
+// each out on this machine's session (ai/session.js) and acknowledges it (an
 // `ack` event: ok, or the error for the browser). Every event of the session goes back as it happens,
 // POST /api/sync/ai/events, a snapshot of the runs first each time the connection is made, so the
 // server shows these runs as it shows its own. A connection lost is made again, with growing waits.
@@ -20,6 +21,7 @@ const path = require('path');
 const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId } = require('../utils/taskUtils');
 const { resolveConfig } = require('../server/config');
 const { isDirectory, spaceOf, taskDirIn, taskDirsUnder } = require('./task');
+const { deleteRecord } = require('./record');
 
 const RETRY_MS = [2000, 5000, 15000, 60000];  // waits before connecting again, the last one repeating
 const FLUSH_MS = 50;                          // events are sent together after this long
@@ -55,7 +57,7 @@ async function* sseMessages(body) {
 // another), `getWorks` the works of taskmgr.json as they are now (read each time, as the file may
 // change), `logFile` where the runs log what claude writes to stderr. Returns { stop }.
 function startRunner({ server, token, machineId, log, warn, logFile, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
-  session.configure({ logFile });
+  session.configure({ logFile, machine: machineId });
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId) };
 
   let stopped = false;
@@ -119,8 +121,9 @@ function startRunner({ server, token, machineId, log, warn, logFile, session = r
   // ---------- the commands ----------
 
   // The task the command names, here: its space by work and repository as in taskmgr.json now, its
-  // folder at `rel`, else by its id anywhere in the space, else made at `rel`.
-  function locate({ work, repository, rel }) {
+  // folder at `rel`, else by its id anywhere in the space, else made at `rel` (for a run; `make`
+  // false, as for forgetting a record, refuses then).
+  function locate({ work, repository, rel }, make = true) {
     const space = spaceOf(getWorks(), String(work || ''), String(repository || ''));
     if (!space) throw httpError(404, `No ${repository ? `repository "${repository}" in "${work}"` : `work "${work}"`} on ${machineId}.`);
     if (!space.root) throw httpError(404, `"${work}" has no tasks folder of its own on ${machineId}.`);
@@ -137,6 +140,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, session = r
     const found = [...taskDirsUnder(space.root)].filter(d => folderId(path.basename(d)) === id);
     if (found.length === 1) return { space, taskDir: found[0], made: false };
     if (found.length > 1) throw httpError(409, `${found.length} tasks on ${machineId} have the id ${id}; which one?`);
+    if (!make) throw httpError(404, `No task ${relPath} on ${machineId}.`);
     const abs = path.resolve(space.root, relPath);
     const toRoot = path.relative(space.root, abs);
     if (!toRoot || toRoot.startsWith('..') || path.isAbsolute(toRoot)) throw httpError(400, 'Path is outside the tasks root.');
@@ -181,6 +185,12 @@ function startRunner({ server, token, machineId, log, warn, logFile, session = r
         case 'dismiss':
           session.dismissRun(String(cmd.run || ''));
           break;
+        case 'forget': {
+          const { space, taskDir } = locate(cmd, false);
+          deleteRecord(taskDir, String(cmd.folder || ''));
+          log(`runner: forgot ${cmd.folder} of ${space.label} ${cmd.rel}`);
+          break;
+        }
         default:
           throw httpError(400, `Unknown command "${cmd.type}".`);
       }

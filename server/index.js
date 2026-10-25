@@ -35,6 +35,7 @@ const { resolveConfig, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
 const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
+const { listRecords } = require('../ai/record');
 const { trimLogs } = require('../utils/logfile');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -642,7 +643,7 @@ app.post('/api/tasks', (req, res) => {
 app.get('/api/task', (req, res) => {
   const { root } = spaceFrom(req.query);
   const taskDir = resolveTaskDir(root, String(req.query.rel || ''));
-  res.json({ task: serializeTask(root, taskFromDir(taskDir)), files: listFiles(root, taskDir), prompt: readPrompt(taskDir) });
+  res.json({ task: serializeTask(root, taskFromDir(taskDir)), files: listFiles(root, taskDir), prompt: readPrompt(taskDir), runs: listRecords(taskDir) });
 });
 
 // Write a task's prompt.txt as typed; a blank text deletes it. Answers the prompt as it is now
@@ -792,6 +793,7 @@ app.put('/api/file', (req, res) => {
 app.use(createAiApp({
   config,
   logFile: path.join(PROJECT_ROOT, 'logs', 'ai.log'),
+  machine: String(process.env.MACHINE_ID || '').trim() || undefined,
   locate: (space) => ({ remote: isMirrored(config.dataDir, space.root), machine: machineOf(space) })
 }));
 

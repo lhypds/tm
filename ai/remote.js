@@ -208,6 +208,12 @@ function dismissRun(id) {
   command(run.machine, { type: 'dismiss', run: id }).catch(() => {});
 }
 
+// Have `machine` remove a run's record (see ai/record.js) from its task folder: the copy here is
+// the machine's to push, so removing it here alone would not last. `task` is { work, repository, rel }.
+function forgetRecord(machine, task, folder) {
+  return command(machine, { type: 'forget', work: task.work, repository: task.repository, rel: task.rel, folder });
+}
+
 // A run as the machine tells it (its publicRun, items included in a snapshot), kept as this machine's.
 function upsert(machine, pub) {
   if (!pub || typeof pub.id !== 'string') return;
@@ -275,4 +281,4 @@ function receive(machine, events) {
   }
 }
 
-module.exports = { subscribe, listRuns, publicRun, has, isConnected, connect, receive, startRun, answerRun, stopRun, dismissRun };
+module.exports = { subscribe, listRuns, publicRun, has, isConnected, connect, receive, startRun, answerRun, stopRun, dismissRun, forgetRecord };

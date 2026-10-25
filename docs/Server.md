@@ -145,8 +145,11 @@ Create a task in `dir`; the folder is named after the first line of `details`. 2
 Create a task in `dir` from the whole `task.txt` text. 201 `{ task }`.  
 
 `GET /api/task?work=&repository=&rel=`  
-One task, its files and its prompt: `{ task, files, prompt }`, each file `{ name, rel, isDir, isSubtask, size }`  
-(`task.txt` and `prompt.txt` are not among them), `prompt` the text of the task's `prompt.txt`, or `null` when it has none.  
+One task, its files, its prompt and the records of its runs of Claude Code: `{ task, files, prompt, runs }`, each file  
+`{ name, rel, isDir, isSubtask, size }` (`task.txt`, `prompt.txt` and dot files are not among them), `prompt` the text of  
+the task's `prompt.txt`, or `null` when it has none, and `runs` the records kept in the folder (its `.claude_<time>`  
+folders, see AI below), newest first, each a run as `GET /api/ai/runs` answers one, without `items`, plus `folder` (the  
+record's name) and `saved: true`.  
 
 `PUT /api/task/prompt` `{ work, repository?, rel, text }`  
 Write the task's `prompt.txt` as typed; a blank `text` deletes the file instead. `{ prompt, files }` as they are after it.  
@@ -241,6 +244,20 @@ Stop a run: Claude Code is interrupted and a pending question refused. `{ run }`
 `DELETE /api/ai/runs/:id`  
 Forget a finished run, transcript and all. `{ ok: true }`; 409 while it runs.  
 
+A run that is over is also written into the task folder by the machine that ran it, as `.claude_<yyyyMMddHHmmss>/` (the  
+time it began; `-2`, `-3`... when two began the same second): `run.json`, the run as above with its transcript plus `input`  
+(the first prompt claude was given) and `machine` (where it ran); `prompt.txt`, the task's prompt.txt as it was (when it  
+had one); and `transcript.md`, the same to read. Dot folders go with the task when it is pushed or pulled, so a server  
+shows the runs of the tasks pushed to it after they are over, whatever restarted meanwhile; `GET /api/task` lists them.  
+
+`GET /api/ai/saved/:folder?work=&repository=&rel=`  
+One record of the task, transcript included: `{ run }`, the run plus `folder` and `saved: true`. 400 when the name is not a  
+record's, 404 when there is none.  
+
+`DELETE /api/ai/saved/:folder?work=&repository=&rel=`  
+Remove a record. For a task of a pushed copy, the machine it came from removes it too (its next push would bring it back  
+otherwise), so its runner must be connected (409 otherwise). `{ ok: true }`; 404 when there is none.  
+
 The routes of a runner (the taskmgrd of another machine with `AI_RUNNER=1`, see [taskmgrd.md](taskmgrd.md)), authorized  
 as the sync routes are (`Authorization: Bearer <SYNC_SERVER_TOKEN>` and `X-Machine-Id`, which names the machine; 400 without  
 one), so a runner connected counts as its machine being in touch:  
@@ -248,8 +265,8 @@ one), so a runner connected counts as its machine being in touch:
 `GET /api/sync/ai/commands`  
 The commands for that machine, live: a `text/event-stream` of `command` events, each `{ id, type, ... }`: `run` `{ run, work,  
 repository, rel, files }` (start Claude Code on that task as run `run`, `files` being `{ "task.txt": text, "prompt.txt": text | null }`  
-as the server has them), `answer` `{ run, pending, body }`, `stop` `{ run }` and `dismiss` `{ run }`, with a comment every 25 seconds  
-to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
+as the server has them), `answer` `{ run, pending, body }`, `stop` `{ run }`, `dismiss` `{ run }` and `forget` `{ work, repository, rel, folder }`  
+(remove that run record from the task folder there), with a comment every 25 seconds to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
 
 `POST /api/sync/ai/events` `{ events }`  
 The events of the machine's session, in order, each `{ event, data }` as `GET /api/ai/events` sends them (`snapshot` first,  

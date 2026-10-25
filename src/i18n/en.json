@@ -336,6 +336,9 @@
     "noRunner": "Runs on {{machine}}, which is not connected: start taskmgrd there with AI_RUNNER=1 in its .env",
     "noMachine": "This copy was pushed without a machine id: Claude Code cannot run on it",
     "thinking": "Thinking",
-    "using": "Using {{tool}}"
+    "using": "Using {{tool}}",
+    "runs": "Runs",
+    "forget": "Remove the run of {{when}}",
+    "forgetConfirm": "Remove the run of {{when}}?"
   }
 }

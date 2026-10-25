@@ -336,6 +336,9 @@
     "noRunner": "需在 {{machine}} 上运行，但它未连接：在那台机器的 .env 里设 AI_RUNNER=1 并启动 taskmgrd",
     "noMachine": "这个副本推送时没有机器名，无法运行 Claude Code",
     "thinking": "思考中",
-    "using": "正在使用 {{tool}}"
+    "using": "正在使用 {{tool}}",
+    "runs": "运行记录",
+    "forget": "删除 {{when}} 的运行记录",
+    "forgetConfirm": "删除 {{when}} 的运行记录？"
   }
 }

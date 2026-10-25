@@ -11,8 +11,9 @@
 // stopping the run (stopRun) refuses it.
 //
 // One run at a time per task. The runs are kept in memory, the last RUNS_KEPT finished ones too, so a
-// transcript can be read again until it is dismissed (dismissRun); a restart forgets them. What
-// claude writes to stderr goes to logs/ai.log.
+// transcript can be read again until it is dismissed (dismissRun); a restart forgets them. A run that
+// is over is also written into the task folder, as .claude_<time>/ (see ai/record.js), which goes with
+// the task wherever it is synced. What claude writes to stderr goes to logs/ai.log.
 //
 // AI_PERMISSION_MODE in .env picks the permission mode of a run: acceptEdits unless set; `default`
 // asks for edits too, `plan` has Claude plan first (the plan is asked about in the browser, as a
@@ -20,9 +21,11 @@
 // (`dontAsk` refuses instead). The allow rules of the user's and the repository's Claude settings
 // apply in every mode, as in the terminal.
 const crypto = require('crypto');
+const os = require('os');
 
 const { appendLog } = require('../utils/logfile');
 const { samePath, describeRun } = require('./task');
+const record = require('./record');
 
 const RUNS_KEPT = 20;          // finished runs kept, oldest dropped first
 const RESULT_MAX = 4000;       // characters of a tool result kept in the transcript
@@ -46,9 +49,11 @@ const loadSdk = () => (sdk ||= import('@anthropic-ai/claude-agent-sdk'));
 const runs = new Map();        // id -> run, in the order started
 const listeners = new Set();   // (event, data) => void, the browsers following the runs
 let logFile = null;
+let machine = os.hostname();   // this machine, as the records say where a run was (MACHINE_ID when there is one)
 
-function configure({ logFile: file }) {
+function configure({ logFile: file, machine: name }) {
   logFile = file;
+  if (name) machine = name;
 }
 
 function log(run, text) {
@@ -178,7 +183,9 @@ function startRun({ space, taskDir, taskRef, id = null }) {
     billed: false,     // whether that is paid: Claude Code used with an API key, not a claude.ai login
     abort: new AbortController(),
     text: null,        // the index of the text item being streamed, while one is
-    done: null         // resolves the input stream, which ends the session, when the run is over
+    done: null,        // resolves the input stream, which ends the session, when the run is over
+    prompt: d.prompt,  // the task's prompt.txt as it was, for the record (null without one)
+    input: d.text      // the first prompt claude was given, for the record
   };
   runs.set(run.id, run);
   prune();
@@ -188,7 +195,8 @@ function startRun({ space, taskDir, taskRef, id = null }) {
   return run;
 }
 
-// The run is over: its pending question (if any) refused, its status and end set, everyone told.
+// The run is over: its pending question (if any) refused, its status and end set, everyone told, and
+// the run written into the task folder (see ai/record.js).
 function end(run, status, error = null) {
   if (run.status !== 'running') return;
   if (run.pending) run.pending.settle({ cancelled: true }, { behavior: 'deny', message: 'The run was stopped.' });
@@ -197,6 +205,12 @@ function end(run, status, error = null) {
   run.error = error;
   emit('run', publicRun(run));
   log(run, `end: ${status}${error ? ` (${error})` : ''}`);
+  try {
+    const folder = record.saveRun(run.taskDir, { ...publicRun(run, true), input: run.input, machine }, run.prompt);
+    log(run, `recorded in ${folder}`);
+  } catch (e) {
+    log(run, `cannot record the run: ${e.message}`);
+  }
   if (run.done) run.done();
 }
 

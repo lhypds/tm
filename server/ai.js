@@ -7,6 +7,8 @@
 //   POST   /api/ai/runs/:id/answer   { pending, decision } or { pending, answers }: answer the run's question; { run }
 //   POST   /api/ai/runs/:id/stop     stop the run; { run }
 //   DELETE /api/ai/runs/:id          forget a finished run; { ok: true }
+//   GET    /api/ai/saved/:folder     ?work&repository&rel: a run's record in the task folder (see ai/record.js); { run }
+//   DELETE /api/ai/saved/:folder     ?work&repository&rel: remove that record; { ok: true }
 //
 // The event stream starts with `snapshot` { runs } (the runs with their transcripts), then sends
 // `run` (a run's state: status, pending question...), `item` { run, i, item } (one item of a run's
@@ -17,7 +19,10 @@
 // its taskmgrd (server/sync.js) runs on that machine, where the tasks, the source code and the claude
 // login are, through its runner (ai/runner.js; ai/remote.js keeps those runs here): the run says so
 // in `machine`, is `queued` until the machine starts it, and needs the machine's runner connected
-// (409 otherwise). The runner's own routes, with the sync token rather than a login (createAiRunnerApp):
+// (409 otherwise). A run that is over is kept in the task folder by the machine that ran it (ai/record.js;
+// GET /api/task lists a task's records), and comes here with the task when it is pushed; removing a
+// record of a pushed copy goes through that machine too. The runner's own routes, with the sync token
+// rather than a login (createAiRunnerApp):
 //
 //   GET    /api/sync/ai/commands     the commands for this machine, live: a text/event-stream of `command` events
 //   POST   /api/sync/ai/events       { events: [{ event, data }] }: the events of its session, and its acks
@@ -29,6 +34,7 @@ const { TASK_FILE, PROMPT_FILE, readPrompt, readTaskDir } = require('../utils/ta
 const { isDirectory, spaceOf, taskDirIn, titleOf } = require('../ai/task');
 const session = require('../ai/session');
 const remote = require('../ai/remote');
+const record = require('../ai/record');
 
 const KEEP_MS = 25 * 1000;  // a comment this often keeps an event stream open
 
@@ -58,9 +64,10 @@ function eventStream(req, res, onClose) {
 
 // `locate(space)` says where a space's tasks are: { remote, machine }, `remote` whether the folder is
 // a copy pushed from another machine and `machine` that machine as the web UI shows it ({ name,
-// online, runner }, see index.js), null when unknown.
-function createAiApp({ config, logFile, locate = () => ({ remote: false, machine: null }) }) {
-  session.configure({ logFile });
+// online, runner }, see index.js), null when unknown. `machine` is this machine's name, for the records
+// of its runs (MACHINE_ID; the hostname when not given).
+function createAiApp({ config, logFile, machine, locate = () => ({ remote: false, machine: null }) }) {
+  session.configure({ logFile, machine });
   const app = express.Router();
 
   // The space a request names, as the task APIs do (work, repository "" for the common tasks).
@@ -129,6 +136,29 @@ function createAiApp({ config, logFile, locate = () => ({ remote: false, machine
     const id = String(req.params.id);
     if (remote.has(id)) remote.dismissRun(id);
     else session.dismissRun(id);
+    res.json({ ok: true });
+  });
+
+  // A run's record in the task folder (see ai/record.js), named as GET /api/task lists them.
+  app.get('/api/ai/saved/:folder', (req, res) => {
+    const space = spaceFrom(req.query);
+    const taskDir = taskDirIn(space, String(req.query.rel || ''));
+    res.json({ run: record.readRecord(taskDir, String(req.params.folder)) });
+  });
+
+  // Remove a record. A pushed copy's is removed by the machine it came from (the next push would
+  // bring it back otherwise), and here as well, so it is gone at once.
+  app.delete('/api/ai/saved/:folder', async (req, res) => {
+    const space = spaceFrom(req.query);
+    const rel = String(req.query.rel || '');
+    const taskDir = taskDirIn(space, rel);
+    const folder = String(req.params.folder);
+    const where = locate(space) || {};
+    if (where.remote) {
+      if (!where.machine) throw httpError(409, 'This folder is a copy pushed without a machine id; its records cannot be removed from here.');
+      await remote.forgetRecord(where.machine.name, { work: space.work, repository: space.repository, rel }, folder);
+    }
+    record.deleteRecord(taskDir, folder);
     res.json({ ok: true });
   });
 

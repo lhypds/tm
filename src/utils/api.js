@@ -106,8 +106,9 @@ export const listAllTasks = (scope) => request(`/api/tasks/all?${q(scope)}`);
 // fields: { status, details }
 export const createTask = (space, dir, fields) => request("/api/tasks", json("POST", { ...sp(space), dir, ...fields }));
 
-// One task with its attachments and its prompt: { task, files, prompt }, prompt being the prompt.txt
-// text, or null when the task has none.
+// One task with its attachments, its prompt and the records of its runs of Claude Code: { task, files,
+// prompt, runs }, prompt being the prompt.txt text, or null when the task has none, and runs the
+// records newest first, each a run without its transcript plus `folder` (see getSavedRun).
 export const getTask = (space, rel) => request(`/api/task?${q({ ...sp(space), rel })}`);
 
 // Write the task's prompt.txt as typed; a blank text deletes it. Resolves to { prompt, files } as
@@ -173,3 +174,10 @@ export const answerRun = (id, pending, body) => request(`/api/ai/runs/${encodeUR
 export const stopRun = (id) => request(`/api/ai/runs/${encodeURIComponent(id)}/stop`, json("POST", {}));
 
 export const dismissRun = (id) => request(`/api/ai/runs/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+// A run's record, kept in the task folder once the run was over (its folder is named in the task's
+// `runs`, see getTask): the run with its transcript. { run }.
+export const getSavedRun = (space, rel, folder) => request(`/api/ai/saved/${encodeURIComponent(folder)}?${q({ ...sp(space), rel })}`);
+
+// Remove that record (for a copy pushed from another machine, there too). { ok: true }.
+export const deleteSavedRun = (space, rel, folder) => request(`/api/ai/saved/${encodeURIComponent(folder)}?${q({ ...sp(space), rel })}`, { method: "DELETE" });

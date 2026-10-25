@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrainIcon, TrashIcon } from "@components/icons";
 import Attachments from "@components/Attachments";
 import RunButton from "@components/RunButton";
+import RunList from "@components/RunList";
 import styles from "./panel.module.css";
 
 // The selected task beside the list: its task.txt as written, editable in place. It is saved
@@ -17,8 +18,10 @@ import styles from "./panel.module.css";
 // The divider also carries the run button (RunButton), greyed out until the task has a prompt, or
 // while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
 // text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
-// or opens the dialog of the run the task has (`run`, see useRuns), which the button shows with a dot
-// while it goes.
+// or opens the dialog of the run the task has (`run`, see useRuns) or of its last run kept in the
+// folder (`attachments.runs`), which the button shows with a dot. Under the prompt's text, those runs
+// are listed as the files are (RunList): a click on one opens it in the dialog (onRun(task, folder)),
+// its × removes it (attachments.forgetRun).
 // `section` is the text the keyboard is on, "task" or "prompt" (null while an attachment is), shown
 // by which head is highlighted; onSection(area) is called when a text is clicked into.
 // Under the texts, the task's attachments; files dropped anywhere on the panel are uploaded into
@@ -143,7 +146,7 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  <RunButton run={run} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
+                  <RunButton run={run} saved={attachments.runs?.length > 0} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
                   <button
                     type="button"
                     className="btn"
@@ -160,7 +163,7 @@ export default function TaskPanel({
                   </button>
                 </div>
               </div>
-              {/* The prompt's part: its text. */}
+              {/* The prompt's part: its text, with the task's runs under it when it has had any. */}
               <div className={styles.region}>
                 <PromptText
                   key={`prompt:${task.space.work}/${task.space.repository || ""}/${task.id}`}
@@ -172,6 +175,7 @@ export default function TaskPanel({
                   onFocus={() => onSection("prompt")}
                   onSave={onSavePrompt}
                 />
+                {attachments.runs?.length > 0 && <RunList className={styles.files} runs={attachments.runs} onOpen={(r) => onRun(task, r.folder)} onRemove={(r) => attachments.forgetRun(r.folder)} />}
               </div>
             </>
           )}

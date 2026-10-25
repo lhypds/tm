@@ -404,15 +404,25 @@ export default function Home({ all = false }) {
     if (!s.machine) return t("ai.noMachine");
     return s.machine.runner ? null : t("ai.noRunner", { machine: s.machine.name });
   }, [selected, works, t]);
-  const [runKey, setRunKey] = useState(null);
-  const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
-  const openRun = (task) => {
-    setRunKey(task.key);
-    if (!ai.runFor(task)) ai.start(task);
-  };
-
-  // The selected task's attachments; on the Task panel j / k walk them and space opens one.
+  // The selected task's attachments; on the Task panel j / k walk them and space opens one. Also the
+  // records of its runs of Claude Code (attachments.runs), which the run button shows when the task
+  // has no run going.
   const attachments = useTaskFiles(selected?.space, selected?.rel, loads);
+  const [runKey, setRunKey] = useState(null);
+  const [runFolder, setRunFolder] = useState(null); // a record picked from the list under the prompt, shown whatever run is going
+  const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
+  // The records are the selected task's: the dialog shows them for that task only.
+  const savedRuns = runTask && runTask.key === selected?.key ? attachments.runs : [];
+  const openRun = (task, folder = null) => {
+    setRunKey(task.key);
+    setRunFolder(folder);
+    // a record picked, a run going, or a record to show, opens; else a run starts
+    if (!folder && !ai.runFor(task) && !(task.key === selected?.key && attachments.runs.length)) ai.start(task);
+  };
+  const closeRun = () => {
+    setRunKey(null);
+    setRunFolder(null);
+  };
   const [fileRel, setFileRel] = useState(null);
   const fileList = attachments.files.filter((f) => !f.isDir);
   const fileIndex = fileList.findIndex((f) => f.rel === fileRel);
@@ -1540,13 +1550,21 @@ export default function Home({ all = false }) {
       <RunModal
         task={runTask}
         run={ai.runFor(runTask)}
-        onClose={() => setRunKey(null)}
+        saved={savedRuns}
+        folder={runFolder}
+        onClose={closeRun}
         onStop={ai.stop}
         onAnswer={ai.answer}
         onRunAgain={ai.start}
         onDismiss={async (run) => {
           await ai.dismiss(run);
-          setRunKey(null);
+          closeRun();
+        }}
+        onForget={async (record) => {
+          // the run going or the next record, if any, shows; else the dialog closes
+          if (!(await attachments.forgetRun(record.folder))) return;
+          setRunFolder(null);
+          if (savedRuns.length <= 1 && !ai.runFor(runTask)) closeRun();
         }}
       />
 

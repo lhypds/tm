@@ -84,7 +84,9 @@ follows sends them back), and a task the server has that is not here yet is made
 daemon, or with `AI_RUNNER` off, the server's run button for this machine's tasks is greyed out and says so; a run  
 asked for shows as "waiting for <machine>" until this machine starts it. The runs are kept in this daemon's memory  
 (the server shows them again after its own restart, from here): the web UI on this machine, another process, does  
-not list them. What claude writes to stderr goes to `logs/ai.log`, as for the web UI's own runs. Anyone logged in to  
+not list them. A run that is over is written into the task folder as `.claude_<time>/` (see the README's `Task folder`)  
+and pushed with the task like any file in it, so the server shows it after it is over for as long as the folder is  
+there; clearing it in the server's web UI removes it here, through the same connection. What claude writes to stderr goes to `logs/ai.log`, as for the web UI's own runs. Anyone logged in to  
 the server's web UI can so run code on this machine, with the permissions above: turn the runner on only for a server  
 you trust.  
 

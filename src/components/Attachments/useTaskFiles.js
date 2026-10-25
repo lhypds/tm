@@ -8,13 +8,15 @@ const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 // The attachments of one task folder, loaded while `rel` is set, with upload and delete (remove asks first unless ask is false, and says whether it deleted),
 // and the task's prompt, its prompt.txt: `prompt` is undefined until the folder is read, null when
 // there is no file, else its text; savePrompt(text) writes it (a blank text deletes the file) and
-// says whether it did.
+// says whether it did. Also `runs`, the records of the task's runs of Claude Code kept in the folder
+// (newest first, each without its transcript, see api.getTask), and forgetRun(folder), which removes one.
 // `version` re-reads them when it changes (e.g. after the task list reloads); the files shown stay
 // until the fresh ones arrive, so nothing flickers. Another task (by work, repository and rel, not
 // by the identity of `space`, which the list remakes) starts from no files.
 export default function useTaskFiles(space, rel, version) {
   const [files, setFiles] = useState([]);
   const [prompt, setPrompt] = useState(undefined);
+  const [runs, setRuns] = useState([]);
   const [uploading, setUploading] = useState(false);
   const taskKey = space && rel ? `${space.work}/${space.repository || ""}/${rel}` : null;
   const shown = useRef(null); // the taskKey the files are of
@@ -24,6 +26,7 @@ export default function useTaskFiles(space, rel, version) {
       shown.current = taskKey;
       setFiles([]);
       setPrompt(undefined);
+      setRuns([]);
     }
     if (!taskKey) return;
     let stale = false;
@@ -33,6 +36,7 @@ export default function useTaskFiles(space, rel, version) {
         if (stale) return;
         setFiles(attachmentsOf(d.files));
         setPrompt(d.prompt ?? null);
+        setRuns(d.runs || []);
       })
       .catch(() => {});
     return () => {
@@ -89,5 +93,19 @@ export default function useTaskFiles(space, rel, version) {
     [space, rel, taskKey],
   );
 
-  return { files, prompt, uploading, add, remove, savePrompt };
+  const forgetRun = useCallback(
+    async (folder) => {
+      try {
+        await api.deleteSavedRun(space, rel, folder);
+        if (shown.current === taskKey) setRuns((prev) => prev.filter((r) => r.folder !== folder));
+        return true;
+      } catch (e) {
+        showToast(e.message, 4000);
+        return false;
+      }
+    },
+    [space, rel, taskKey],
+  );
+
+  return { files, prompt, runs, uploading, add, remove, savePrompt, forgetRun };
 }

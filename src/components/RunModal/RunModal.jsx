@@ -2,38 +2,67 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@ui";
 import { XIcon, PlayIcon, StopIcon } from "@components/icons";
+import * as api from "@utils/api";
+import { duration } from "@utils/task";
 import styles from "./run.module.css";
 
 // The run of Claude Code on a task, in a dialog sized as the task preview's: opened by the run button
 // beside the task's prompt, for `task` (null: closed), it shows the task's run (`run`, null while
-// the run is being started; see useRuns) as it goes. The header says "Claude: <task>" with the run's
-// state (starting, running, waiting for an answer, done...) at its right end, followed by the machine
-// the run is on when it is another (`run.machine`: a task pushed from there runs there, and is queued
-// until that machine starts it), and carries, at its
-// left as the preview's buttons, the stop button while the run goes (onStop(run)), else run again
-// (onRunAgain(task)) and clear (onDismiss(run)). The body is the transcript, followed as it grows:
-// Claude's text, the tools it calls (a click shows the output), and what it asks, answered right
-// there: a permission, with allow / deny, or a question, with its options and a line for an answer
-// of one's own (onAnswer(run, body), body { decision } or { answers }). Closing the dialog (esc, ×,
-// onClose) leaves the run going.
-export default function RunModal({ task, run, onClose, onStop, onAnswer, onRunAgain, onDismiss }) {
+// the run is being started; see useRuns) as it goes. Without one, it shows the latest of the task's
+// runs kept in its folder (`saved`, the records as useTaskFiles lists them, newest first), and with
+// `folder`, the record so named, picked from the list under the prompt, whatever run is going; the
+// record is read here, transcript and all, through api.getSavedRun, and shown with when it was. The header says
+// "Claude: <task>" with the run's state (starting, running, waiting for an answer, done...) at its
+// right end, followed by the machine the run is on when it is another (`run.machine`: a task pushed
+// from there runs there, and is queued until that machine starts it), and carries, at its left as the
+// preview's buttons, the stop button while the run goes (onStop(run)), else run again (onRunAgain(task))
+// and clear (onDismiss(run), or onForget(record) for a record). The body is the transcript, followed as
+// it grows: Claude's text, the tools it calls (a click shows the output), and what it asks, answered
+// right there: a permission, with allow / deny, or a question, with its options and a line for an
+// answer of one's own (onAnswer(run, body), body { decision } or { answers }). Closing the dialog
+// (esc, ×, onClose) leaves the run going.
+export default function RunModal({ task, run, saved, folder, onClose, onStop, onAnswer, onRunAgain, onDismiss, onForget }) {
   const { t } = useTranslation();
-  const queued = run?.status === "queued";
-  const running = run?.status === "running" || queued;
-  const state = !run
-    ? t("ai.starting")
+
+  // The record to show: the one picked, while the task still has it; else, without a run going, the
+  // latest. Read when it changes.
+  const picked = folder && saved?.some((s) => s.folder === folder) ? folder : null;
+  const wanted = picked || (!run ? saved?.[0]?.folder : null) || null;
+  const [record, setRecord] = useState(null);
+  useEffect(() => {
+    setRecord(null);
+    if (!task || !wanted) return undefined;
+    let stale = false;
+    api.getSavedRun(task.space, task.rel, wanted).then(
+      (d) => {
+        if (!stale) setRecord(d.run);
+      },
+      () => {},
+    );
+    return () => {
+      stale = true;
+    };
+  }, [task?.key, wanted]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const shown = wanted ? record : run;
+  const live = run?.status === "running" || run?.status === "queued"; // a run going, shown or not
+  const queued = shown?.status === "queued";
+  const running = shown?.status === "running" || queued;
+  const state = !shown
+    ? t(wanted ? "common.loading" : "ai.starting")
     : queued
-      ? t("ai.queued", { machine: run.machine })
-      : run.pending
+      ? t("ai.queued", { machine: shown.machine })
+      : shown.pending
         ? t("ai.waiting")
         : running
           ? t("ai.running")
-          : run.status === "done"
-            ? t("ai.done", { time: duration(run.endedAt - run.startedAt) })
-            : run.status === "stopped"
+          : shown.status === "done"
+            ? t("ai.done", { time: duration(shown.endedAt - shown.startedAt) })
+            : shown.status === "stopped"
               ? t("ai.stopped")
               : t("ai.failed");
-  const where = run?.machine && !queued ? ` · ${run.machine}` : "";
+  const where = shown?.machine && !queued ? ` · ${shown.machine}` : "";
+  const when = record ? ` · ${new Date(record.startedAt).toLocaleString()}` : "";
 
   const button = (label, icon, onClick, disabled = false) => (
     <button
@@ -55,34 +84,32 @@ export default function RunModal({ task, run, onClose, onStop, onAnswer, onRunAg
     <div className={styles.headerButtons}>
       {running
         ? button(t("ai.stop"), <StopIcon />, () => onStop(run))
-        : [button(t("ai.again"), <PlayIcon />, () => onRunAgain(task), !run), button(t("ai.dismiss"), <XIcon />, () => onDismiss(run), !run)].map((b, i) => (
-            <span key={i}>{b}</span>
-          ))}
+        : [
+            button(t("ai.again"), <PlayIcon />, () => onRunAgain(task), !shown || live),
+            button(t("ai.dismiss"), <XIcon />, () => (shown === run ? onDismiss(run) : onForget(record)), !shown),
+          ].map((b, i) => <span key={i}>{b}</span>)}
     </div>
   );
   const stateTag = (
-    <span className={`muted ${styles.state}`} data-pending={!!run?.pending} title={run?.error || ""}>
+    <span className={`muted ${styles.state}`} data-pending={!!shown?.pending} title={shown?.error || ""}>
       {state}
       {where}
+      {when}
     </span>
   );
 
   return (
     <Modal isOpen={!!task} onClose={onClose} title={task ? t("ai.titleOf", { title: task.title }) : ""} className={styles.modal} titleActions={actions} headerActions={stateTag} tight>
       <div className={styles.body}>
-        <Transcript run={run} onAnswer={(body) => onAnswer(run, body)} />
+        <Transcript run={shown} loading={!!wanted && !record} onAnswer={(body) => onAnswer(run, body)} />
       </div>
     </Modal>
   );
 }
 
-function duration(ms) {
-  const s = Math.max(0, Math.round((ms || 0) / 1000));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-}
-
 // The transcript, scrolled to its end as it grows until it is scrolled up.
-function Transcript({ run, onAnswer }) {
+// `loading`: a record is being read, nothing to say yet.
+function Transcript({ run, loading, onAnswer }) {
   const listRef = useRef(null);
   const follow = useRef(true);
   const items = run?.items;
@@ -102,7 +129,7 @@ function Transcript({ run, onAnswer }) {
       {(items || []).map((item, i) => (
         <Item key={i} item={item} pending={run.pending?.i === i} billed={run.billed} onAnswer={onAnswer} />
       ))}
-      {(!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <Working run={run} />}
+      {!loading && (!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <Working run={run} />}
     </div>
   );
 }
