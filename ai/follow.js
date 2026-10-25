@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 // The terminal window of a run of Claude Code the runner does for the server (opened by ai/window.js):
-// follows the file the run's events are appended to and prints the transcript as the server's web UI
-// shows it, Claude's text as it is written, each tool call with its result, what Claude asks and the
+// under a banner of three lines like Claude Code's own ("tm" with the version, the task's folder and
+// the working directory) and the run's details, follows the file the run's events are appended to and
+// prints the transcript, under the title the web UI's run dialog has ("Claude: " and the task), as the
+// web UI shows it, Claude's text as it is written, each tool call with its result, what Claude asks and the
 // answer that comes from the server's browser, and the result; then says how the run ended, removes
 // the file, and closes the window a few seconds later (`closeAfter` of the file's meta line, counted
-// down; 0 keeps it) or on Enter.
+// down; 0 keeps it) or on Enter; space stops the countdown.
 //
 //   node ai/follow.js <file>       <tmpdir>/tm-runs/<run id>.jsonl: one JSON line per event (see ai/window.js)
 const fs = require('fs');
 const { execFileSync, spawn } = require('child_process');
 const { StringDecoder } = require('string_decoder');
 const { formatDateTime } = require('../utils/taskUtils');
+const { version } = require('../package.json');
 
 const POLL_MS = 150;        // how often the file is looked at
 const RESULT_LINES = 10;    // lines of a tool result shown
@@ -30,6 +33,10 @@ const tty = !!process.stdout.isTTY;
 const color = tty && !process.env.NO_COLOR;
 const paint = (code) => (s) => (color ? `\x1b[${code}m${s}\x1b[0m` : s);
 const bold = paint(1), dim = paint(2), red = paint(31), green = paint(32), yellow = paint(33), cyan = paint(36);
+// The green of the "tm" at the top, #63EF3F, as a true color where the terminal has them (iTerm2 and
+// most others say so with COLORTERM, Windows Terminal with WT_SESSION); the bright green elsewhere.
+const trueColor = /^(truecolor|24bit)$/i.test(process.env.COLORTERM || '') || !!process.env.WT_SESSION;
+const phosphor = paint(trueColor ? '38;2;99;239;63' : 92);
 // Plain marks for a Windows console that may lack the glyphs (Windows Terminal has them).
 const M = process.platform === 'win32' && !process.env.WT_SESSION
   ? { tool: '>', ok: 'ok', bad: 'x', arrow: '->', dot: '-', more: '...' }
@@ -75,19 +82,36 @@ let terminal = 'terminal'; // the app this window is, on macOS: "terminal" (Term
 let closeAfter = CLOSE_S;  // seconds the window stays after the run (0: until Enter)
 let run = null;          // the run as last told
 let modelShown = false;
+let titleShown = false;  // the "Claude: ..." title over the transcript has been printed
 let pendingShown = null; // the pending question the waiting line was printed for
 const state = [];        // i -> { opened, printed (characters of a text item written), done }
 let finished = false;
 
+// A detail of the run: its name, dim, then the value.
+const field = (label, value) => line(`${dim(`${label}:`)} ${value}`);
+
+// At the first word of the run, as Claude Code opens: "tm" with the version, then the run's details
+// one under another, the task's folder and the working directory first.
 function header(r) {
   const t = r.task || {};
   const name = [t.id, t.title].filter(Boolean).join(' ');
   if (tty) process.stdout.write(`\x1b]0;tm ${name}\x07`);
-  line(bold(`Claude Code ${M.dot} ${name}`));
-  if (r.cwd) line(dim(`folder   ${r.cwd}`));
-  if (machine) line(dim(`machine  ${machine}`));
-  if (server) line(dim(`server   ${server}`));
-  line(dim(`started  ${formatDateTime(r.startedAt || Date.now())}`));
+  line(`${bold(phosphor('tm'))} ${dim(`v${version}`)}`);
+  field('task path', r.taskDir || name);
+  field('working directory', r.cwd || '');
+  if (machine) field('machine', machine);
+  if (server) field('server', server);
+  field('started', formatDateTime(r.startedAt || Date.now()));
+}
+
+// Before the first item of the transcript, the title the web UI's run dialog has: "Claude: " and the
+// task's title.
+function title() {
+  if (titleShown) return;
+  titleShown = true;
+  const t = (run && run.task) || {};
+  gap();
+  line(bold(`Claude: ${t.title || t.id || ''}`));
 }
 
 function onRun(r) {
@@ -97,7 +121,7 @@ function onRun(r) {
   if (first) header(r);
   if (r.model && !modelShown) {
     modelShown = true;
-    line(dim(`model    ${r.model}`));
+    field('model', r.model);
   }
   if (r.pending && pendingShown !== r.pending.id) {
     pendingShown = r.pending.id;
@@ -114,6 +138,7 @@ function summary(item) {
 
 function onItem(i, item) {
   if (!item || !Number.isInteger(i) || i < 0) return;
+  title();
   const s = state[i] || (state[i] = { opened: false, printed: 0, done: false });
   switch (item.type) {
     case 'text': {
@@ -237,22 +262,37 @@ function finish(r) {
 }
 
 // After the run, the window closes by itself `closeAfter` seconds later, counted down on its last
-// line, or on Enter before that; with closeAfter 0 it stays until Enter.
+// line, or on Enter before that; space stops the countdown, and the window then stays until Enter,
+// as it does from the start with closeAfter 0. The keys are read one by one (raw mode), so ctrl-c
+// closes too.
 function waitToClose() {
+  const stdin = process.stdin;
   let countdown = null;
+  const stayOpen = () => {
+    if (!countdown) return;
+    clearInterval(countdown);
+    countdown = null;
+    process.stdout.write(`\r\x1b[2K${dim('Press Enter to close.')}`);
+  };
   const close = () => {
     if (countdown) clearInterval(countdown);
+    if (stdin.setRawMode) stdin.setRawMode(false);
     closeWindow();
     process.exit(0);
   };
-  process.stdin.resume();
-  process.stdin.once('data', close);
+  if (stdin.setRawMode) stdin.setRawMode(true);
+  stdin.setEncoding('utf8');
+  stdin.resume();
+  stdin.on('data', (key) => {
+    if (key === '\r' || key === '\n' || key === '\x03' || key === '\x04') close();  // enter, ctrl-c, ctrl-d
+    else if (key === ' ') stayOpen();
+  });
   if (!(closeAfter > 0)) {
     line(dim('Press Enter to close.'));
     return;
   }
   let left = Math.ceil(closeAfter);
-  const show = () => process.stdout.write(`\r\x1b[2K${dim(`Closing in ${left}s ${M.dot} Enter closes now.`)}`);
+  const show = () => process.stdout.write(`\r\x1b[2K${dim(`Closing in ${left}s ${M.dot} Enter closes now, space keeps it open.`)}`);
   nl();
   show();
   countdown = setInterval(() => {

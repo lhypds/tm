@@ -94,7 +94,8 @@ Watching the runs here: with `AI_RUNNER_WINDOW=1` in `.env` as well, each run op
 starts, which shows the transcript as the server's web UI does, Claude's text as it is written, each tool call with its  
 result, what Claude asks (with "waiting for the answer in the web UI of ...", since the answer is still given in the  
 server's browser) and the answer when it comes, then how the run ended; it closes by itself `AI_RUNNER_WINDOW_CLOSE`  
-seconds later (10 when not set; 0 keeps it open), counted down on its last line, or on Enter before that. The window is  
+seconds later (10 when not set; 0 keeps it open), counted down on its last line, or on Enter before that; space stops the  
+countdown, and the window then stays until Enter. The window is  
 Terminal.app on macOS, or iTerm2 with `AI_RUNNER_TERMINAL=iterm` (the first time, macOS asks you to let node control the  
 app; a window refused is told in the daemon's log), a new  
 console window on Windows, and on Linux the first found of `x-terminal-emulator`, `gnome-terminal`, `konsole`,  
