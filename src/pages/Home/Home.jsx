@@ -41,7 +41,6 @@ import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/wo
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import useRuns from "@hooks/useRuns";
-import MachineDot from "@components/MachineDot";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -263,15 +262,6 @@ export default function Home({ all = false }) {
     }, 10 * 1000);
     return () => clearInterval(id);
   }, [reload]);
-
-  // The machine of the space shown, for the footer: from the works list, which is kept current (see
-  // above), rather than from the task list, which is not re-read for it.
-  const footerMachine = useMemo(() => {
-    if (!data.remote) return null;
-    const w = space && works?.find((x) => x.work === space.work);
-    const m = w && (space.repository ? w.repositories.find((p) => p.name === space.repository)?.machine : w.machine);
-    return m || data.machine || null;
-  }, [data.remote, data.machine, space, works]);
 
   // The root (every origin's tasks) is just "taskmgr".
   useEffect(() => {
@@ -1497,15 +1487,8 @@ export default function Home({ all = false }) {
             <span>
               {t("status.aborted")} {c.aborted ?? 0}
             </span>
-            <span className={`mono ${styles.path}`} title={data.remote ? footerMachine?.name || t("tree.remote") : data.absDir}>
-              {data.remote ? (
-                <>
-                  {footerMachine?.name || t("tree.remote")}
-                  <MachineDot machine={footerMachine} />
-                </>
-              ) : (
-                data.absDir
-              )}
+            <span className={`mono ${styles.path}`} title={data.absDir}>
+              {data.absDir}
             </span>
             {syncServer && (
               <span className={`mono ${styles.server}`} title={pollingTitle(polling, t) || syncServer}>
