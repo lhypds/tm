@@ -50,29 +50,29 @@ function statusFolders(dir) {
   return [{ dir, status: 'todo' }, ...STATUS_DIRS.map(st => ({ dir: path.join(dir, st), status: st }))];
 }
 
-// Folder names that are tasks by name alone: a 12-digit creation minute,
-// optionally followed by a space and a title ("202610191522 fix mail").
+// Folder names that are tasks: a 12-digit creation minute, optionally followed by a space and
+// a title ("202610191522 fix mail").
 const TASK_FOLDER_RE = /^\d{12}( |$)/;
 
-// A directory is a task folder when its name has the time prefix, or (for
-// folders named some other way) when it contains a task file.
+// A directory is a task folder when its name has the time prefix, and only then: a folder named
+// some other way is not a task even when it holds a task.txt (a run record, .claude_<time>/,
+// keeps a copy of the task's; see ai/record.js).
 function isTaskFolder(dirAbs) {
   try {
     if (!fs.statSync(dirAbs).isDirectory()) return false;
   } catch (e) {
     return false;
   }
-  return TASK_FOLDER_RE.test(path.basename(dirAbs)) || fs.existsSync(path.join(dirAbs, TASK_FILE));
+  return TASK_FOLDER_RE.test(path.basename(dirAbs));
 }
 
 // Of a tasks folder listed for the sync (paths relative to it, "/"-separated; a file as { path },
 // an empty folder as { path, dir: true }; see snapshot in push.js), the entries that are in one of
 // its task folders: a folder right in it, or in its done, pending or aborted folder, that is a task
-// by name alone (TASK_FOLDER_RE: an id, then a title or nothing). Nothing else in a tasks folder is
-// synced: a file right in it, a folder named some other way and whatever is in it (even a task.txt:
-// the sync is stricter than isTaskFolder, so what is kept beside the tasks stays here), a file right
-// in a status folder; an empty status folder is left out too. What is in a task folder goes whole,
-// subtasks, attachments and other files alike.
+// by name alone (TASK_FOLDER_RE: an id, then a title or nothing, as isTaskFolder tells a task).
+// Nothing else in a tasks folder is synced: a file right in it, a folder named some other way and
+// whatever is in it (even a task.txt), a file right in a status folder; an empty status folder is
+// left out too. What is in a task folder goes whole, subtasks, attachments and other files alike.
 function taskEntries(entries) {
   return entries.filter((e) => {
     const p = String(e.path).split('/');

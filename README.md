@@ -144,7 +144,7 @@ Prints the commands above. To open a folder named like a command (`config`, `run
 Task files
 ----------
 
-Each task is a folder `<id> <title>`, the id being its creation minute (`YYYYMMDDHHmm`).
+Each task is a folder `<id> <title>`, the id being its creation minute (`YYYYMMDDHHmm`). A folder named some other way is not a task, whatever is in it.
 
 `task.txt`  
 Plain text file, just the task details. The first line is the title.  

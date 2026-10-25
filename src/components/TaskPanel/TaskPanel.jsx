@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { BrainIcon, TrashIcon } from "@components/icons";
+import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
 import Attachments from "@components/Attachments";
 import RunButton from "@components/RunButton";
 import RunList from "@components/RunList";
@@ -10,8 +10,9 @@ import styles from "./panel.module.css";
 // when the text loses focus or on cmd/ctrl+s; esc ends the edit, saving it. onSave(task, text)
 // writes it. When `focusKey` is the task's key, the text named by `focusArea` ("task", or "prompt")
 // takes the focus and onFocused is called.
-// Under a head like the tree's: "Task", with the brain and delete at its right; onDelete(task)
-// asks before deleting. The brain (onTogglePrompt) shows and hides the task's prompt, its
+// Under a head like the tree's: "Task", with the folder, the brain and delete at its right, as the
+// preview's title has them; onOpenFolder(task) opens the task's folder in the OS file manager,
+// onDelete(task) asks before deleting. The brain (onTogglePrompt) shows and hides the task's prompt, its
 // prompt.txt (`promptOpen`): the text is then split in two, the prompt under a divider that says
 // "Prompt" and carries the prompt's own delete (onDeletePrompt(task) asks first).
 // Typing a prompt creates the file, onSavePrompt(task, text) writing it; a blank one deletes it.
@@ -36,6 +37,7 @@ export default function TaskPanel({
   focusArea,
   onFocused,
   onSave,
+  onOpenFolder,
   onDelete,
   onPreview,
   onDeleteFile,
@@ -87,6 +89,20 @@ export default function TaskPanel({
       <div className={styles.bar} data-focused={focused && section !== "prompt"}>
         <span className={styles.barTitle}>{t("panel.heading")}</span>
         <div className={styles.barActions}>
+          <button
+            type="button"
+            className="btn"
+            tabIndex={-1}
+            disabled={!task}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onOpenFolder(task);
+            }}
+            title={t("tree.openFolder")}
+            aria-label={t("tree.openFolder")}
+          >
+            <FolderIcon />
+          </button>
           {/* it looks the same shown or hidden (the prompt being there says so), with a dot while the
               task has a prompt.txt. Not kept focused on mousedown: a text being edited saves on the
               blur before the toggle; let go after the click, so space and enter are the page's again. */}
@@ -94,6 +110,7 @@ export default function TaskPanel({
             type="button"
             className="btn"
             tabIndex={-1}
+            disabled={!task}
             data-dot={hasPrompt}
             aria-pressed={promptOpen}
             onClick={(e) => {

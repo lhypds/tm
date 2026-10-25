@@ -1442,6 +1442,7 @@ export default function Home({ all = false }) {
               focusArea={focusing?.area}
               onFocused={() => setFocusing(null)}
               onSave={saveText}
+              onOpenFolder={openFolder}
               onDelete={setConfirm}
               onPreview={(file) => selected && setPreview({ ...file, space: selected.space })}
               onDeleteFile={(file) => deleteFile(attachments, fileList, file, setFileRel)}
