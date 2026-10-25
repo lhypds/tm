@@ -20,7 +20,9 @@
 // AI_RUNNER=1 it also runs Claude Code for the server: a task pushed from here can be run from the
 // server's web UI, and runs here, where the tasks, the source code and the claude login are (see
 // ai/runner.js); with AI_RUNNER_WINDOW=1 as well, each of those runs opens a terminal window here
-// that shows it as it goes (ai/window.js). With all three off, or without SYNC_SERVER, it has nothing to do, and with a
+// that shows it as it goes (ai/window.js; on macOS Terminal.app, or iTerm2 with AI_RUNNER_TERMINAL=iterm)
+// and closes by itself AI_RUNNER_WINDOW_CLOSE seconds after the run (10 when not set; 0 keeps it until
+// Enter). With all three off, or without SYNC_SERVER, it has nothing to do, and with a
 // POLLING_INTERVAL that is not a number of seconds it cannot poll: it says so and exits with 0 (pm2
 // then leaves it stopped rather than starting it again and again, see ecosystem.config.cjs).
 const fs = require('fs');
@@ -39,6 +41,12 @@ const PUSHING = String(process.env.PUSHING || '').trim() === '' || isOn(process.
 const POLLING = isOn(process.env.POLLING);
 const AI_RUNNER = isOn(process.env.AI_RUNNER);
 const AI_RUNNER_WINDOW = AI_RUNNER && isOn(process.env.AI_RUNNER_WINDOW);
+// Which terminal that window is, on macOS (Terminal.app unless AI_RUNNER_TERMINAL says iterm), and
+// how many seconds it stays after the run before closing by itself (10; 0 keeps it until Enter).
+const terminalSetting = String(process.env.AI_RUNNER_TERMINAL || '').trim().toLowerCase();
+const AI_RUNNER_TERMINAL = /^iterm2?$/.test(terminalSetting) ? 'iterm' : 'terminal';
+const closeSetting = String(process.env.AI_RUNNER_WINDOW_CLOSE ?? '').trim();
+const AI_RUNNER_WINDOW_CLOSE = closeSetting !== '' && Number(closeSetting) >= 0 ? Number(closeSetting) : 10;
 function notRunning(why) {
   console.log(`taskmgrd: ${why}; not running.`);
   process.exit(0);
@@ -405,7 +413,9 @@ log(`  server     : ${SERVER}`);
 log(`  machine    : ${MACHINE_ID}`);
 log(`  pushing    : ${PUSHING ? 'on' : 'off (PUSHING=0 in .env)'}`);
 log(`  polling    : ${POLLING ? `tm pull every ${POLLING_INTERVAL_S % 60 === 0 ? `${POLLING_INTERVAL_S / 60} min` : `${POLLING_INTERVAL_S}s`}` : 'off (POLLING=1 in .env turns it on)'}`);
-log(`  ai runner  : ${AI_RUNNER ? `on: runs Claude Code here for the server${AI_RUNNER_WINDOW ? ', each run in a terminal window here' : ' (AI_RUNNER_WINDOW=1 in .env opens a terminal window for each run)'}` : 'off (AI_RUNNER=1 in .env turns it on)'}`);
+const windowDesc = `each run in a terminal window here${process.platform === 'darwin' ? ` (${AI_RUNNER_TERMINAL === 'iterm' ? 'iTerm2' : 'Terminal.app'})` : ''}${AI_RUNNER_WINDOW_CLOSE ? `, closed ${AI_RUNNER_WINDOW_CLOSE}s after the run` : ', kept until Enter'}`;
+log(`  ai runner  : ${AI_RUNNER ? `on: runs Claude Code here for the server${AI_RUNNER_WINDOW ? `, ${windowDesc}` : ' (AI_RUNNER_WINDOW=1 in .env opens a terminal window for each run)'}` : 'off (AI_RUNNER=1 in .env turns it on)'}`);
+if (AI_RUNNER_WINDOW && terminalSetting && !['terminal', 'iterm', 'iterm2'].includes(terminalSetting)) warn(`AI_RUNNER_TERMINAL=${terminalSetting} is not "terminal" or "iterm"; using Terminal.app`);
 
 const first = readConfig();
 if (!first) die(`${CONFIG_PATH} could not be read, or is invalid (see above).`);
@@ -421,8 +431,10 @@ else if (PUSHING) rescan();
 if (PUSHING) setInterval(rescan, RESCAN_MS);
 
 // The runner: Claude Code run here for the server (ai/runner.js), logging what claude writes to
-// stderr where the web UI's runs do, and each run in a terminal window here when asked.
-const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log'), window: AI_RUNNER_WINDOW }) : null;
+// stderr where the web UI's runs do, and each run in a terminal window here when asked (which
+// terminal on macOS, and how long it stays after the run; see ai/window.js).
+const window = AI_RUNNER_WINDOW ? { terminal: AI_RUNNER_TERMINAL, closeAfter: AI_RUNNER_WINDOW_CLOSE } : false;
+const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log'), window }) : null;
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {

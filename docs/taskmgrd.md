@@ -93,8 +93,10 @@ you trust.
 Watching the runs here: with `AI_RUNNER_WINDOW=1` in `.env` as well, each run opens a terminal window on this machine as it  
 starts, which shows the transcript as the server's web UI does, Claude's text as it is written, each tool call with its  
 result, what Claude asks (with "waiting for the answer in the web UI of ...", since the answer is still given in the  
-server's browser) and the answer when it comes, then how the run ended; Enter closes it. The window is Terminal.app on  
-macOS (the first time, macOS asks you to let node control Terminal; a window refused is told in the daemon's log), a new  
+server's browser) and the answer when it comes, then how the run ended; it closes by itself `AI_RUNNER_WINDOW_CLOSE`  
+seconds later (10 when not set; 0 keeps it open), counted down on its last line, or on Enter before that. The window is  
+Terminal.app on macOS, or iTerm2 with `AI_RUNNER_TERMINAL=iterm` (the first time, macOS asks you to let node control the  
+app; a window refused is told in the daemon's log), a new  
 console window on Windows, and on Linux the first found of `x-terminal-emulator`, `gnome-terminal`, `konsole`,  
 `xfce4-terminal` and `xterm`. It needs the daemon in a session with a display: one started by `./start.sh` from your  
 desktop session is; a machine without one logs that no window could be opened and the run goes on as usual. The window  

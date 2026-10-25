@@ -17,8 +17,8 @@
 // (it may be in another status folder here) and, when it is nowhere here, made at that path.
 //
 // With `window` on (AI_RUNNER_WINDOW=1 in .env) each run also opens a terminal window on this machine
-// that shows the transcript as it grows (ai/window.js), for whoever sits here; the server's browser
-// is where the run is answered, as before.
+// that shows the transcript as it grows and closes a while after the run (ai/window.js), for whoever
+// sits here; the server's browser is where the run is answered, as before.
 const fs = require('fs');
 const path = require('path');
 
@@ -61,10 +61,12 @@ async function* sseMessages(body) {
 // log / warn the daemon's. `session` is this machine's runs (ai/session.js unless a test gives
 // another), `getWorks` the works of taskmgr.json as they are now (read each time, as the file may
 // change), `logFile` where the runs log what claude writes to stderr, `window` whether each run opens
-// a terminal window here (AI_RUNNER_WINDOW). Returns { stop }.
+// a terminal window here (AI_RUNNER_WINDOW): false, or { terminal, closeAfter } as ai/window.js
+// watchRuns takes them (which terminal on macOS, and the seconds the window stays after the run).
+// Returns { stop }.
 function startRunner({ server, token, machineId, log, warn, logFile, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
   session.configure({ logFile, machine: machineId });
-  const unwatch = window ? watchRuns(session, { server, machine: machineId, log, warn }) : null;
+  const unwatch = window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId) };
 
   let stopped = false;

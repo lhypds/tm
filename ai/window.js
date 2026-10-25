@@ -7,14 +7,16 @@
 // The window is a terminal running ai/follow.js on a file the session's events for the run are
 // appended to as they happen, one JSON line each ({ event, data }, as the web UI's event stream has
 // them, see server/ai.js), in <tmpdir>/tm-runs/<run id>.jsonl; the first line (`meta`) names the server
-// and this machine. follow.js removes the file when it is through; one it never read (no terminal
-// could be opened) is removed here a minute after the run.
+// and this machine, which terminal the window is (`terminal`, so follow.js can close it) and how many
+// seconds it stays after the run (`closeAfter`). follow.js removes the file when it is through; one it
+// never read (no terminal could be opened) is removed here a minute after the run.
 //
-// Which terminal: Terminal.app on macOS (through osascript, which the first time asks you to let node
-// control Terminal), a new console window on Windows (`start`), and on Linux the first found of
-// x-terminal-emulator, gnome-terminal, konsole, xfce4-terminal and xterm. A window that cannot be
-// opened (no display, no terminal found, permission refused) is told in the daemon's log, and the run
-// goes on as it would without one.
+// Which terminal: on macOS Terminal.app, or iTerm2 with `terminal` "iterm" (AI_RUNNER_TERMINAL=iterm in
+// .env), either through osascript, which the first time asks you to let node control the app; a new
+// console window on Windows (`start`); and on Linux the first found of x-terminal-emulator,
+// gnome-terminal, konsole, xfce4-terminal and xterm. A window that cannot be opened (no display, no
+// terminal found, permission refused) is told in the daemon's log, and the run goes on as it would
+// without one.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -33,8 +35,10 @@ const LINUX_TERMINALS = [
 
 // Follow the runs of `session` (ai/session.js): a window for each as it starts. `server` is the tm
 // server the runner works for and `machine` this machine's name, both shown in the window; log and
-// warn the daemon's. Returns the way to stop following (the windows open stay).
-function watchRuns(session, { server, machine, log, warn }) {
+// warn the daemon's. `terminal` is which terminal on macOS ("terminal", Terminal.app, or "iterm") and
+// `closeAfter` the seconds the window stays after the run before closing by itself (0: until Enter).
+// Returns the way to stop following (the windows open stay).
+function watchRuns(session, { server, machine, log, warn, terminal = 'terminal', closeAfter = 10 }) {
   const open = new Map();   // run id -> { file, stream }
 
   function start(run) {
@@ -42,14 +46,14 @@ function watchRuns(session, { server, machine, log, warn }) {
     const file = path.join(DIR, `${run.id}.jsonl`);
     try {
       fs.mkdirSync(DIR, { recursive: true });
-      fs.writeFileSync(file, JSON.stringify({ event: 'meta', data: { server, machine } }) + '\n');
+      fs.writeFileSync(file, JSON.stringify({ event: 'meta', data: { server, machine, terminal, closeAfter } }) + '\n');
       stream = fs.createWriteStream(file, { flags: 'a' });
       stream.on('error', (e) => warn(`runner: window of run ${run.id}: cannot write ${file}: ${e.message}`));
     } catch (e) {
       warn(`runner: window of run ${run.id}: cannot write ${file}: ${e.message}`);
       return null;
     }
-    openTerminal(`tm ${run.task.id} ${run.task.title}`, file, (error) => warn(`runner: window of run ${run.id}: ${error}`));
+    openTerminal(`tm ${run.task.id} ${run.task.title}`, file, terminal, (error) => warn(`runner: window of run ${run.id}: ${error}`));
     log(`runner: run ${run.id}: window opened (${file})`);
     return { file, stream };
   }
@@ -75,13 +79,14 @@ function watchRuns(session, { server, machine, log, warn }) {
   return off;
 }
 
-// Open a terminal window titled `title` running follow.js on `file`; `onError(message)` is told when
-// that fails (now, or when the program that opens it says so).
-function openTerminal(title, file, onError) {
+// Open a terminal window titled `title` running follow.js on `file` (`terminal` picks the app on
+// macOS, see watchRuns); `onError(message)` is told when that fails (now, or when the program that
+// opens it says so).
+function openTerminal(title, file, terminal, onError) {
   const args = [FOLLOW, file];
   let child;
   try {
-    if (process.platform === 'darwin') child = openMac(args);
+    if (process.platform === 'darwin') child = terminal === 'iterm' ? openITerm(args) : openMac(args);
     else if (process.platform === 'win32') child = openWindows(title, args);
     else child = openLinux(args);
   } catch (e) {
@@ -101,11 +106,14 @@ const detached = { detached: true, stdio: ['ignore', 'ignore', 'pipe'] };
 
 const shellQuote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
+// The command a macOS window's shell runs, as an AppleScript string literal's text: the shell is
+// replaced by follow.js, so the window is through when it is.
+const macCommand = (args) => `clear; exec ${[process.execPath, ...args].map(shellQuote).join(' ')}`.replace(/[\\"]/g, '\\$&');
+
 // Terminal.app: a new window running the command. Terminal opens a window of its own when it is
 // launched, so that one is used then, rather than leaving an idle window beside the run's.
 function openMac(args) {
-  const cmd = `clear; exec ${[process.execPath, ...args].map(shellQuote).join(' ')}`;
-  const script = cmd.replace(/[\\"]/g, '\\$&');
+  const script = macCommand(args);
   const lines = [
     'set wasRunning to application "Terminal" is running',
     'tell application "Terminal"',
@@ -115,6 +123,25 @@ function openMac(args) {
     'else',
     `do script "${script}" in front window`,
     'end if',
+    'end tell'
+  ];
+  return spawn('osascript', lines.flatMap(l => ['-e', l]), detached);
+}
+
+// iTerm2: a new window, the command typed into its session's shell as Terminal's is. iTerm too may
+// open a window of its own when launched (as its settings say), used then the same way.
+function openITerm(args) {
+  const script = macCommand(args);
+  const lines = [
+    'set wasRunning to application "iTerm" is running',
+    'tell application "iTerm"',
+    'activate',
+    'if wasRunning or (count of windows) is 0 then',
+    'set w to (create window with default profile)',
+    'else',
+    'set w to front window',
+    'end if',
+    `tell current session of w to write text "${script}"`,
     'end tell'
   ];
   return spawn('osascript', lines.flatMap(l => ['-e', l]), detached);

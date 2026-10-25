@@ -2,8 +2,9 @@
 // The terminal window of a run of Claude Code the runner does for the server (opened by ai/window.js):
 // follows the file the run's events are appended to and prints the transcript as the server's web UI
 // shows it, Claude's text as it is written, each tool call with its result, what Claude asks and the
-// answer that comes from the server's browser, and the result; then says how the run ended, waits for
-// Enter and removes the file.
+// answer that comes from the server's browser, and the result; then says how the run ended, removes
+// the file, and closes the window a few seconds later (`closeAfter` of the file's meta line, counted
+// down; 0 keeps it) or on Enter.
 //
 //   node ai/follow.js <file>       <tmpdir>/tm-runs/<run id>.jsonl: one JSON line per event (see ai/window.js)
 const fs = require('fs');
@@ -15,6 +16,7 @@ const POLL_MS = 150;        // how often the file is looked at
 const RESULT_LINES = 10;    // lines of a tool result shown
 const SUMMARY_LINES = 20;   // lines of a tool call's summary shown (a long command, a plan)
 const OPEN_MS = 10 * 1000;  // how long to wait for the file to appear
+const CLOSE_S = 10;         // seconds the window stays after the run, unless the meta line says otherwise
 
 const file = process.argv[2];
 if (!file) {
@@ -69,6 +71,8 @@ function duration(ms) {
 
 let server = '';
 let machine = '';
+let terminal = 'terminal'; // the app this window is, on macOS: "terminal" (Terminal.app) or "iterm"
+let closeAfter = CLOSE_S;  // seconds the window stays after the run (0: until Enter)
 let run = null;          // the run as last told
 let modelShown = false;
 let pendingShown = null; // the pending question the waiting line was printed for
@@ -203,6 +207,8 @@ function handle(msg) {
     case 'meta':
       server = String((data && data.server) || '');
       machine = String((data && data.machine) || '');
+      terminal = String((data && data.terminal) || 'terminal');
+      if (data && Number.isFinite(data.closeAfter) && data.closeAfter >= 0) closeAfter = data.closeAfter;
       break;
     case 'run': onRun(data); break;
     case 'item': if (data) onItem(data.i, data.item); break;
@@ -227,15 +233,39 @@ function finish(r) {
   else line(red(`Run ${r.status || 'failed'}${r.error ? `: ${r.error}` : '.'}`));
   cleanup();
   if (!process.stdin.isTTY) process.exit(0);
-  line(dim('Press Enter to close.'));
-  process.stdin.resume();
-  process.stdin.once('data', () => { closeWindow(); process.exit(0); });
+  waitToClose();
 }
 
-// On macOS the window is Terminal.app's, which keeps a window whose process ended ("[Process
-// completed]", by default) rather than closing it: it is closed from here, once this process is gone
-// (so Terminal does not ask about a process still running), by its tty. Elsewhere the terminal closes
-// with the process.
+// After the run, the window closes by itself `closeAfter` seconds later, counted down on its last
+// line, or on Enter before that; with closeAfter 0 it stays until Enter.
+function waitToClose() {
+  let countdown = null;
+  const close = () => {
+    if (countdown) clearInterval(countdown);
+    closeWindow();
+    process.exit(0);
+  };
+  process.stdin.resume();
+  process.stdin.once('data', close);
+  if (!(closeAfter > 0)) {
+    line(dim('Press Enter to close.'));
+    return;
+  }
+  let left = Math.ceil(closeAfter);
+  const show = () => process.stdout.write(`\r\x1b[2K${dim(`Closing in ${left}s ${M.dot} Enter closes now.`)}`);
+  nl();
+  show();
+  countdown = setInterval(() => {
+    if (--left > 0) { show(); return; }
+    process.stdout.write('\n');
+    close();
+  }, 1000);
+}
+
+// On macOS the window is Terminal.app's or iTerm2's (`terminal`). Terminal keeps a window whose
+// process ended ("[Process completed]", by default) rather than closing it, and iTerm2 may be set to
+// (its profile's "after a session ends"): it is closed from here, once this process is gone (so the app
+// does not ask about a process still running), by its tty. Elsewhere the terminal closes with the process.
 function closeWindow() {
   if (process.platform !== 'darwin') return;
   let tty;
@@ -245,7 +275,18 @@ function closeWindow() {
     return;
   }
   if (!/^\/dev\/[\w/]+$/.test(tty)) return;
-  const script = [
+  const script = terminal === 'iterm' ? [
+    'delay 0.3',
+    'tell application "iTerm"',
+    'repeat with w in windows',
+    'repeat with t in tabs of w',
+    'repeat with s in sessions of t',
+    `if tty of s is "${tty}" then close s`,
+    'end repeat',
+    'end repeat',
+    'end repeat',
+    'end tell'
+  ] : [
     'delay 0.3',
     'tell application "Terminal"',
     'repeat with w in windows',
