@@ -156,6 +156,14 @@ function formatTaskId(d) {
     `${p(d.getHours())}${p(d.getMinutes())}`;
 }
 
+// A time (ms) as tm shows every time, the way a task id reads: "2026-10-25 09:38", local, to the
+// minute (the web UI has the same in src/utils/task.js).
+function formatDateTime(ms) {
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // Task folders are named "<id>" or "<id> <title>": the id is the first
 // space-separated token of the folder name.
 function folderId(name) {
@@ -320,6 +328,7 @@ function openFolder(dir) {
 }
 
 module.exports = {
+  formatDateTime,
   TASK_FILE,
   PROMPT_FILE,
   STATUS_DIRS,

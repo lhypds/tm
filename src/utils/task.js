@@ -44,6 +44,13 @@ export function joinDetails(title, body) {
   return b ? `${t}\n${b}` : t;
 }
 
+// A time (ms) as a task id reads: "2026-10-25 10:20", local, to the minute.
+export function formatDateTime(ms) {
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // "202508142100" -> "2025-08-14 21:00"; anything else is shown as-is.
 export function formatStamp(s) {
   const m = /^(\d{4})(\d{2})(\d{2})[_]?(\d{2})(\d{2})/.exec(s || "");

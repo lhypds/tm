@@ -2,7 +2,7 @@
 // pushes from taskmgrd (server/sync.js), a task of a pushed copy is run where its tasks, the source
 // code and the claude login are: on the machine that pushed it, by its taskmgrd (ai/runner.js, with
 // AI_RUNNER=1 in its .env). That runner keeps one connection open here (GET /api/sync/ai/commands in
-// server/ai.js) and gets the browsers' commands over it: run, answer, stop, dismiss (command). What
+// server/ai.js) and gets the browsers' commands over it: run, answer, stop, forget (command). What
 // its runs do comes back as the events of its own session (ai/session.js: snapshot, run, item, delta,
 // remove; POST /api/sync/ai/events, see receive) and is kept here, run by run, so the browsers see
 // those runs as they see the runs of this machine: the same events (subscribe), the same shape
@@ -199,15 +199,6 @@ async function stopRun(id) {
   return runs.get(id) || run;
 }
 
-// Forget a finished run here, and on its machine (which may be gone: no reason to keep the run).
-function dismissRun(id) {
-  const run = getRun(id);
-  if (run.status === 'running' || run.status === 'queued') throw httpError(409, 'Stop the run first.');
-  runs.delete(id);
-  emit('remove', { run: id });
-  command(run.machine, { type: 'dismiss', run: id }).catch(() => {});
-}
-
 // Have `machine` remove a run's record (see ai/record.js) from its task folder: the copy here is
 // the machine's to push, so removing it here alone would not last. `task` is { work, repository, rel }.
 function forgetRecord(machine, task, folder) {
@@ -281,4 +272,4 @@ function receive(machine, events) {
   }
 }
 
-module.exports = { subscribe, listRuns, publicRun, has, isConnected, connect, receive, startRun, answerRun, stopRun, dismissRun, forgetRecord };
+module.exports = { subscribe, listRuns, publicRun, has, isConnected, connect, receive, startRun, answerRun, stopRun, forgetRecord };

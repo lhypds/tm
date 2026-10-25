@@ -308,9 +308,7 @@
   "ai": {
     "run": "用 Claude Code 执行",
     "show": "查看运行",
-    "again": "再次运行",
     "stop": "停止 Claude Code",
-    "dismiss": "清除本次运行",
     "titleOf": "Claude：{{title}}",
     "starting": "启动中",
     "running": "运行中",
@@ -339,6 +337,7 @@
     "using": "正在使用 {{tool}}",
     "runs": "运行记录",
     "forget": "删除 {{when}} 的运行记录",
-    "forgetConfirm": "删除 {{when}} 的运行记录？"
+    "forgetConfirm": "删除 {{when}} 的运行记录？",
+    "forgetTitle": "删除运行记录"
   }
 }

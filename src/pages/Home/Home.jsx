@@ -36,7 +36,7 @@ import { BOARD_STATUSES, boardStatus } from "@components/TaskBoard";
 import { showToast, Checkbox } from "@ui";
 import { useAuth } from "@store";
 import * as api from "@utils/api";
-import { ALL_MONTHS, taskMonth, taskMonths, monthLabel, previewKind, flattenTasks, filterTasks } from "@utils/task";
+import { ALL_MONTHS, taskMonth, taskMonths, monthLabel, previewKind, flattenTasks, filterTasks, formatDateTime } from "@utils/task";
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
@@ -94,7 +94,7 @@ const keyOf = (space, rel) => `${space.work}/${space.repository || ""}/${rel}`;
 function pollingTitle(polling, t) {
   if (!polling?.on) return "";
   if (!polling.at) return t("status.pollingNone");
-  const when = new Date(polling.at).toLocaleTimeString();
+  const when = formatDateTime(polling.at);
   if (!polling.ok) return t("status.pollingFailed", { when, error: polling.error || "" });
   return polling.fresh ? t("status.pollingOk", { when }) : t("status.pollingStale", { when });
 }
@@ -391,7 +391,12 @@ export default function Home({ all = false }) {
   // The run button opens the run's dialog (`runKey`: the task whose run it shows), starting a run
   // when the task has none; the dialog shows the run as it is now, so a new run on the same task
   // shows there too. A question Claude asks, on whatever task, shows as a toast.
-  const ai = useRuns({ onAsk: (run) => showToast(t("ai.asks", { title: run.task.title }), 6000) });
+  // A run over leaves its record in the task folder (see ai/record.js): the selected task's files
+  // are re-read, so the list of runs under the prompt shows it at once.
+  const ai = useRuns({
+    onAsk: (run) => showToast(t("ai.asks", { title: run.task.title }), 6000),
+    onEnd: () => setLoads((n) => n + 1),
+  });
   const selectedRun = ai.runFor(selected);
   // Where the selected task would run: here, or, for a copy pushed from another machine, on that
   // machine (see server/ai.js), which needs its taskmgrd connected as a runner (AI_RUNNER=1 there).
@@ -413,20 +418,48 @@ export default function Home({ all = false }) {
   const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
   // The records are the selected task's: the dialog shows them for that task only.
   const savedRuns = runTask && runTask.key === selected?.key ? attachments.runs : [];
-  const openRun = (task, folder = null) => {
+  const [starting, setStarting] = useState(false); // a run asked for and not answered yet: the dialog says so, rather than showing the task's last run
+  const isGoing = (run) => !!run && (run.status === "running" || run.status === "queued");
+  const openRun = async (task, folder = null) => {
     setRunKey(task.key);
     setRunFolder(folder);
-    // a record picked, a run going, or a record to show, opens; else a run starts
-    if (!folder && !ai.runFor(task) && !(task.key === selected?.key && attachments.runs.length)) ai.start(task);
+    if (folder) {
+      selectRun(folder); // the keyboard is on the record opened, so space closes and opens it again
+      return;
+    }
+    if (isGoing(ai.runFor(task))) return; // the run going opens
+    // else a run starts; refused (the machine not connected, say), the dialog closes again
+    setStarting(true);
+    const ok = await ai.start(task);
+    setStarting(false);
+    if (!ok) closeRun();
   };
   const closeRun = () => {
     setRunKey(null);
     setRunFolder(null);
+    setLoads((n) => n + 1); // whatever the run left in the task folder (its record, its files) shows now
   };
   const [fileRel, setFileRel] = useState(null);
   const fileList = attachments.files.filter((f) => !f.isDir);
   const fileIndex = fileList.findIndex((f) => f.rel === fileRel);
   const selectedFile = fileList[fileIndex] || null;
+  // The run record the keyboard is on, among those listed under the prompt (j / k walk them after
+  // the prompt; space opens one in the run dialog, d removes it). One thing is chosen at a time: a
+  // file, a record, or a text (see selectSection).
+  const [pickedRun, setPickedRun] = useState(null);
+  const pickedRecord = attachments.runs.find((r) => r.folder === pickedRun) || null;
+  const selectFile = (rel) => {
+    setFileRel(rel);
+    setPickedRun(null);
+  };
+  const selectRun = (folder) => {
+    setPickedRun(folder);
+    setFileRel(null);
+  };
+  // Remove a run's record (d on it, or its ×): the delete popup asks first, as for a file (d again
+  // confirms; see confirmDeleteFile), then the highlight moves to the next record, else the previous,
+  // else off.
+  const forgetRecord = (record) => setRemovingFile({ hook: attachments, record });
   // The same for the task preview opened with space: j / k pick a file, enter opens it.
   // peek holds the key; the task itself is read fresh, so a saved edit shows at once
   const peekTask = tasks.find((task) => task.key === peek?.key) || peek;
@@ -444,14 +477,22 @@ export default function Home({ all = false }) {
   };
   // d on a file asks in a popup; confirming (d again, or the button) deletes it and moves the highlight to its neighbour.
   // The same popup asks before the task's prompt.txt is deleted (`prompt`: the divider's delete, or
-  // d on the prompt); deleting it is saving a blank prompt (see useTaskFiles).
-  const [removingFile, setRemovingFile] = useState(null); // { hook, list, file, setRel } or { hook, file, prompt: true }
+  // d on the prompt); deleting it is saving a blank prompt (see useTaskFiles). And before a run's
+  // record is removed (`record`, see forgetRecord).
+  const [removingFile, setRemovingFile] = useState(null); // { hook, list, file, setRel }, { hook, file, prompt: true } or { hook, record }
   const deleteFile = (hook, list, file, setRel) => setRemovingFile({ hook, list, file, setRel });
   // `after` runs once the prompt is deleted: the panel or the preview it was deleted from hides the prompt.
   const deletePrompt = (hook, task, after) => setRemovingFile({ hook, file: { name: "prompt.txt", rel: `${task.rel}/prompt.txt` }, prompt: true, after });
   const confirmDeleteFile = async () => {
-    const { hook, list, file, setRel, prompt, after } = removingFile;
+    const { hook, list, file, setRel, prompt, after, record } = removingFile;
     setRemovingFile(null);
+    if (record) {
+      const runs = hook.runs;
+      const i = runs.findIndex((r) => r.folder === record.folder);
+      if (!(await hook.forgetRun(record.folder))) return;
+      if (pickedRun === record.folder) selectRun((runs[i + 1] || runs[i - 1])?.folder || null);
+      return;
+    }
     if (prompt) {
       if (!(await hook.savePrompt(""))) return;
       setLoads((n) => n + 1); // the other reader of the folder (panel or preview) follows
@@ -459,7 +500,7 @@ export default function Home({ all = false }) {
       return;
     }
     const i = list.indexOf(file);
-    if (await hook.remove(file, false)) setRel((list[i + 1] || list[i - 1] || null)?.rel ?? null);
+    if (await hook.remove(file)) setRel((list[i + 1] || list[i - 1] || null)?.rel ?? null);
   };
   // The file shown in the preview, in the list it came from (the task preview's, else the panel's):
   // d, or the preview's delete button, deletes it as d on a file chosen in that list does (asking
@@ -481,7 +522,10 @@ export default function Home({ all = false }) {
   // chosen there, or nothing yet, stays). Deleting a prompt hides it too (see confirmDeleteFile).
   function showPrompt(open) {
     setPromptOpen(open);
-    if (!open) setSection("task");
+    if (!open) {
+      setSection("task");
+      setPickedRun(null); // the runs under the prompt go with it
+    }
   }
   function showPeekPrompt(open) {
     setPeekPromptOpen(open);
@@ -489,13 +533,15 @@ export default function Home({ all = false }) {
   }
 
   // The text the keyboard is on in the panel, also when a text is clicked into: the task's or its
-  // prompt's, which takes the highlight off an attachment. `detailSection` is what the panel shows
-  // as such: null while an attachment is chosen, the task's text while the prompt is hidden.
+  // prompt's, which takes the highlight off an attachment or a run record. `detailSection` is what
+  // the panel shows as such: null while an attachment or a record is chosen, the task's text while
+  // the prompt is hidden.
   const selectSection = (area) => {
     setSection(area);
     setFileRel(null);
+    setPickedRun(null);
   };
-  const detailSection = selectedFile ? null : promptOpen ? section : "task";
+  const detailSection = selectedFile || pickedRecord ? null : promptOpen ? section : "task";
 
   // The prompt edited under the task's text, in the panel or the preview, its prompt.txt: typing
   // one creates the file, a blank one deletes it (see useTaskFiles.savePrompt). `hook` is the
@@ -851,10 +897,23 @@ export default function Home({ all = false }) {
       adding ||
       editingRepository ||
       analysisOpen ||
-      runKey !== null ||
       command !== null
     )
       return false;
+    if (runKey !== null) {
+      // The run dialog: space and q close it, as they close a file's preview; j / k step to the
+      // next / previous record of the task while one is shown (not while a run is).
+      if (runFolder && savedRuns.length) {
+        const move = moveIndex(name, savedRuns.findIndex((r) => r.folder === runFolder), savedRuns.length);
+        if (move !== null) {
+          if (savedRuns[move].folder !== runFolder) openRun(runTask, savedRuns[move].folder);
+          return true;
+        }
+      }
+      if (!["q", "space"].includes(name)) return false;
+      closeRun();
+      return true;
+    }
     if (preview) {
       // j / k step to the next / previous file of the task the preview came from
       const list = (peek ? peekFiles : fileList).filter((f) => previewKind(f.name));
@@ -966,18 +1025,20 @@ export default function Home({ all = false }) {
     if (pane === "tree") return treeKey(name);
 
     if (pane === "detail") {
-      // j / k walk the attachments; with the prompt shown, the task's text first and its prompt
-      // last, as the panel shows them, so the keyboard moves from the text (where enter, e and i
-      // put the caret) down through the attachments to the prompt. The highlight starts on the
-      // task's text then, else on nothing.
-      const rows = promptOpen && selected ? ["task", ...fileList.map((f) => f.rel), "prompt"] : fileList.map((f) => f.rel);
-      const at = selectedFile ? rows.indexOf(selectedFile.rel) : promptOpen && selected ? rows.indexOf(section) : -1;
+      // j / k walk the attachments; with the prompt shown, the task's text first, then its prompt
+      // and the run records listed under it last, as the panel shows them, so the keyboard moves
+      // from the text (where enter, e and i put the caret) down through the attachments to the
+      // prompt and its runs. The highlight starts on the task's text then, else on nothing.
+      const runRows = promptOpen && selected ? attachments.runs.map((r) => `run:${r.folder}`) : [];
+      const rows = promptOpen && selected ? ["task", ...fileList.map((f) => f.rel), "prompt", ...runRows] : fileList.map((f) => f.rel);
+      const at = selectedFile ? rows.indexOf(selectedFile.rel) : pickedRecord ? rows.indexOf(`run:${pickedRecord.folder}`) : promptOpen && selected ? rows.indexOf(section) : -1;
       const move = moveIndex(name, at, rows.length);
       if (move !== null) {
         if (move >= 0) {
           const row = rows[move];
           if (row === "task" || row === "prompt") selectSection(row);
-          else setFileRel(row);
+          else if (row.startsWith("run:")) selectRun(row.slice(4));
+          else selectFile(row);
         }
         return true;
       }
@@ -992,6 +1053,20 @@ export default function Home({ all = false }) {
         }
         if (name === "escape") {
           setFileRel(null);
+          return true;
+        }
+      } else if (pickedRecord) {
+        // the record chosen: space / enter show it in the run dialog (space closes it again), d removes it
+        if (["space", "enter"].includes(name)) {
+          openRun(selected, pickedRecord.folder);
+          return true;
+        }
+        if (name === "d") {
+          forgetRecord(pickedRecord);
+          return true;
+        }
+        if (name === "escape") {
+          setPickedRun(null);
           return true;
         }
       } else {
@@ -1368,6 +1443,7 @@ export default function Home({ all = false }) {
               onSave={saveText}
               onDelete={setConfirm}
               onPreview={(file) => selected && setPreview({ ...file, space: selected.space })}
+              onDeleteFile={(file) => deleteFile(attachments, fileList, file, setFileRel)}
               attachments={attachments}
               selectedFile={selectedFile?.rel}
               promptOpen={promptOpen}
@@ -1379,6 +1455,8 @@ export default function Home({ all = false }) {
               run={selectedRun}
               noRunner={noRunner}
               onRun={openRun}
+              selectedRun={pickedRun}
+              onForgetRun={forgetRecord}
             />
           )}
         </aside>
@@ -1549,23 +1627,12 @@ export default function Home({ all = false }) {
       {/* the run of Claude Code on a task, opened by the run button beside its prompt */}
       <RunModal
         task={runTask}
-        run={ai.runFor(runTask)}
+        run={starting ? null : ai.runFor(runTask)}
         saved={savedRuns}
         folder={runFolder}
         onClose={closeRun}
         onStop={ai.stop}
         onAnswer={ai.answer}
-        onRunAgain={ai.start}
-        onDismiss={async (run) => {
-          await ai.dismiss(run);
-          closeRun();
-        }}
-        onForget={async (record) => {
-          // the run going or the next record, if any, shows; else the dialog closes
-          if (!(await attachments.forgetRun(record.folder))) return;
-          setRunFolder(null);
-          if (savedRuns.length <= 1 && !ai.runFor(runTask)) closeRun();
-        }}
       />
 
       {/* after the task preview, so it stacks in front of it */}
@@ -1582,8 +1649,8 @@ export default function Home({ all = false }) {
 
       <ConfirmModal
         isOpen={!!removingFile}
-        title={t("attach.deleteTitle")}
-        message={removingFile ? t("attach.deleteConfirm", { name: removingFile.file.name }) : ""}
+        title={t(removingFile?.record ? "ai.forgetTitle" : "attach.deleteTitle")}
+        message={!removingFile ? "" : removingFile.record ? t("ai.forgetConfirm", { when: formatDateTime(removingFile.record.startedAt) }) : t("attach.deleteConfirm", { name: removingFile.file.name })}
         onCancel={() => setRemovingFile(null)}
         onConfirm={confirmDeleteFile}
       />

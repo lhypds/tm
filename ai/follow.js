@@ -9,6 +9,7 @@
 const fs = require('fs');
 const { execFileSync, spawn } = require('child_process');
 const { StringDecoder } = require('string_decoder');
+const { formatDateTime } = require('../utils/taskUtils');
 
 const POLL_MS = 150;        // how often the file is looked at
 const RESULT_LINES = 10;    // lines of a tool result shown
@@ -82,7 +83,7 @@ function header(r) {
   if (r.cwd) line(dim(`folder   ${r.cwd}`));
   if (machine) line(dim(`machine  ${machine}`));
   if (server) line(dim(`server   ${server}`));
-  line(dim(`started  ${new Date(r.startedAt || Date.now()).toLocaleTimeString()}`));
+  line(dim(`started  ${formatDateTime(r.startedAt || Date.now())}`));
 }
 
 function onRun(r) {

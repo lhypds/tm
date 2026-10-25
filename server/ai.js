@@ -6,7 +6,6 @@
 //   POST   /api/ai/run               { work, repository?, rel }: start Claude Code on that task; 201 { run }
 //   POST   /api/ai/runs/:id/answer   { pending, decision } or { pending, answers }: answer the run's question; { run }
 //   POST   /api/ai/runs/:id/stop     stop the run; { run }
-//   DELETE /api/ai/runs/:id          forget a finished run; { ok: true }
 //   GET    /api/ai/saved/:folder     ?work&repository&rel: a run's record in the task folder (see ai/record.js); { run }
 //   DELETE /api/ai/saved/:folder     ?work&repository&rel: remove that record; { ok: true }
 //
@@ -130,13 +129,6 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     const id = String(req.params.id);
     if (remote.has(id)) return res.json({ run: remote.publicRun(await remote.stopRun(id)) });
     res.json({ run: session.publicRun(session.stopRun(id)) });
-  });
-
-  app.delete('/api/ai/runs/:id', (req, res) => {
-    const id = String(req.params.id);
-    if (remote.has(id)) remote.dismissRun(id);
-    else session.dismissRun(id);
-    res.json({ ok: true });
   });
 
   // A run's record in the task folder (see ai/record.js), named as GET /api/task lists them.

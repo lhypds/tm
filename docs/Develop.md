@@ -26,7 +26,7 @@ The Claude Code integration itself is in `ai/`: `task.js` finds a task and makes
 and the web UI), `run.js` is `tm run` (the `run.js` at the root only requires it), and `session.js` runs Claude Code for the  
 web UI through the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`, which brings its own copy of Claude Code and uses  
 the login in `~/.claude`), keeping the runs and relaying what Claude asks, and `record.js` writes a run that is over into  
-the task folder (`.claude_<time>/`: run.json, prompt.txt, transcript.md) and reads those records back. A task pushed from another machine runs on  
+the task folder (`.claude_<time>/`: run.json, task.txt, prompt.txt, transcript.md) and reads those records back. A task pushed from another machine runs on  
 that machine: `runner.js` is the runner in its taskmgrd (`AI_RUNNER=1`), which holds a connection to the server, carries  
 out the commands it gets on its own `session.js` and sends the session's events back, and `remote.js` is the server's  
 side, which keeps those runs as it gets them and hands the browsers' commands over, so `server/ai.js` serves both kinds  

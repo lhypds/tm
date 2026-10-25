@@ -18,15 +18,17 @@ import styles from "./panel.module.css";
 // The divider also carries the run button (RunButton), greyed out until the task has a prompt, or
 // while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
 // text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
-// or opens the dialog of the run the task has (`run`, see useRuns) or of its last run kept in the
-// folder (`attachments.runs`), which the button shows with a dot. Under the prompt's text, those runs
-// are listed as the files are (RunList): a click on one opens it in the dialog (onRun(task, folder)),
-// its × removes it (attachments.forgetRun).
+// or opens the dialog of the run the task has going (`run`, see useRuns), which the button shows with
+// a dot. Under the prompt's text, the task's past runs (`attachments.runs`, the records kept in its
+// folder) are listed as the files are (RunList): a click on one opens it in the dialog (onRun(task, folder)),
+// its × removes it (onForgetRun(record), which asks first), and `selectedRun` is the folder of the one
+// the keyboard is on (j / k walk them after the prompt), highlighted as a chosen file is.
 // `section` is the text the keyboard is on, "task" or "prompt" (null while an attachment is), shown
 // by which head is highlighted; onSection(area) is called when a text is clicked into.
 // Under the texts, the task's attachments; files dropped anywhere on the panel are uploaded into
 // the task folder (`attachments` is the task's useTaskFiles, which also holds the prompt;
-// onPreview(file) opens one; `selectedFile` is the rel of the one the keyboard is on).
+// onPreview(file) opens one, onDeleteFile(file) asks before deleting one, its ×, as d on it does;
+// `selectedFile` is the rel of the one the keyboard is on).
 export default function TaskPanel({
   task,
   focused,
@@ -36,6 +38,7 @@ export default function TaskPanel({
   onSave,
   onDelete,
   onPreview,
+  onDeleteFile,
   attachments,
   selectedFile,
   promptOpen,
@@ -47,6 +50,8 @@ export default function TaskPanel({
   run,
   noRunner,
   onRun,
+  selectedRun,
+  onForgetRun,
 }) {
   const { t } = useTranslation();
   const textRef = useRef(null);
@@ -137,7 +142,7 @@ export default function TaskPanel({
               selectedRel={selectedFile}
               busy={attachments.uploading}
               onAdd={attachments.add}
-              onRemove={attachments.remove}
+              onRemove={onDeleteFile}
               onPreview={onPreview}
             />
           </div>
@@ -146,7 +151,7 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  <RunButton run={run} saved={attachments.runs?.length > 0} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
+                  <RunButton run={run} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
                   <button
                     type="button"
                     className="btn"
@@ -175,7 +180,7 @@ export default function TaskPanel({
                   onFocus={() => onSection("prompt")}
                   onSave={onSavePrompt}
                 />
-                {attachments.runs?.length > 0 && <RunList className={styles.files} runs={attachments.runs} onOpen={(r) => onRun(task, r.folder)} onRemove={(r) => attachments.forgetRun(r.folder)} />}
+                {attachments.runs?.length > 0 && <RunList className={styles.files} runs={attachments.runs} selectedFolder={selectedRun} onOpen={(r) => onRun(task, r.folder)} onRemove={onForgetRun} />}
               </div>
             </>
           )}

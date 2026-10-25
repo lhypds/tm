@@ -1,8 +1,11 @@
 /* The run of Claude Code (see RunModal), in a dialog sized as the task preview's: the transcript
-   is a bordered box filling it, as the preview's text is. Its header sits as close to the top edge
-   as the file preview's (its title is text too; see the modal's --modal-top). */
+   is a bordered box filling it, as the preview's text is. Its header row (title, stop / run button,
+   state) sits 4px lower than the file preview's and as much closer to the box under it (see the
+   modal's --modal-top and --modal-gap: the row is as tall as the preview's, so the box is where the
+   preview's is); the close button stays in its corner. */
 .modal.modal {
-  --modal-top: 12px;
+  --modal-top: 16px;
+  --modal-gap: 4px;
   max-width: 900px;
   width: 80vw;
   height: 70vh;

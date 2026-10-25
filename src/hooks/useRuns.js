@@ -5,20 +5,27 @@ import * as api from "@utils/api";
 // The runs of Claude Code (see ai/session.js), followed live over the server's event stream for as
 // long as the page is open: `runs` is every run the server has, by id, each with its transcript
 // (`items`) and its `pending` question. runFor(task) is the latest run of a task of the list (by
-// its space and rel), start / answer / stop / dismiss act on one (an error shows as a toast).
-// onAsk(run) is called when a run gets a question for the user, whatever task is shown.
-export default function useRuns({ onAsk } = {}) {
+// its space and rel), start / answer / stop act on one (an error shows as a toast).
+// onAsk(run) is called when a run gets a question for the user, whatever task is shown; onEnd(run)
+// when a run seen going here is over (done, failed or stopped; not for one found over already).
+export default function useRuns({ onAsk, onEnd } = {}) {
   const [runs, setRuns] = useState({});
   const askRef = useRef(onAsk);
   askRef.current = onAsk;
+  const endRef = useRef(onEnd);
+  endRef.current = onEnd;
   const asked = useRef(new Set()); // the ids of the questions onAsk was called for, each once
+  const going = useRef(new Set()); // the ids of the runs seen going (running or queued), for onEnd
+  const isGoing = (r) => r.status === "running" || r.status === "queued";
 
   useEffect(() => {
     const es = new EventSource(api.runEventsUrl);
     const parse = (e) => JSON.parse(e.data);
     // The server's state, whole: on connecting, and again after a reconnection (the browser's own).
     es.addEventListener("snapshot", (e) => {
-      setRuns(Object.fromEntries(parse(e).runs.map((r) => [r.id, r])));
+      const list = parse(e).runs;
+      going.current = new Set(list.filter(isGoing).map((r) => r.id));
+      setRuns(Object.fromEntries(list.map((r) => [r.id, r])));
     });
     es.addEventListener("run", (e) => {
       const r = parse(e);
@@ -26,6 +33,8 @@ export default function useRuns({ onAsk } = {}) {
         asked.current.add(r.pending.id);
         askRef.current?.(r);
       }
+      if (isGoing(r)) going.current.add(r.id);
+      else if (going.current.delete(r.id)) endRef.current?.(r);
       setRuns((prev) => ({ ...prev, [r.id]: { ...prev[r.id], ...r, items: prev[r.id]?.items || r.items || [] } }));
     });
     es.addEventListener("item", (e) => {
@@ -51,6 +60,7 @@ export default function useRuns({ onAsk } = {}) {
     });
     es.addEventListener("remove", (e) => {
       const { run } = parse(e);
+      going.current.delete(run);
       setRuns((prev) => {
         if (!prev[run]) return prev;
         const next = { ...prev };
@@ -106,18 +116,5 @@ export default function useRuns({ onAsk } = {}) {
     }
   }, []);
 
-  const dismiss = useCallback(async (run) => {
-    try {
-      await api.dismissRun(run.id);
-      setRuns((prev) => {
-        const next = { ...prev };
-        delete next[run.id];
-        return next;
-      });
-    } catch (e) {
-      failed(e);
-    }
-  }, []);
-
-  return { runs, runFor, start, answer, stop, dismiss };
+  return { runs, runFor, start, answer, stop };
 }

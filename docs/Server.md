@@ -241,13 +241,10 @@ own). `{ run }`; 409 when that question is not pending any more.
 `POST /api/ai/runs/:id/stop`  
 Stop a run: Claude Code is interrupted and a pending question refused. `{ run }`; 409 when it is over.  
 
-`DELETE /api/ai/runs/:id`  
-Forget a finished run, transcript and all. `{ ok: true }`; 409 while it runs.  
-
 A run that is over is also written into the task folder by the machine that ran it, as `.claude_<yyyyMMddHHmmss>/` (the  
 time it began; `-2`, `-3`... when two began the same second): `run.json`, the run as above with its transcript plus `input`  
-(the first prompt claude was given) and `machine` (where it ran); `prompt.txt`, the task's prompt.txt as it was (when it  
-had one); and `transcript.md`, the same to read. Dot folders go with the task when it is pushed or pulled, so a server  
+(the first prompt claude was given) and `machine` (where it ran); `task.txt` and `prompt.txt`, the task's own files as  
+they were (each when it had one); and `transcript.md`, the same to read. Dot folders go with the task when it is pushed or pulled, so a server  
 shows the runs of the tasks pushed to it after they are over, whatever restarted meanwhile; `GET /api/task` lists them.  
 
 `GET /api/ai/saved/:folder?work=&repository=&rel=`  
@@ -265,7 +262,7 @@ one), so a runner connected counts as its machine being in touch:
 `GET /api/sync/ai/commands`  
 The commands for that machine, live: a `text/event-stream` of `command` events, each `{ id, type, ... }`: `run` `{ run, work,  
 repository, rel, files }` (start Claude Code on that task as run `run`, `files` being `{ "task.txt": text, "prompt.txt": text | null }`  
-as the server has them), `answer` `{ run, pending, body }`, `stop` `{ run }`, `dismiss` `{ run }` and `forget` `{ work, repository, rel, folder }`  
+as the server has them), `answer` `{ run, pending, body }`, `stop` `{ run }` and `forget` `{ work, repository, rel, folder }`  
 (remove that run record from the task folder there), with a comment every 25 seconds to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
 
 `POST /api/sync/ai/events` `{ events }`  

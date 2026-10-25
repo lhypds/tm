@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import i18n from "../../i18n";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
 
 const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 
-// The attachments of one task folder, loaded while `rel` is set, with upload and delete (remove asks first unless ask is false, and says whether it deleted),
+// The attachments of one task folder, loaded while `rel` is set, with upload and delete (remove says
+// whether it deleted; asking first is the caller's, the app's delete popup),
 // and the task's prompt, its prompt.txt: `prompt` is undefined until the folder is read, null when
 // there is no file, else its text; savePrompt(text) writes it (a blank text deletes the file) and
 // says whether it did. Also `runs`, the records of the task's runs of Claude Code kept in the folder
@@ -61,8 +61,7 @@ export default function useTaskFiles(space, rel, version) {
   );
 
   const remove = useCallback(
-    async (file, ask = true) => {
-      if (ask && !window.confirm(i18n.t("attach.deleteConfirm", { name: file.name }))) return false;
+    async (file) => {
       try {
         const d = await api.deleteFile(space, file.rel);
         setFiles(attachmentsOf(d.files));

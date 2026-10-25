@@ -308,9 +308,7 @@
   "ai": {
     "run": "Run with Claude Code",
     "show": "Show the run",
-    "again": "Run again",
     "stop": "Stop Claude Code",
-    "dismiss": "Clear this run",
     "titleOf": "Claude: {{title}}",
     "starting": "starting",
     "running": "running",
@@ -339,6 +337,7 @@
     "using": "Using {{tool}}",
     "runs": "Runs",
     "forget": "Remove the run of {{when}}",
-    "forgetConfirm": "Remove the run of {{when}}?"
+    "forgetConfirm": "Remove the run of {{when}}?",
+    "forgetTitle": "Remove run"
   }
 }

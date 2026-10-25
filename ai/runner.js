@@ -3,8 +3,8 @@
 // tasks, the source code and the claude login are. On with AI_RUNNER=1 in .env (see taskmgrd.js).
 //
 // It keeps one connection open to the server, GET /api/sync/ai/commands (a text/event-stream, see
-// server/ai.js), reads the commands the server's browsers give (run, answer, stop, dismiss, and forget,
-// which removes a run's record from the task folder here, see ai/record.js; see ai/remote.js), carries
+// server/ai.js), reads the commands the server's browsers give (run, answer, stop, and forget, which
+// removes a run's record from the task folder here, see ai/record.js; see ai/remote.js), carries
 // each out on this machine's session (ai/session.js) and acknowledges it (an
 // `ack` event: ok, or the error for the browser). Every event of the session goes back as it happens,
 // POST /api/sync/ai/events, a snapshot of the runs first each time the connection is made, so the
@@ -188,9 +188,6 @@ function startRunner({ server, token, machineId, log, warn, logFile, window = fa
           break;
         case 'stop':
           session.stopRun(String(cmd.run || ''));
-          break;
-        case 'dismiss':
-          session.dismissRun(String(cmd.run || ''));
           break;
         case 'forget': {
           const { space, taskDir } = locate(cmd, false);

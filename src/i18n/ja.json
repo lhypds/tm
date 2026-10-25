@@ -308,9 +308,7 @@
   "ai": {
     "run": "Claude Code で実行",
     "show": "実行を表示",
-    "again": "もう一度実行",
     "stop": "Claude Code を停止",
-    "dismiss": "この実行を消す",
     "titleOf": "Claude：{{title}}",
     "starting": "開始中",
     "running": "実行中",
@@ -339,6 +337,7 @@
     "using": "{{tool}} を使用中",
     "runs": "実行履歴",
     "forget": "{{when}} の実行を削除",
-    "forgetConfirm": "{{when}} の実行を削除しますか？"
+    "forgetConfirm": "{{when}} の実行を削除しますか？",
+    "forgetTitle": "実行履歴を削除"
   }
 }

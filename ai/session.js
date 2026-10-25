@@ -11,9 +11,9 @@
 // stopping the run (stopRun) refuses it.
 //
 // One run at a time per task. The runs are kept in memory, the last RUNS_KEPT finished ones too, so a
-// transcript can be read again until it is dismissed (dismissRun); a restart forgets them. A run that
-// is over is also written into the task folder, as .claude_<time>/ (see ai/record.js), which goes with
-// the task wherever it is synced. What claude writes to stderr goes to logs/ai.log.
+// transcript can be read again meanwhile; a restart forgets them. A run that is over is also written
+// into the task folder, as .claude_<time>/ (see ai/record.js), which goes with the task wherever it is
+// synced and is what the web UI shows of it from then on. What claude writes to stderr goes to logs/ai.log.
 //
 // AI_PERMISSION_MODE in .env picks the permission mode of a run: acceptEdits unless set; `default`
 // asks for edits too, `plan` has Claude plan first (the plan is asked about in the browser, as a
@@ -21,8 +21,11 @@
 // (`dontAsk` refuses instead). The allow rules of the user's and the repository's Claude settings
 // apply in every mode, as in the terminal.
 const crypto = require('crypto');
+const fs = require('fs');
 const os = require('os');
+const path = require('path');
 
+const { TASK_FILE, PROMPT_FILE } = require('../utils/taskUtils');
 const { appendLog } = require('../utils/logfile');
 const { samePath, describeRun } = require('./task');
 const record = require('./record');
@@ -77,6 +80,11 @@ function subscribe(fn) {
 }
 
 const newId = () => crypto.randomBytes(6).toString('hex');
+
+// A text file's content, null when there is none.
+function readText(abs) {
+  try { return fs.readFileSync(abs, 'utf8'); } catch (e) { return null; }
+}
 
 function httpError(status, message) {
   const e = new Error(message);
@@ -184,7 +192,7 @@ function startRun({ space, taskDir, taskRef, id = null }) {
     abort: new AbortController(),
     text: null,        // the index of the text item being streamed, while one is
     done: null,        // resolves the input stream, which ends the session, when the run is over
-    prompt: d.prompt,  // the task's prompt.txt as it was, for the record (null without one)
+    files: { [TASK_FILE]: readText(path.join(taskDir, TASK_FILE)), [PROMPT_FILE]: d.prompt },  // the task's own files as they are, for the record
     input: d.text      // the first prompt claude was given, for the record
   };
   runs.set(run.id, run);
@@ -195,22 +203,23 @@ function startRun({ space, taskDir, taskRef, id = null }) {
   return run;
 }
 
-// The run is over: its pending question (if any) refused, its status and end set, everyone told, and
-// the run written into the task folder (see ai/record.js).
+// The run is over: its pending question (if any) refused, its status and end set, the run written
+// into the task folder (see ai/record.js) and then everyone told, so a browser that re-reads the
+// folder on the news finds the record there.
 function end(run, status, error = null) {
   if (run.status !== 'running') return;
   if (run.pending) run.pending.settle({ cancelled: true }, { behavior: 'deny', message: 'The run was stopped.' });
   run.status = status;
   run.endedAt = Date.now();
   run.error = error;
-  emit('run', publicRun(run));
   log(run, `end: ${status}${error ? ` (${error})` : ''}`);
   try {
-    const folder = record.saveRun(run.taskDir, { ...publicRun(run, true), input: run.input, machine }, run.prompt);
+    const folder = record.saveRun(run.taskDir, { ...publicRun(run, true), input: run.input, machine }, run.files);
     log(run, `recorded in ${folder}`);
   } catch (e) {
     log(run, `cannot record the run: ${e.message}`);
   }
+  emit('run', publicRun(run));
   if (run.done) run.done();
 }
 
@@ -408,12 +417,4 @@ function stopRun(id) {
   return run;
 }
 
-// Forget a finished run, transcript and all.
-function dismissRun(id) {
-  const run = getRun(id);
-  if (run.status === 'running') throw httpError(409, 'Stop the run first.');
-  runs.delete(id);
-  emit('remove', { run: id });
-}
-
-module.exports = { configure, subscribe, listRuns, publicRun, startRun, answerRun, stopRun, dismissRun, summarizeTool };
+module.exports = { configure, subscribe, listRuns, publicRun, startRun, answerRun, stopRun, summarizeTool };

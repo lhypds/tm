@@ -30,6 +30,10 @@
   min-width: 0;
 }
 
+.runs li[data-selected="true"] {
+  background: var(--bg-hover);
+}
+
 /* When the run was, a link as a file's name is */
 .name {
   min-width: 0;

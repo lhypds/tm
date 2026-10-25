@@ -4,7 +4,8 @@
 //   <task>/.claude_20261025143012/
 //     run.json         the run as the API answers it (server/ai.js), transcript included, plus `input`
 //                      (the first prompt claude was given) and `machine` (where it ran)
-//     prompt.txt       the task's prompt.txt as it was when the run began (left out when it had none)
+//     task.txt         the task's task.txt as it was when the run began (left out when it had none)
+//     prompt.txt       its prompt.txt as it was (left out when it had none)
 //     transcript.md    the same run, to read
 //
 // A dot folder: not an attachment in the web UI, not told to claude (ai/task.js listFiles), but synced
@@ -15,11 +16,13 @@
 const fs = require('fs');
 const path = require('path');
 
+const { TASK_FILE, PROMPT_FILE, formatDateTime } = require('../utils/taskUtils');
+
 const PREFIX = '.claude_';
 const RECORD_RE = /^\.claude_(\d{14})(?:-\d+)?$/;  // the time, and a number when two began the same second
 const RUN_FILE = 'run.json';
-const PROMPT_FILE = 'prompt.txt';
 const TRANSCRIPT_FILE = 'transcript.md';
+const COPIED_FILES = [TASK_FILE, PROMPT_FILE];  // the task's own files, copied as they were
 
 function httpError(status, message) {
   const e = new Error(message);
@@ -56,8 +59,8 @@ function transcript(record) {
   out.push(`- task: ${[t.work, t.repository, t.rel].filter(Boolean).join(' / ')}`);
   if (record.machine) out.push(`- machine: ${record.machine}`);
   if (record.cwd) out.push(`- folder: ${record.cwd}`);
-  out.push(`- started: ${new Date(record.startedAt).toISOString()}`);
-  if (record.endedAt) out.push(`- ended: ${new Date(record.endedAt).toISOString()} (${duration(record.endedAt - record.startedAt)})`);
+  out.push(`- started: ${formatDateTime(record.startedAt)}`);
+  if (record.endedAt) out.push(`- ended: ${formatDateTime(record.endedAt)} (${duration(record.endedAt - record.startedAt)})`);
   out.push(`- status: ${record.status}${record.error ? ` (${record.error})` : ''}`);
   if (record.model) out.push(`- model: ${record.model}`);
   if (record.sessionId) out.push(`- session: ${record.sessionId}`);
@@ -109,15 +112,15 @@ function transcript(record) {
 }
 
 // Write the record of a run that is over: `record` is the run as the API answers it with its
-// transcript, plus `input` and `machine`; `prompt` the task's prompt.txt text when it had one. Returns
-// the folder's name.
-function saveRun(taskDir, record, prompt) {
+// transcript, plus `input` and `machine`; `files` the task's own files as they were when the run
+// began, { "task.txt": text, "prompt.txt": text }, each left out when null. Returns the folder's name.
+function saveRun(taskDir, record, files = {}) {
   let name = `${PREFIX}${stamp(record.startedAt || Date.now())}`;
   for (let n = 2; fs.existsSync(path.join(taskDir, name)); n++) name = `${PREFIX}${stamp(record.startedAt || Date.now())}-${n}`;
   const dir = path.join(taskDir, name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, RUN_FILE), JSON.stringify(record, null, 2) + '\n');
-  if (typeof prompt === 'string') fs.writeFileSync(path.join(dir, PROMPT_FILE), prompt);
+  for (const f of COPIED_FILES) if (typeof files[f] === 'string') fs.writeFileSync(path.join(dir, f), files[f]);
   fs.writeFileSync(path.join(dir, TRANSCRIPT_FILE), transcript(record));
   return name;
 }

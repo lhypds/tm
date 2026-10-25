@@ -77,12 +77,14 @@
 }
 
 /* `tight` (the previews): the header row (its buttons, 22px tall) sits `--modal-top` from the top
-   edge (16px, as far as the content is from the sides and the bottom; a dialog may set its own on
-   the `.modal`), and the content has no room over it, so the bordered box starts close under the
-   title or the buttons. */
+   edge (16px, as far as the content is from the sides and the bottom) and `--modal-gap` over the
+   content (8px); a dialog may set its own on the `.modal`, and moving the same amount from one to
+   the other moves the row without moving the content. The content has no room over it, so the
+   bordered box starts right under the row. */
 .modal[data-tight="true"] .header {
-  min-height: calc(30px + var(--modal-top, 16px));
+  min-height: calc(22px + var(--modal-top, 16px) + var(--modal-gap, 8px));
   padding-top: var(--modal-top, 16px);
+  padding-bottom: var(--modal-gap, 8px);
 }
 
 /* ... and its close sits up in the corner, 10px from the top edge, above the row. */

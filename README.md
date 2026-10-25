@@ -153,7 +153,8 @@ Any other file in the folder is an attachment, except `prompt.txt` (optional): a
 agent working on the task, which the web UI's Task panel edits under the task's text (see [docs/Web UI.md](docs/Web%20UI.md))  
 and `tm run` hands to Claude Code with the task text and the list of the attachments (see `Command`),  
 and the `.claude_<time>` folders, one per run of Claude Code started from the web UI, written when the run is over:  
-`run.json` (the run and its transcript), `prompt.txt` (the prompt as it was) and `transcript.md` (the same, to read).  
+`run.json` (the run and its transcript), `task.txt` and `prompt.txt` (the task and its prompt as they were) and  
+`transcript.md` (the same run, to read).  
 They are not attachments, and are synced with the task, so the web UI's run button shows the last run wherever the task is.
 
 File example:
