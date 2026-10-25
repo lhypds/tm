@@ -334,6 +334,8 @@
     "turns_other": "{{count}} turns",
     "queued": "waiting for {{machine}}",
     "noRunner": "Runs on {{machine}}, which is not connected: start taskmgrd there with AI_RUNNER=1 in its .env",
-    "noMachine": "This copy was pushed without a machine id: Claude Code cannot run on it"
+    "noMachine": "This copy was pushed without a machine id: Claude Code cannot run on it",
+    "thinking": "Thinking",
+    "using": "Using {{tool}}"
   }
 }

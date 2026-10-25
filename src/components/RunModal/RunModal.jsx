@@ -102,7 +102,43 @@ function Transcript({ run, onAnswer }) {
       {(items || []).map((item, i) => (
         <Item key={i} item={item} pending={run.pending?.i === i} billed={run.billed} onAnswer={onAnswer} />
       ))}
-      {(!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <div className={`muted ${styles.working}`}>...</div>}
+      {(!run || ((run.status === "running" || run.status === "queued") && !run.pending)) && <Working run={run} />}
+    </div>
+  );
+}
+
+// The glyphs of the spinner, turned through one after another (as Claude Code's own does).
+const GLYPHS = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
+const GLYPH_MS = 120;
+
+// What Claude is at while the run goes, under the transcript: a glyph that turns, the tool being
+// used (the last one not done) or "thinking", dots that pulse one after the other, and how long the
+// run has been going. Still when the reader asked for less motion.
+function Working({ run }) {
+  const { t } = useTranslation();
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
+    const id = setInterval(() => setTick((n) => n + 1), GLYPH_MS);
+    return () => clearInterval(id);
+  }, []);
+  const items = run?.items || [];
+  const tool = [...items].reverse().find((it) => it.type === "tool" && !it.done);
+  const what = !run ? t("ai.starting") : run.status === "queued" ? t("ai.queued", { machine: run.machine }) : tool ? t("ai.using", { tool: tool.name }) : t("ai.thinking");
+  return (
+    <div className={`muted ${styles.working}`}>
+      <span className={styles.glyph} aria-hidden="true">
+        {GLYPHS[tick % GLYPHS.length]}
+      </span>
+      <span>
+        {what}
+        <span className={styles.dots} aria-hidden="true">
+          <i>.</i>
+          <i>.</i>
+          <i>.</i>
+        </span>
+      </span>
+      {run && <span className={styles.elapsed}>{duration(Date.now() - run.startedAt)}</span>}
     </div>
   );
 }

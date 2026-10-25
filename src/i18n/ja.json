@@ -334,6 +334,8 @@
     "turns_other": "{{count}} ターン",
     "queued": "{{machine}} を待っています",
     "noRunner": "{{machine}} で実行しますが、接続されていません：そのマシンの .env で AI_RUNNER=1 にして taskmgrd を起動してください",
-    "noMachine": "このコピーはマシン名なしで送られたため、Claude Code を実行できません"
+    "noMachine": "このコピーはマシン名なしで送られたため、Claude Code を実行できません",
+    "thinking": "考え中",
+    "using": "{{tool}} を使用中"
   }
 }
