@@ -52,7 +52,7 @@ the above; `PUSHING=0` turns it off: nothing is watched, nothing pushed, and `tm
 With both off, and `AI_RUNNER` off too (below), the daemon has nothing to do and does not start.  
 
 Polling: with `POLLING=1` in `.env`, the daemon pulls too. Every `POLLING_INTERVAL`  
-seconds (600, ten minutes, when it is not set) it runs the pull of `tm pull` (see the README: the server's  
+seconds (600, ten minutes, when it is not set) it runs the pull of `tm pull` (see [Commands.md](Commands.md): the server's  
 `taskmgr.json` merged into this one, every task file and other file of the works and repositories here that  
 the server also has added or updated, and the tasks the server deleted since the last sync deleted here),  
 so a change made on the server, or pushed to it by another machine, comes here as well. It pulls once  
@@ -60,8 +60,8 @@ when it starts, before its first push, so what the server has is taken in first 
 sends the folders as merged; after that a pull comes `POLLING_INTERVAL` seconds after the last  
 one ended. Before a pull, a change here still waiting out its 10 seconds is looked at and pushed, so it  
 reaches the server first. A pull never writes over a change made here: when a folder has one not pushed  
-yet (the push failed, or the change came in between), it pulls nothing and says so (see `tm pull` in the  
-README), the rescan after it pushes the change, and the next pull goes through. While it runs nothing is  
+yet (the push failed, or the change came in between), it pulls nothing and says so (see `tm pull` in  
+[Commands.md](Commands.md)), the rescan after it pushes the change, and the next pull goes through. While it runs nothing is  
 pushed; after it the server is asked what it has and every folder compared, as at a rescan. The pull's lines go to the  
 daemon's `logs/taskmgrd.log`, and a pull that fails is only told there (and in `pm2 logs taskmgrd`):  
 the next one comes at the next interval. With `POLLING=0`, or unset, the daemon only pushes,  
@@ -84,7 +84,7 @@ follows sends them back), and a task the server has that is not here yet is made
 daemon, or with `AI_RUNNER` off, the server's run button for this machine's tasks is greyed out and says so; a run  
 asked for shows as "waiting for <machine>" until this machine starts it. The runs are kept in this daemon's memory  
 (the server shows them again after its own restart, from here): the web UI on this machine, another process, does  
-not list them. A run that is over is written into the task folder as `.claude_<time>/` (see the README's `Task folder`)  
+not list them. A run that is over is written into the task folder as `.claude_<time>/` (see [Task file.md](Task%20file.md))  
 and pushed with the task like any file in it, so the server shows it after it is over for as long as the folder is  
 there; clearing it in the server's web UI removes it here, through the same connection. What claude writes to stderr goes to `logs/ai.log`, as for the web UI's own runs. Anyone logged in to  
 the server's web UI can so run code on this machine, with the permissions above: turn the runner on only for a server  
@@ -130,6 +130,6 @@ stopped until the next `./start.sh`. The daemon alone, with pm2's own commands (
 `pm2 startup` then `pm2 save` make it start with the machine, as the web UI  
 `pnpm run daemon` runs it in the foreground without pm2 (Ctrl+C to stop), to see what it does  
 `tm push` pushes once, by hand, and exits: `taskmgr.json` and every tasks folder that differs from the server's copy, whether or not the daemon runs (it exits with an error when the server cannot be reached or refuses)  
-`tm pull` is the other direction, once: it fetches `taskmgr.json`, the task files and the other files from the server and adds or updates them here, and deletes the tasks the server deleted since the last sync, but no other file (see the README)  
+`tm pull` is the other direction, once: it fetches `taskmgr.json`, the task files and the other files from the server and adds or updates them here, and deletes the tasks the server deleted since the last sync, but no other file (see [Commands.md](Commands.md))  
 
 For the API the daemon uses, see [Server.md](Server.md).  
