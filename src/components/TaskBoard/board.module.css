@@ -141,10 +141,12 @@
   color: var(--bg);
 }
 
-/* The details after the name, on the same line in grey, as far from it as the tag is. Their line
-   breaks are folded into spaces, and they break at any character, as the name does. */
+/* The details after the name, on the same line in grey and a size smaller, as in the list, as far
+   from it as the tag is. Their line breaks are folded into spaces, and they break at any character,
+   as the name does. */
 .cardDetail {
   margin-left: 8px;
+  font-size: 11px;
   color: var(--muted);
   word-break: break-all;
 }
