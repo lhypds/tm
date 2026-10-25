@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { FromTag, TaskActions } from "@components/TaskList";
-import TreeLines from "@components/TreeLines";
+import { FromTag } from "@components/TaskList";
 import { describe, formatStamp } from "@utils/task";
 import styles from "./board.module.css";
 
@@ -9,18 +8,16 @@ import styles from "./board.module.css";
 // are shown (`statuses` says which columns a board has).
 export const BOARD_STATUSES = ["todo", "done", "pending", "aborted"];
 
-// A task's own status as a column: anything that is not done, pending or aborted is still to do.
-const ownStatus = (task) => (BOARD_STATUSES.includes(task.status) ? task.status : "todo");
+// The column a task sits in: that of its status; anything that is not done, pending or aborted is
+// still to do.
+export const boardStatus = (task) => (BOARD_STATUSES.includes(task.status) ? task.status : "todo");
 
-// The column a task sits in: a subtask's is its task's (`column`, set when the rows are built),
-// whatever its own status; a task at the top sits in the column of its status.
-export const boardStatus = (task) => task.column || ownStatus(task);
-
-// The progress view: a column per status in `statuses` with the tasks as cards, each task's subtasks as cards
-// under it, drawn as a tree like the list (`tasks` are the rows in order, with their `depth`,
-// `through` and `last`, see flattenTasks). Dragging a card into another column sets the task to
-// that status (`onMove`); a subtask stays under its task, in grey when its status is not the
-// column's. As in the list, a click only selects and a double click opens the preview (`onPreview`).
+// The progress view: a column per status in `statuses` with the tasks as cards. Only the tasks at
+// the top of the folder are cards (`tasks`, in order): a task's subtasks are not shown under it,
+// as the list does; its card has a subtasks button instead (how many, at its bottom right), which opens that task's
+// folder (`onSubtasks`), so its subtasks show on a board of their own. Dragging a card into another
+// column sets the task to that status (`onMove`). As in the list, a click only selects and a double
+// click opens the preview (`onPreview`).
 export default function TaskBoard({
   tasks,
   statuses = BOARD_STATUSES,
@@ -29,10 +26,8 @@ export default function TaskBoard({
   onFocusStatus,
   onSelect,
   onPreview,
-  onOpen,
-  onOpenFolder,
-  onDelete,
   onMove,
+  onSubtasks,
 }) {
   const [dragKey, setDragKey] = useState(null);
   const selectedRef = useRef(null);
@@ -43,7 +38,7 @@ export default function TaskBoard({
   function drop(status) {
     const task = tasks.find((t) => t.key === dragKey);
     setDragKey(null);
-    if (task && ownStatus(task) !== status) onMove(task, status);
+    if (task && boardStatus(task) !== status) onMove(task, status);
   }
 
   return (
@@ -76,9 +71,7 @@ export default function TaskBoard({
           onDragEnd={() => setDragKey(null)}
           onSelect={onSelect}
           onPreview={onPreview}
-          onOpen={onOpen}
-          onOpenFolder={onOpenFolder}
-          onDelete={onDelete}
+          onSubtasks={onSubtasks}
         />
       ))}
     </div>
@@ -100,9 +93,7 @@ function Column({
   onDragEnd,
   onSelect,
   onPreview,
-  onOpen,
-  onOpenFolder,
-  onDelete,
+  onSubtasks,
 }) {
   const { t: tr } = useTranslation();
 
@@ -125,31 +116,50 @@ function Column({
       <div className={styles.cards}>
         {cards.map((t) => {
           const detail = describe(t.details);
+          const count = t.subtaskCount || 0;
           return (
-            <div key={t.key} className={styles.cardRow} style={{ "--depth": t.depth || 0 }}>
-              <TreeLines depth={t.depth || 0} through={t.through} last={t.last} />
-              <div
-                ref={t.key === selectedKey ? selectedRef : null}
-                className={styles.card}
-                data-selected={t.key === selectedKey}
-                data-dragging={t.key === dragKey}
-                data-off={ownStatus(t) !== status}
-                role="button"
-                tabIndex={0}
-                draggable
-                onDragStart={(e) => onDragStart(e, t)}
-                onDragEnd={onDragEnd}
-                onFocus={() => onSelect(t)}
-                onClick={() => onSelect(t)}
-                onDoubleClick={() => onPreview(t)}
-              >
-                <div className={styles.cardTitle}>
-                  <FromTag task={t} />
-                  <span className={styles.cardName}>{t.title || <span className="muted">{tr("common.untitled")}</span>}</span>
-                  {detail && <span className={styles.cardDetail}>{detail}</span>}
-                </div>
-                <div className={`mono ${styles.cardStamp}`}>{formatStamp(t.id)}</div>
-                <TaskActions task={t} className={styles.actions} onOpen={onOpen} onOpenFolder={onOpenFolder} onDelete={onDelete} />
+            <div
+              key={t.key}
+              ref={t.key === selectedKey ? selectedRef : null}
+              className={styles.card}
+              data-selected={t.key === selectedKey}
+              data-dragging={t.key === dragKey}
+              role="button"
+              tabIndex={0}
+              draggable
+              onDragStart={(e) => onDragStart(e, t)}
+              onDragEnd={onDragEnd}
+              onFocus={() => onSelect(t)}
+              onClick={() => onSelect(t)}
+              onDoubleClick={() => onPreview(t)}
+            >
+              <div className={styles.cardTitle}>
+                <FromTag task={t} />
+                <span className={styles.cardName}>{t.title || <span className="muted">{tr("common.untitled")}</span>}</span>
+                {detail && <span className={styles.cardDetail}>{detail}</span>}
+              </div>
+              <div className={styles.cardFoot}>
+                <span className={`mono ${styles.cardStamp}`}>{formatStamp(t.id)}</span>
+                {count > 0 && (
+                  <button
+                    type="button"
+                    className={styles.subtasks}
+                    title={tr("board.showSubtasks", { name: t.title || t.id })}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDragStart={(e) => {
+                      // the button is in the card, which is draggable: a press on it must not pick the card up
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSubtasks(t);
+                    }}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                  >
+                    {count}
+                  </button>
+                )}
               </div>
             </div>
           );

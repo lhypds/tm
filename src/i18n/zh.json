@@ -32,7 +32,6 @@
     "filter": "搜索任务...",
     "filterLabel": "筛选任务",
     "clearFilter": "清除筛选",
-    "up": "上级",
     "refresh": "刷新",
     "newTask": "新建任务",
     "newSubtask": "新建子任务",
@@ -91,6 +90,9 @@
     "noOrigins": "taskmgr.json 中没有 origin。",
     "openFolder": "打开文件夹",
     "showHidden": "显示已隐藏的 work（{{count}}）"
+  },
+  "board": {
+    "showSubtasks": "显示“{{name}}”的子任务"
   },
   "list": {
     "markTodo": "标为待办",
@@ -167,6 +169,10 @@
     "open": {
       "keys": "o；Progress 中按 enter",
       "desc": "打开任务文件夹"
+    },
+    "into": {
+      "keys": "⌘↓ / ⌘↑",
+      "desc": "进入选中的任务（其子任务）/ 返回上级"
     },
     "copy": {
       "keys": "⌘c / ctrl+c",

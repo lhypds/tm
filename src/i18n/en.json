@@ -32,7 +32,6 @@
     "filter": "Search task...",
     "filterLabel": "Filter tasks",
     "clearFilter": "Clear filter",
-    "up": "Up",
     "refresh": "Refresh",
     "newTask": "New task",
     "newSubtask": "New subtask",
@@ -91,6 +90,9 @@
     "noOrigins": "No origins in taskmgr.json.",
     "openFolder": "Open folder",
     "showHidden": "Show hidden works ({{count}})"
+  },
+  "board": {
+    "showSubtasks": "Show the subtasks of “{{name}}”"
   },
   "list": {
     "markTodo": "Mark as todo",
@@ -167,6 +169,10 @@
     "open": {
       "keys": "o; enter in progress",
       "desc": "open the task folder"
+    },
+    "into": {
+      "keys": "⌘↓ / ⌘↑",
+      "desc": "into the selected task (its subtasks) / up out of it"
     },
     "copy": {
       "keys": "⌘c / ctrl+c",

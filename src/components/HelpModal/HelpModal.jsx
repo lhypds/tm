@@ -4,7 +4,7 @@ import styles from "./help.module.css";
 
 // The same bindings as the terminal UI (cli.js), with the web's meaning where it differs.
 // Each is help.<id>.keys and help.<id>.desc in the translations.
-const SHORTCUTS = ["move", "nav", "toTree", "fromTree", "tab", "add", "unselect", "edit", "open", "copy", "preview", "files", "prompt", "done", "pending", "aborted", "delete", "refresh", "command", "quit"];
+const SHORTCUTS = ["move", "nav", "toTree", "fromTree", "tab", "add", "unselect", "edit", "open", "into", "copy", "preview", "files", "prompt", "done", "pending", "aborted", "delete", "refresh", "command", "quit"];
 
 export default function HelpModal({ isOpen, onClose }) {
   const { t } = useTranslation();

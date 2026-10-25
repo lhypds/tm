@@ -32,7 +32,6 @@
     "filter": "タスクを検索...",
     "filterLabel": "タスクを絞り込む",
     "clearFilter": "絞り込みを解除",
-    "up": "上へ",
     "refresh": "更新",
     "newTask": "新規タスク",
     "newSubtask": "サブタスクを追加",
@@ -91,6 +90,9 @@
     "noOrigins": "taskmgr.json に origin がありません。",
     "openFolder": "フォルダを開く",
     "showHidden": "非表示の work を表示（{{count}}）"
+  },
+  "board": {
+    "showSubtasks": "「{{name}}」のサブタスクを表示"
   },
   "list": {
     "markTodo": "ToDoにする",
@@ -167,6 +169,10 @@
     "open": {
       "keys": "o；進捗で enter",
       "desc": "タスクフォルダを開く"
+    },
+    "into": {
+      "keys": "⌘↓ / ⌘↑",
+      "desc": "選択中のタスクの中へ（サブタスク）/ 上の階層へ"
     },
     "copy": {
       "keys": "⌘c / ctrl+c",

@@ -55,22 +55,13 @@
   display: none;
 }
 
-/* A card in its row. A subtask's card is indented 20px per level under its task's, with the tree
-   lines (TreeLines) before it, level 0 at 8px. The 8px between cards is the row's top padding,
-   not a gap, so the lines run on through it from the card above; the elbow points at the middle
-   of the card's first line: that 8px, the border, the card's 8px padding and half of 16px. */
-.cardRow {
-  position: relative;
-  padding: 8px 0 0 calc(20px * var(--depth, 0));
-  --tree-left: 8px;
-  --tree-mid: 25px;
-}
-
+/* The cards, 8px apart. */
 .card {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 8px;
   padding: 8px 10px;
   border: var(--line) solid var(--border);
   background: var(--bg);
@@ -86,12 +77,6 @@
 
 .card[data-dragging="true"] {
   opacity: 0.4;
-}
-
-/* A subtask whose own status is not the column's (its task's): in grey, as in the list. */
-.card[data-off="true"] .cardTitle,
-.card[data-off="true"] .cardStamp {
-  color: var(--muted);
 }
 
 /* The repository (in a list of several), the task's name and its details, one inline flow as in
@@ -117,11 +102,43 @@
   word-break: break-all;
 }
 
-/* The created time, on the last line beside the hover buttons. */
+/* The last line: the created time on the left, the subtasks button at the right end. */
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 14px;
+}
+
 .cardStamp {
   font-size: 10px;
   line-height: 14px;
   color: var(--fg);
+}
+
+/* The subtasks button: just how many the task has, in the card's bottom right corner, in grey
+   until hovered. */
+.subtasks {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.subtasks:hover {
+  background: var(--border);
+  color: var(--bg);
 }
 
 /* The details after the name, on the same line in grey, as far from it as the tag is. Their line
@@ -130,19 +147,6 @@
   margin-left: 8px;
   color: var(--muted);
   word-break: break-all;
-}
-
-
-/* The edit / open folder / delete buttons float at the bottom right on hover, beside the created
-   time, so they take no row of their own. */
-.actions {
-  position: absolute;
-  bottom: 7px;
-  right: 10px;
-}
-
-.card:hover .actions {
-  visibility: visible;
 }
 
 

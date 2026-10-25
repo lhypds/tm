@@ -335,6 +335,7 @@ export default function Home({ all = false }) {
           key: keyOf(s, task.rel),
           from,
           fromParts,
+          subtaskCount: (task.subtasks || []).length, // all of them, whatever a filter keeps (the board's subtasks button)
           subtasks: (task.subtasks || []).map(decorate),
         });
         return decorate(t);
@@ -362,14 +363,15 @@ export default function Home({ all = false }) {
       (!q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.from.toLowerCase().includes(q)) &&
       (showAbort || t.status !== "aborted") &&
       (view === "board" || ((showDone || t.status !== "done") && (showPending || t.status !== "pending")));
-    // Both views show every task under its parent, which stays when a subtask of it is kept. The
-    // list leaves the done, the pending and the aborted tasks out unless they are shown. The board
-    // always has its todo / done / pending columns, and its aborted column while aborted tasks are shown;
-    // a task at the top sits in the column of its status with its subtasks under it, whatever
-    // theirs (`column` says which), and on it j / k go down a column and on into the next one.
+    // A task stays when a subtask of it is kept, so a filter never hides a task that matches it.
+    // The list shows every task under its parent, and leaves the done, the pending and the aborted
+    // tasks out unless they are shown. The board always has its todo / done / pending columns, and
+    // its aborted column while aborted tasks are shown; only the tasks at the top are its cards,
+    // each in the column of its status (its subtasks are a board of their own, see enterTask), and
+    // on it j / k go down a column and on into the next one.
     const kept = filterTasks(tree, keep);
     if (view !== "board") return flattenTasks(kept);
-    return boardStatuses.flatMap((s) => flattenTasks(kept.filter((t) => boardStatus(t) === s)).map((r) => ({ ...r, column: s })));
+    return boardStatuses.flatMap((s) => kept.filter((t) => boardStatus(t) === s));
   }, [tree, query, view, showDone, showPending, showAbort, boardStatuses, monthKey]);
 
   // No row is selected until one is chosen, or when the selected task is not in this list (a new
@@ -590,6 +592,13 @@ export default function Home({ all = false }) {
   const toggleAbort = (task) => setStatus(task, task.status === "aborted" ? "todo" : "aborted");
 
   const goTo = (rel) => setSearchParams(rel ? { dir: rel } : {});
+
+  // Into a task's folder, so its subtasks are the list (the board's subtasks button): in the
+  // task's own space, since a list of several spaces has no folder of its own.
+  function enterTask(task) {
+    const { origin: o, work: w, repository: r } = task.space;
+    navigate({ pathname: api.spacePath(o, w, r), search: `?${new URLSearchParams({ dir: task.rel })}` });
+  }
 
   // Up one folder, selecting the task we came out of; at the top, over to the tree.
   function goUp() {
@@ -980,6 +989,16 @@ export default function Home({ all = false }) {
       setHelp(false);
       return true;
     }
+    // cmd+down goes into the selected task (its subtasks are the list), cmd+up back out to the
+    // folder above, as in the Finder; at the top cmd+up does nothing.
+    if (name === "cmd+down") {
+      if (selected && pane !== "tree") enterTask(selected);
+      return true;
+    }
+    if (name === "cmd+up") {
+      if (!data.isRoot) goUp();
+      return true;
+    }
     if (name === "Tab") {
       if (pane !== "tree") {
         setTreeOpen(true);
@@ -1170,10 +1189,8 @@ export default function Home({ all = false }) {
           setSelectedKey(t.key);
         }}
         onPreview={setPeek}
-        onOpen={openEditor}
-        onOpenFolder={openFolder}
-        onDelete={setConfirm}
         onMove={setStatus}
+        onSubtasks={enterTask}
       />
     );
   } else {
@@ -1265,12 +1282,6 @@ export default function Home({ all = false }) {
         </div>
 
         <div className={styles.actions}>
-          {!data.isRoot && (
-            <button type="button" className="btn" onClick={() => goTo(data.parent || "")}>
-              <ChevronLeftIcon />
-              {t("header.up")}
-            </button>
-          )}
           <button
             type="button"
             className="btn"

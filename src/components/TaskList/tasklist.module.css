@@ -175,43 +175,6 @@
   margin-left: 8px;
 }
 
-/* The edit, open folder and delete buttons, shown only while a progress card is hovered. */
-.rowActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  visibility: hidden;
-}
-
-.rowButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  line-height: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.rowButton svg {
-  width: 12px;
-  height: 12px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.rowButton:hover,
-.rowButton:focus-visible {
-  color: var(--fg);
-}
-
 /* The details after the title, on the same line in grey, as far from it as the tags are. They
    break at any character, so even a long run without spaces starts right after the title instead
    of on the next line. */

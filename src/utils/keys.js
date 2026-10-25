@@ -41,8 +41,9 @@ export function keyName(e) {
 }
 
 // Page-level shortcuts, as in the terminal UI. The handler gets (name, event) for plain key
-// presses outside text fields and returns true when it used the key. The latest handler is read
-// at key time so it can close over fresh state.
+// presses outside text fields and returns true when it used the key. The one chord is cmd (or
+// ctrl) with up / down, as "cmd+up" / "cmd+down": into and out of a folder, as in the macOS
+// Finder. The latest handler is read at key time so it can close over fresh state.
 export function useShortcuts(handler) {
   const ref = useRef(handler);
   useEffect(() => {
@@ -51,8 +52,13 @@ export function useShortcuts(handler) {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isTyping(e)) return;
-      const name = keyName(e);
+      if (e.defaultPrevented || e.altKey || isTyping(e)) return;
+      let name = keyName(e);
+      if (e.ctrlKey || e.metaKey) {
+        if (e.ctrlKey && e.metaKey) return;
+        if (name !== "up" && name !== "down") return;
+        name = `cmd+${name}`;
+      }
       if ((name === "enter" || name === "space") && isControl(e.target)) return;
       if (ref.current(name, e)) e.preventDefault();
     };

@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import * as api from "@utils/api";
-import { EditIcon, FolderIcon, TrashIcon } from "@components/icons";
 import TreeLines from "@components/TreeLines";
 import { describe, formatStamp } from "@utils/task";
 import styles from "./tasklist.module.css";
@@ -16,24 +15,6 @@ function DoneBox({ checked, pending, aborted, onChange, title }) {
         {pending ? "p" : aborted ? "a" : null}
       </span>
     </label>
-  );
-}
-
-// A small button at the right end of a row's title, shown while the row is hovered (as in the tree).
-function RowButton({ label, className = "", onClick, children }) {
-  return (
-    <button
-      type="button"
-      className={`${styles.rowButton} ${className}`}
-      title={label}
-      aria-label={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -59,24 +40,6 @@ export function FromTag({ task }) {
         </span>
       ))}
     </Link>
-  );
-}
-
-// A task's edit, open folder and delete buttons, shown while its row (or card) is hovered.
-export function TaskActions({ task, className = "", onOpen, onOpenFolder, onDelete }) {
-  const { t: tr } = useTranslation();
-  return (
-    <div className={`${styles.rowActions} ${className}`}>
-      <RowButton label={tr("common.edit")} onClick={() => onOpen(task)}>
-        <EditIcon />
-      </RowButton>
-      <RowButton label={tr("tree.openFolder")} onClick={() => onOpenFolder(task)}>
-        <FolderIcon />
-      </RowButton>
-      <RowButton label={tr("delete.title")} onClick={() => onDelete(task)}>
-        <TrashIcon />
-      </RowButton>
-    </div>
   );
 }
 
