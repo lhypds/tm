@@ -175,11 +175,12 @@
   margin-left: 8px;
 }
 
-/* The details after the title, on the same line in grey, as far from it as the tags are. They
-   break at any character, so even a long run without spaces starts right after the title instead
-   of on the next line. */
+/* The details after the title, on the same line in grey and a size smaller, as far from it as the
+   tags are. They break at any character, so even a long run without spaces starts right after the
+   title instead of on the next line. */
 .detail {
   margin-left: 8px;
+  font-size: 11px;
   word-break: break-all;
   color: var(--muted);
 }
