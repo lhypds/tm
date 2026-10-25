@@ -19,7 +19,8 @@
 // does, so a change made on the server, or pushed to it by another machine, comes here. With
 // AI_RUNNER=1 it also runs Claude Code for the server: a task pushed from here can be run from the
 // server's web UI, and runs here, where the tasks, the source code and the claude login are (see
-// ai/runner.js). With all three off, or without SYNC_SERVER, it has nothing to do, and with a
+// ai/runner.js); with AI_RUNNER_WINDOW=1 as well, each of those runs opens a terminal window here
+// that shows it as it goes (ai/window.js). With all three off, or without SYNC_SERVER, it has nothing to do, and with a
 // POLLING_INTERVAL that is not a number of seconds it cannot poll: it says so and exits with 0 (pm2
 // then leaves it stopped rather than starting it again and again, see ecosystem.config.cjs).
 const fs = require('fs');
@@ -37,6 +38,7 @@ const isOn = (v) => /^(1|true|yes|on)$/i.test(String(v || '').trim());
 const PUSHING = String(process.env.PUSHING || '').trim() === '' || isOn(process.env.PUSHING);
 const POLLING = isOn(process.env.POLLING);
 const AI_RUNNER = isOn(process.env.AI_RUNNER);
+const AI_RUNNER_WINDOW = AI_RUNNER && isOn(process.env.AI_RUNNER_WINDOW);
 function notRunning(why) {
   console.log(`taskmgrd: ${why}; not running.`);
   process.exit(0);
@@ -403,7 +405,7 @@ log(`  server     : ${SERVER}`);
 log(`  machine    : ${MACHINE_ID}`);
 log(`  pushing    : ${PUSHING ? 'on' : 'off (PUSHING=0 in .env)'}`);
 log(`  polling    : ${POLLING ? `tm pull every ${POLLING_INTERVAL_S % 60 === 0 ? `${POLLING_INTERVAL_S / 60} min` : `${POLLING_INTERVAL_S}s`}` : 'off (POLLING=1 in .env turns it on)'}`);
-log(`  ai runner  : ${AI_RUNNER ? 'on: runs Claude Code here for the server' : 'off (AI_RUNNER=1 in .env turns it on)'}`);
+log(`  ai runner  : ${AI_RUNNER ? `on: runs Claude Code here for the server${AI_RUNNER_WINDOW ? ', each run in a terminal window here' : ' (AI_RUNNER_WINDOW=1 in .env opens a terminal window for each run)'}` : 'off (AI_RUNNER=1 in .env turns it on)'}`);
 
 const first = readConfig();
 if (!first) die(`${CONFIG_PATH} could not be read, or is invalid (see above).`);
@@ -419,8 +421,8 @@ else if (PUSHING) rescan();
 if (PUSHING) setInterval(rescan, RESCAN_MS);
 
 // The runner: Claude Code run here for the server (ai/runner.js), logging what claude writes to
-// stderr where the web UI's runs do.
-const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log') }) : null;
+// stderr where the web UI's runs do, and each run in a terminal window here when asked.
+const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log'), window: AI_RUNNER_WINDOW }) : null;
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {

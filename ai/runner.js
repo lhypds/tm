@@ -15,6 +15,10 @@
 // until then (the push that follows sends them back, so nothing is lost; a file the server has not is
 // left as it is here). A task the server has at a path this machine has not is looked for by its id
 // (it may be in another status folder here) and, when it is nowhere here, made at that path.
+//
+// With `window` on (AI_RUNNER_WINDOW=1 in .env) each run also opens a terminal window on this machine
+// that shows the transcript as it grows (ai/window.js), for whoever sits here; the server's browser
+// is where the run is answered, as before.
 const fs = require('fs');
 const path = require('path');
 
@@ -22,6 +26,7 @@ const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId } = require('../utils/t
 const { resolveConfig } = require('../server/config');
 const { isDirectory, spaceOf, taskDirIn, taskDirsUnder } = require('./task');
 const { deleteRecord } = require('./record');
+const { watchRuns } = require('./window');
 
 const RETRY_MS = [2000, 5000, 15000, 60000];  // waits before connecting again, the last one repeating
 const FLUSH_MS = 50;                          // events are sent together after this long
@@ -55,9 +60,11 @@ async function* sseMessages(body) {
 // Start the runner; `server` is SYNC_SERVER, `token` SYNC_SERVER_TOKEN, `machineId` MACHINE_ID, and
 // log / warn the daemon's. `session` is this machine's runs (ai/session.js unless a test gives
 // another), `getWorks` the works of taskmgr.json as they are now (read each time, as the file may
-// change), `logFile` where the runs log what claude writes to stderr. Returns { stop }.
-function startRunner({ server, token, machineId, log, warn, logFile, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
+// change), `logFile` where the runs log what claude writes to stderr, `window` whether each run opens
+// a terminal window here (AI_RUNNER_WINDOW). Returns { stop }.
+function startRunner({ server, token, machineId, log, warn, logFile, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
   session.configure({ logFile, machine: machineId });
+  const unwatch = window ? watchRuns(session, { server, machine: machineId, log, warn }) : null;
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId) };
 
   let stopped = false;
@@ -263,6 +270,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, session = r
       stopped = true;
       connected = false;
       if (abort) abort.abort();
+      if (unwatch) unwatch();
     }
   };
 }

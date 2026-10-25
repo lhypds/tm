@@ -90,6 +90,16 @@ there; clearing it in the server's web UI removes it here, through the same conn
 the server's web UI can so run code on this machine, with the permissions above: turn the runner on only for a server  
 you trust.  
 
+Watching the runs here: with `AI_RUNNER_WINDOW=1` in `.env` as well, each run opens a terminal window on this machine as it  
+starts, which shows the transcript as the server's web UI does, Claude's text as it is written, each tool call with its  
+result, what Claude asks (with "waiting for the answer in the web UI of ...", since the answer is still given in the  
+server's browser) and the answer when it comes, then how the run ended; Enter closes it. The window is Terminal.app on  
+macOS (the first time, macOS asks you to let node control Terminal; a window refused is told in the daemon's log), a new  
+console window on Windows, and on Linux the first found of `x-terminal-emulator`, `gnome-terminal`, `konsole`,  
+`xfce4-terminal` and `xterm`. It needs the daemon in a session with a display: one started by `./start.sh` from your  
+desktop session is; a machine without one logs that no window could be opened and the run goes on as usual. The window  
+only shows: nothing is answered in it. Off when not set.  
+
 On the server: set `SYNC_SERVER_TOKEN` in `.env` to a secret of your choice and restart the web UI  
 (`./start.sh`); its startup lines then say `sync : receiving from taskmgrd`. Without the token the  
 server refuses pushes. The copied files are git-ignored. What each machine pushes and polls is logged  
