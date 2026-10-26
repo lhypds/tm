@@ -16,12 +16,6 @@
   outline: none;
   resize: none;
   box-sizing: border-box;
-  /* It still scrolls, with no scrollbar; the text wraps, so there is never a horizontal one. */
-  scrollbar-width: none;
-}
-
-.textarea::-webkit-scrollbar {
-  display: none;
 }
 
 .handle {

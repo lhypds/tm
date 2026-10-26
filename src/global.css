@@ -32,6 +32,16 @@ body {
   overscroll-behavior: none;
 }
 
+/* Nothing in the app shows a scrollbar, in either direction; everything that overflows still
+   scrolls (wheel, trackpad, keys). One rule here, so no component needs its own. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   font-family: var(--font);
   font-size: 12px;

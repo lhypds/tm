@@ -55,23 +55,18 @@ textarea.text {
   margin: auto;
 }
 
-/* Zoomed in, the image pans with no scrollbar, the usual image-viewer feel. */
+/* Zoomed in, the image pans, the usual image-viewer feel. */
 .image {
   flex: 1;
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  scrollbar-width: none;
   display: flex;
   align-items: center;
   justify-content: center;
   border: var(--line) solid var(--border);
   background: var(--bg-alt);
   cursor: zoom-in;
-}
-
-.image::-webkit-scrollbar {
-  display: none;
 }
 
 .image img {

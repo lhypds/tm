@@ -190,7 +190,6 @@
   width: 340px;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: none;
   transition: width 0.15s ease;
 }
 
@@ -240,30 +239,6 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-}
-
-/* The details still scroll, just without a visible scrollbar. */
-.detail::-webkit-scrollbar {
-  display: none;
-}
-
-/* The task list hides only its vertical scrollbar; when the pane is narrower than the list, the
-   horizontal one shows. (No scrollbar-width here: it would hide both, and override this.) */
-.main::-webkit-scrollbar,
-.scroll::-webkit-scrollbar {
-  width: 0;
-  height: 8px;
-}
-
-/* Once the scrollbar is styled, the browser draws no thumb of its own. */
-.main::-webkit-scrollbar-thumb,
-.scroll::-webkit-scrollbar-thumb {
-  background: var(--faint);
-}
-
-.main::-webkit-scrollbar-thumb:hover,
-.scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
 }
 
 .state {
