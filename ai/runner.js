@@ -24,7 +24,7 @@ const path = require('path');
 
 const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId } = require('../utils/taskUtils');
 const { resolveConfig } = require('../server/config');
-const { isDirectory, spaceOf, taskDirIn, taskDirsUnder } = require('./task');
+const { isDirectory, spaceOf, taskDirIn, taskDirsUnder, afterOf } = require('./task');
 const { deleteRecord } = require('./record');
 const { watchRuns } = require('./window');
 
@@ -181,7 +181,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, window = fa
         case 'run': {
           const { space, taskDir, made } = locate(cmd);
           const written = writeFiles(taskDir, cmd.files);
-          const run = session.startRun({ id: String(cmd.run || '') || null, space, taskDir, taskRef: { work: space.work, repository: space.repository, rel: String(cmd.rel || '') } });
+          const run = session.startRun({ id: String(cmd.run || '') || null, space, taskDir, taskRef: { work: space.work, repository: space.repository, rel: String(cmd.rel || '') }, after: afterOf(cmd.after) });
           log(`runner: run ${run.id}: ${run.task.id} ${run.task.title} in ${run.cwd}${made ? ' (task made here)' : ''}${written.length ? ` (${written.join(', ')} written)` : ''}`);
           break;
         }

@@ -139,8 +139,9 @@ function fail(run, error) {
 // will give it, until the machine starts it (its `run` event takes over) or refuses (then it is
 // forgotten and the refusal thrown). `task` is { work, repository, rel, id, title, key } as the
 // browser names the task, `taskDir` the copy's folder here, `files` the task's text files as they
-// are here ({ "task.txt": text, "prompt.txt": text | null }), written there before the run.
-async function startRun({ machine, task, taskDir, files }) {
+// are here ({ "task.txt": text, "prompt.txt": text | null }), written there before the run, and
+// `after` what Claude is told to do with its changes once done ("push", "pr" or null; see ai/task.js).
+async function startRun({ machine, task, taskDir, files, after = null }) {
   if (!machines.has(machine)) throw notConnected(machine);
   for (const r of runs.values()) {
     if (r.task.key === task.key && (r.status === 'running' || r.status === 'queued')) throw httpError(409, 'Claude Code is already running on this task.');
@@ -151,6 +152,7 @@ async function startRun({ machine, task, taskDir, files }) {
     task,
     cwd: null,
     taskDir,
+    after,
     status: 'queued',
     startedAt: Date.now(),
     endedAt: null,
@@ -165,7 +167,7 @@ async function startRun({ machine, task, taskDir, files }) {
   runs.set(run.id, run);
   emit('run', publicRun(run));
   try {
-    await command(machine, { type: 'run', run: run.id, work: task.work, repository: task.repository, rel: task.rel, files });
+    await command(machine, { type: 'run', run: run.id, work: task.work, repository: task.repository, rel: task.rel, files, after });
   } catch (e) {
     if (runs.get(run.id) === run && run.status === 'queued') {
       runs.delete(run.id);

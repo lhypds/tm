@@ -315,6 +315,8 @@
   },
   "ai": {
     "run": "Run with Claude Code",
+    "afterPush": "Commit and push",
+    "afterPr": "Create PR",
     "show": "Show the run",
     "stop": "Stop Claude Code",
     "titleOf": "Claude: {{title}}",

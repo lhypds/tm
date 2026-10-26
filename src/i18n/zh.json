@@ -315,6 +315,8 @@
   },
   "ai": {
     "run": "用 Claude Code 执行",
+    "afterPush": "Commit and push",
+    "afterPr": "Create PR",
     "show": "查看运行",
     "stop": "停止 Claude Code",
     "titleOf": "Claude：{{title}}",

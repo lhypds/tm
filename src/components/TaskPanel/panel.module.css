@@ -16,6 +16,22 @@
   flex-direction: column;
 }
 
+/* Under the prompt's text: the two checkboxes saying what Claude does with its changes after the work
+   (commit and push, or a pull request), on one line, before the runs. */
+.after {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 8px 12px;
+  border-top: var(--line) solid var(--border);
+  font-size: 12px;
+}
+
+.afterCheck {
+  color: var(--fg);
+}
+
 /* The files under the text (their "Files" head close under the line), and the overlay while files
    are dragged over the panel. */
 .files {

@@ -315,6 +315,8 @@
   },
   "ai": {
     "run": "Claude Code で実行",
+    "afterPush": "Commit and push",
+    "afterPr": "Create PR",
     "show": "実行を表示",
     "stop": "Claude Code を停止",
     "titleOf": "Claude：{{title}}",

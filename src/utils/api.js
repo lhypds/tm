@@ -164,8 +164,9 @@ export const spacePath = (origin, work, repository) =>
 export const runEventsUrl = "/api/ai/events";
 
 // Start Claude Code on the task at `rel` in the space; resolves to { run } with its transcript (409
-// while the task has a run going).
-export const startRun = (space, rel) => request("/api/ai/run", json("POST", { ...sp(space), rel }));
+// while the task has a run going). `after` is what Claude is told to do with its changes once the
+// work is done: "push" (commit and push), "pr" (a new branch, a commit and a pull request) or null.
+export const startRun = (space, rel, after = null) => request("/api/ai/run", json("POST", { ...sp(space), rel, ...(after ? { after } : {}) }));
 
 // Answer the run's pending question `pending`: { decision: "allow" | "deny" } for a permission,
 // { answers: { "<question>": "<answer>" } } for a question. { run }.

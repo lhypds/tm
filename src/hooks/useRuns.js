@@ -5,7 +5,8 @@ import * as api from "@utils/api";
 // The runs of Claude Code (see ai/session.js), followed live over the server's event stream for as
 // long as the page is open: `runs` is every run the server has, by id, each with its transcript
 // (`items`) and its `pending` question. runFor(task) is the latest run of a task of the list (by
-// its space and rel), start / answer / stop act on one (an error shows as a toast).
+// its space and rel), start / answer / stop act on one (an error shows as a toast); start(task, after)
+// takes what Claude should do with its changes once done ("push", "pr" or null, see api.startRun).
 // onAsk(run) is called when a run gets a question for the user, whatever task is shown; onEnd(run)
 // when a run seen going here is over (done, failed or stopped; not for one found over already).
 export default function useRuns({ onAsk, onEnd } = {}) {
@@ -87,9 +88,9 @@ export default function useRuns({ onAsk, onEnd } = {}) {
   const put = (run) => setRuns((prev) => ({ ...prev, [run.id]: { ...prev[run.id], ...run, items: run.items || prev[run.id]?.items || [] } }));
   const failed = (e) => showToast(e.message, 4000, "bottom", "error");
 
-  const start = useCallback(async (task) => {
+  const start = useCallback(async (task, after = null) => {
     try {
-      put((await api.startRun(task.space, task.rel)).run);
+      put((await api.startRun(task.space, task.rel, after)).run);
       return true;
     } catch (e) {
       failed(e);

@@ -3,7 +3,9 @@
 //
 //   GET    /api/ai/events            the runs, live: a text/event-stream (SSE) of events (see below)
 //   GET    /api/ai/runs              the runs, with their transcripts: { runs }
-//   POST   /api/ai/run               { work, repository?, rel }: start Claude Code on that task; 201 { run }
+//   POST   /api/ai/run               { work, repository?, rel, after? }: start Claude Code on that task; 201 { run }.
+//                                    `after` ("push" or "pr") is what Claude is told to do with its changes
+//                                    once done: commit and push, or a new branch and a pull request (see ai/task.js)
 //   POST   /api/ai/runs/:id/answer   { pending, decision } or { pending, answers }: answer the run's question; { run }
 //   POST   /api/ai/runs/:id/stop     stop the run; { run }
 //   GET    /api/ai/saved/:folder     ?work&repository&rel: a run's record in the task folder (see ai/record.js); { run }
@@ -30,7 +32,7 @@ const path = require('path');
 const express = require('express');
 
 const { TASK_FILE, PROMPT_FILE, readPrompt, readTaskDir } = require('../utils/taskUtils');
-const { isDirectory, spaceOf, taskDirIn, titleOf } = require('../ai/task');
+const { isDirectory, spaceOf, taskDirIn, titleOf, afterOf } = require('../ai/task');
 const session = require('../ai/session');
 const remote = require('../ai/remote');
 const record = require('../ai/record');
@@ -101,9 +103,10 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     const rel = String(body.rel || '');
     const taskDir = taskDirIn(space, rel);
     const taskRef = { work: space.work, repository: space.repository, rel };
+    const after = afterOf(body.after);
     const where = locate(space) || {};
     if (!where.remote) {
-      const run = session.startRun({ space, taskDir, taskRef });
+      const run = session.startRun({ space, taskDir, taskRef, after });
       return res.status(201).json({ run: session.publicRun(run, true) });
     }
     // A copy pushed from another machine: run there, with the task's text as it is here.
@@ -113,7 +116,7 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     let text = null;
     try { text = fs.readFileSync(path.join(taskDir, TASK_FILE), 'utf8'); } catch (e) { /* a bare folder: the title stands */ }
     const files = { [TASK_FILE]: text, [PROMPT_FILE]: readPrompt(taskDir) };
-    const run = await remote.startRun({ machine: where.machine.name, task, taskDir, files });
+    const run = await remote.startRun({ machine: where.machine.name, task, taskDir, files, after });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 

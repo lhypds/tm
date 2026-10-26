@@ -63,6 +63,18 @@ function readFlag(key, fallback) {
   }
 }
 
+// What Claude is told to do with its changes once a run's work is done, as the checkboxes under the
+// prompt last left it: "push" (commit and push), "pr" (a new branch, a commit and a pull request) or
+// null (nothing). One or the other, never both.
+function readRunAfter() {
+  try {
+    const v = localStorage.getItem("run.after");
+    return v === "push" || v === "pr" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 // The task view: "list", or "board" (the progress view).
 function readView() {
   try {
@@ -152,6 +164,7 @@ export default function Home({ all = false }) {
   const [focusing, setFocusing] = useState(null); // { key, area }: the task whose text ("task") or prompt ("prompt") the panel should focus
   const [promptOpen, setPromptOpen] = useState(() => readFlag("panel.prompt", false)); // the panel shows the task's prompt.txt under its text
   const [peekPromptOpen, setPeekPromptOpen] = useState(() => readFlag("preview.prompt", false)); // and the preview, on its own
+  const [runAfter, setRunAfter] = useState(readRunAfter); // what Claude does with its changes once a run's work is done: "push", "pr" or null (the checkboxes under the prompt)
   const [section, setSection] = useState("task"); // with the prompt shown, the text the keyboard is on in the panel: "task" or "prompt"
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState(null); // task to delete
@@ -190,6 +203,13 @@ export default function Home({ all = false }) {
   }, [detailOpen]);
   useEffect(() => writeFlag("panel.prompt", promptOpen), [promptOpen]);
   useEffect(() => writeFlag("preview.prompt", peekPromptOpen), [peekPromptOpen]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("run.after", runAfter || "");
+    } catch {
+      /* ignore */
+    }
+  }, [runAfter]);
   useEffect(() => writeFlag("tree.showHidden", showHidden), [showHidden]);
   useEffect(() => writeFlag("tasks.showDone", showDone), [showDone]);
   useEffect(() => writeFlag("tasks.showPending", showPending), [showPending]);
@@ -438,9 +458,10 @@ export default function Home({ all = false }) {
       return;
     }
     if (isGoing(ai.runFor(task))) return; // the run going opens
-    // else a run starts; refused (the machine not connected, say), the dialog closes again
+    // else a run starts, with what to do after the work as the checkboxes under the prompt say;
+    // refused (the machine not connected, say), the dialog closes again
     setStarting(true);
-    const ok = await ai.start(task);
+    const ok = await ai.start(task, runAfter);
     setStarting(false);
     if (!ok) closeRun();
   };
@@ -1483,6 +1504,8 @@ export default function Home({ all = false }) {
               run={selectedRun}
               noRunner={noRunner}
               onRun={openRun}
+              after={runAfter}
+              onAfter={setRunAfter}
               selectedRun={pickedRun}
               onForgetRun={forgetRecord}
             />

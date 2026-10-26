@@ -5,9 +5,11 @@
 //   task APIs take them (spaceOf);
 // - the task folder in one, by id (findTaskDir) or by its path relative to the space (taskDirIn);
 // - the first prompt (buildPrompt): the task's task.txt, its prompt.txt when it has one, and the list
-//   of its other files, with the task folder's path; and the folder Claude works in (cwdOf): the
-//   repository's source folder for a repository's task, so Claude works on the code, else the task
-//   folder. describeRun puts those together for one task.
+//   of its other files, with the task folder's path, then what to do with the changes once the work
+//   is done (`after`, the web UI's checkboxes under the prompt: commit and push, or a branch and a
+//   pull request; see AFTER); and the folder Claude works in (cwdOf): the repository's source folder
+//   for a repository's task, so Claude works on the code, else the task folder. describeRun puts
+//   those together for one task.
 // Nothing here prints or exits: a problem is thrown as an Error with the message to show.
 const fs = require('fs');
 const path = require('path');
@@ -192,8 +194,28 @@ function trimBlank(text) {
   return (text || '').replace(/^(\s*\n)+/, '').replace(/\s+$/, '');
 }
 
-// The first prompt for claude: what to do, the task text, the prompt text, and where the files are.
-function buildPrompt(space, task, prompt, taskDir, cwd) {
+// What Claude is told to do with its changes once the work is done, by name: "push" commits them and
+// pushes, "pr" puts them on a new branch and opens a pull request. Nothing else is said otherwise.
+const AFTER = {
+  push: [
+    'When the work is done, commit every change you made with a clear commit message and push the',
+    'commit to the remote of the current branch.'
+  ].join('\n'),
+  pr: [
+    'When the work is done, create a new branch for this task from the current one, commit every change',
+    'you made on it with a clear commit message, push the branch and open a pull request for it against',
+    'the branch you started from (`gh pr create`), with the task as its description. Do not merge it.'
+  ].join('\n')
+};
+
+// `after` as given (by the API, say) when it names a step of AFTER, else null (nothing after).
+function afterOf(after) {
+  return typeof after === 'string' && Object.prototype.hasOwnProperty.call(AFTER, after) ? after : null;
+}
+
+// The first prompt for claude: what to do, the task text, the prompt text, where the files are, and
+// what to do with the changes after (`after`: a key of AFTER, or null).
+function buildPrompt(space, task, prompt, taskDir, cwd, after = null) {
   const where = space.repository
     ? `repository "${space.repository}" of work "${space.work}"`
     : space.work ? `work "${space.work}"` : `folder ${space.root}`;
@@ -227,6 +249,11 @@ function buildPrompt(space, task, prompt, taskDir, cwd) {
     out.push('');
     out.push(`Working folder: ${cwd}, the source code of the repository.`);
   }
+  if (AFTER[after]) {
+    out.push('');
+    out.push('## After');
+    out.push(AFTER[after]);
+  }
   return out.join('\n') + '\n';
 }
 
@@ -244,12 +271,14 @@ function titleOf(task, taskDir) {
 }
 
 // Everything a run of Claude Code on the task in taskDir starts from: { task, title, prompt, cwd,
-// text }, `prompt` the prompt.txt text (null without one) and `text` the first prompt for claude.
-function describeRun(space, taskDir) {
+// after, text }, `prompt` the prompt.txt text (null without one), `after` the step asked for once the
+// work is done (a key of AFTER, or null) and `text` the first prompt for claude.
+function describeRun(space, taskDir, after = null) {
   const task = readTaskDir(taskDir);
   const prompt = readPrompt(taskDir);
   const cwd = cwdOf(space, taskDir);
-  return { task, title: titleOf(task, taskDir), prompt, cwd, text: buildPrompt(space, task, prompt, taskDir, cwd) };
+  after = afterOf(after);
+  return { task, title: titleOf(task, taskDir), prompt, cwd, after, text: buildPrompt(space, task, prompt, taskDir, cwd, after) };
 }
 
 module.exports = {
@@ -265,6 +294,8 @@ module.exports = {
   findTaskDir,
   taskDirIn,
   listFiles,
+  AFTER,
+  afterOf,
   buildPrompt,
   cwdOf,
   titleOf,

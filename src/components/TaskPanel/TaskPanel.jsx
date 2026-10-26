@@ -4,6 +4,7 @@ import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
 import Attachments from "@components/Attachments";
 import RunButton from "@components/RunButton";
 import RunList from "@components/RunList";
+import { Checkbox } from "@ui";
 import styles from "./panel.module.css";
 
 // The selected task beside the list: its task.txt as written, editable in place. It is saved
@@ -20,7 +21,10 @@ import styles from "./panel.module.css";
 // while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
 // text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
 // or opens the dialog of the run the task has going (`run`, see useRuns), which the button shows with
-// a dot. Under the prompt's text, the task's past runs (`attachments.runs`, the records kept in its
+// a dot. Under the prompt's text, two checkboxes say what Claude does with its changes once the
+// work is done (`after`: "push" commits and pushes, "pr" makes a branch, commits and opens a pull
+// request, null nothing; onAfter(value) changes it): one or the other, so ticking one unticks the
+// other. Then the task's past runs (`attachments.runs`, the records kept in its
 // folder) are listed as the files are (RunList): a click on one opens it in the dialog (onRun(task, folder)),
 // its × removes it (onForgetRun(record), which asks first), and `selectedRun` is the folder of the one
 // the keyboard is on (j / k walk them after the prompt), highlighted as a chosen file is.
@@ -52,6 +56,8 @@ export default function TaskPanel({
   run,
   noRunner,
   onRun,
+  after,
+  onAfter,
   selectedRun,
   onForgetRun,
 }) {
@@ -197,6 +203,15 @@ export default function TaskPanel({
                   onFocus={() => onSection("prompt")}
                   onSave={onSavePrompt}
                 />
+                {/* what to do with the changes after the work: one of the two, or neither */}
+                <div className={styles.after}>
+                  <Checkbox className={styles.afterCheck} checked={after === "push"} onChange={(on) => onAfter(on ? "push" : null)}>
+                    {t("ai.afterPush")}
+                  </Checkbox>
+                  <Checkbox className={styles.afterCheck} checked={after === "pr"} onChange={(on) => onAfter(on ? "pr" : null)}>
+                    {t("ai.afterPr")}
+                  </Checkbox>
+                </div>
                 {attachments.runs?.length > 0 && <RunList className={styles.files} runs={attachments.runs} selectedFolder={selectedRun} onOpen={(r) => onRun(task, r.folder)} onRemove={onForgetRun} />}
               </div>
             </>
