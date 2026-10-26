@@ -125,10 +125,17 @@
   user-select: none;
 }
 
-/* Chosen like a row: the hover grey. */
-.origin:hover,
+/* Chosen like a row: the hover grey. The hover itself only with a pointer: on a touch screen a
+   tap leaves the row "hovered", which would look like a second choice. */
 .origin[data-active="true"] {
   background: var(--bg-hover);
+}
+
+@media (hover: hover) {
+  .origin:hover,
+  .row:hover {
+    background: var(--bg-hover);
+  }
 }
 
 .origin:focus-visible {
@@ -151,10 +158,6 @@
   cursor: pointer;
   outline: none;
   user-select: none;
-}
-
-.row:hover {
-  background: var(--bg-hover);
 }
 
 /* The space on the right sits on the hover grey, whether or not the keyboard is on the tree. */
@@ -241,14 +244,33 @@
   margin-left: -4px;
 }
 
-.row:hover .rowEdit,
-.origin:hover .rowEdit {
-  display: inline-flex;
+/* Only where there is a pointer to hover with. On a touch screen (iOS) a tap "hovers" the row
+   first, and a hover that changes what the row holds eats the tap: the row is chosen only on a
+   second one. */
+@media (hover: hover) {
+  .row:hover .rowEdit,
+  .origin:hover .rowEdit {
+    display: inline-flex;
+  }
+
+  .row:hover .income,
+  .origin:hover .income {
+    display: none;
+  }
 }
 
-.row:hover .income,
-.origin:hover .income {
-  display: none;
+/* On a touch screen the buttons come up on the row chosen instead: one tap chooses it, and then
+   they are there. */
+@media (hover: none) {
+  .row[data-active="true"] .rowEdit,
+  .origin[data-active="true"] .rowEdit {
+    display: inline-flex;
+  }
+
+  .row[data-active="true"] .income,
+  .origin[data-active="true"] .income {
+    display: none;
+  }
 }
 
 /* The income in short (in 万) at the right end of the name line, as small as the line under the

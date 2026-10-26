@@ -72,6 +72,17 @@ function readView() {
   }
 }
 
+// Whether the window is narrow (a phone, the width at which the page's layout folds, see
+// home.module.css): the two side panels start closed then, whatever they were last time, as open
+// they cover the tasks.
+function isNarrow() {
+  try {
+    return window.matchMedia("(max-width: 860px)").matches;
+  } catch {
+    return false;
+  }
+}
+
 function writeFlag(key, value) {
   try {
     localStorage.setItem(key, value ? "1" : "0");
@@ -116,8 +127,8 @@ export default function Home({ all = false }) {
   const [works, setWorks] = useState(null);
   const [origins, setOrigins] = useState([]); // the named origins, { origin, income }, some maybe without works
   const [worksError, setWorksError] = useState("");
-  const [treeOpen, setTreeOpen] = useState(() => readFlag("panel.tree", true));
-  const [detailOpen, setDetailOpen] = useState(() => readFlag("panel.detail", true));
+  const [treeOpen, setTreeOpen] = useState(() => !isNarrow() && readFlag("panel.tree", true));
+  const [detailOpen, setDetailOpen] = useState(() => !isNarrow() && readFlag("panel.detail", true));
   const [pane, setPane] = useState("tasks"); // where j / k and friends go: "tree" or "tasks"
   // The list last loaded and the path it is for. On any other path `data` is empty and `loading`
   // until this path's own list arrives. That is decided while rendering, not in an effect after a
@@ -169,8 +180,14 @@ export default function Home({ all = false }) {
   const [showPending, setShowPending] = useState(() => readFlag("tasks.showPending", true)); // and pending ones
   const [showAbort, setShowAbort] = useState(() => readFlag("tasks.showAbort", true)); // and aborted ones (the board's aborted column too)
 
-  useEffect(() => writeFlag("panel.tree", treeOpen), [treeOpen]);
-  useEffect(() => writeFlag("panel.detail", detailOpen), [detailOpen]);
+  // The panels' state is not kept from a narrow window, where they start closed anyway: what a
+  // wide window had stays for the next wide one.
+  useEffect(() => {
+    if (!isNarrow()) writeFlag("panel.tree", treeOpen);
+  }, [treeOpen]);
+  useEffect(() => {
+    if (!isNarrow()) writeFlag("panel.detail", detailOpen);
+  }, [detailOpen]);
   useEffect(() => writeFlag("panel.prompt", promptOpen), [promptOpen]);
   useEffect(() => writeFlag("preview.prompt", peekPromptOpen), [peekPromptOpen]);
   useEffect(() => writeFlag("tree.showHidden", showHidden), [showHidden]);

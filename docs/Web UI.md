@@ -11,7 +11,7 @@ work
     task
 ```
 
-It is one page: that tree on the left (a drawer that folds away), the tasks of the chosen work  
+It is one page: that tree on the left (a drawer that folds away; on a narrow window, a phone, it and the Task panel start closed), the tasks of the chosen work  
 (its common tasks) or repository on the right, to list, filter, add, edit, mark done, pending or aborted,  
 delete, and open subtasks and attachments. Above the list, the "done", "pending" and "aborted" boxes take  
 the done, the pending and the aborted tasks out of the list and back (the progress view always has its  
