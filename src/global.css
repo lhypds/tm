@@ -25,17 +25,13 @@
   --err-bg: #fbe9eb;
 }
 
-/* The page itself never scrolls; the list does. overscroll-behavior stops the viewport from
-   rubber-banding when the list runs out of scroll. */
-html,
-body {
-  overscroll-behavior: none;
-}
-
 /* Nothing in the app shows a scrollbar, in either direction; everything that overflows still
-   scrolls (wheel, trackpad, keys). One rule here, so no component needs its own. */
+   scrolls (wheel, trackpad, keys). Scrolling stops dead at the edge in both axes: no
+   rubber-band bounce and no chaining to the parent or the viewport. One rule here, so no
+   component needs its own. */
 * {
   scrollbar-width: none;
+  overscroll-behavior: none;
 }
 
 *::-webkit-scrollbar {

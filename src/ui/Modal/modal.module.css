@@ -6,7 +6,6 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  overscroll-behavior: none;
 }
 
 .modal {
