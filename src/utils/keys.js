@@ -105,3 +105,20 @@ export function useWheelSteps(el, onStep) {
     return () => el.removeEventListener("wheel", onWheel);
   }, [el]);
 }
+
+// Mouse wheel over `el` scrolls `el` itself, by script. The browser's own scrolling is not enough
+// beside useWheelSteps: Firefox keeps a run of wheel events (a trackpad's go on with no pause) on
+// the scroller where the run began, so after the task list the pointer moves onto `el` and its
+// wheel events reach it, but the scroll still goes to the list, which takes none.
+export function useWheelScroll(el) {
+  useEffect(() => {
+    if (!el) return;
+    const onWheel = (e) => {
+      if (e.ctrlKey || e.deltaY === 0) return; // ctrl+wheel zooms
+      e.preventDefault();
+      el.scrollTop += e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY;
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [el]);
+}

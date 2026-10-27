@@ -108,6 +108,8 @@
     "dropFiles": "ファイルをドロップしてこのタスクに添付"
   },
   "attach": {
+    "expand": "{{name}} を展開",
+    "collapse": "{{name}} を折りたたむ",
     "title": "ファイル",
     "folder": "フォルダ",
     "remove": "{{name}} を削除",

@@ -1,18 +1,26 @@
 import { useTranslation } from "react-i18next";
-import { useRef, useState } from "react";
-import { XIcon } from "@components/icons";
+import { useMemo, useRef, useState } from "react";
+import { MinusIcon, PlusIcon, XIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
-import { formatSize, previewKind } from "@utils/task";
+import { fileRows, formatSize, previewKind } from "@utils/task";
 import styles from "./attachments.module.css";
+
+const NONE_OPEN = new Set();
 
 // The files in a task folder, plus a drop zone to add more. `files` are the saved ones
 // ({ name, rel, size, isDir }) and link to the file; `pending` are File objects not uploaded yet
 // (a new task gets its files once it is created). A PDF, image or text file opens in onPreview;
-// any other file opens in a new tab.
-export default function Attachments({ className, space, files, pending = [], busy, selectedRel, onAdd, onRemove, onRemovePending, onPreview }) {
+// any other file opens in a new tab. A folder that is synced comes with its `children` (see
+// listFiles in server/index.js) and opens and closes with the + / − at its left (`open`, the rels
+// of the folders opened, and onToggle(rel), see useTaskFiles); what is in an open one is listed
+// under it, indented, as the attachments are.
+export default function Attachments({ className, space, files, pending = [], busy, selectedRel, open = NONE_OPEN, onToggle, onAdd, onRemove, onRemovePending, onPreview }) {
   const { t } = useTranslation();
   const inputRef = useRef(null);
   const [over, setOver] = useState(false);
+  const rows = useMemo(() => fileRows(files, open), [files, open]);
+  // with a folder to open, every name moves right by the + / −'s width, so folders and files line up
+  const tree = files.some((f) => f.children);
 
   const add = (list) => {
     const picked = Array.from(list || []);
@@ -37,9 +45,20 @@ export default function Attachments({ className, space, files, pending = [], bus
         }}
       >
         {files.length + pending.length > 0 && (
-          <ul className={styles.files}>
-            {files.map((f) => (
-              <li key={f.rel} data-selected={f.rel === selectedRel}>
+          <ul className={styles.files} data-tree={tree}>
+            {rows.map((f) => (
+              <li key={f.rel} data-selected={f.rel === selectedRel} style={{ "--depth": f.depth }}>
+                {f.children && (
+                  <button
+                    type="button"
+                    className={styles.toggle}
+                    onClick={() => onToggle?.(f.rel)}
+                    aria-expanded={open.has(f.rel)}
+                    aria-label={t(open.has(f.rel) ? "attach.collapse" : "attach.expand", { name: f.name })}
+                  >
+                    {open.has(f.rel) ? <MinusIcon /> : <PlusIcon />}
+                  </button>
+                )}
                 {f.isDir ? (
                   <span className={styles.fileName}>{f.name}/</span>
                 ) : (

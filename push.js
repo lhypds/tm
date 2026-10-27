@@ -24,7 +24,7 @@
 // named some other way are not tasks: not pushed, not looked at. The server brings its copy to the
 // snapshot, so after a push its copy is the tasks as they are here, and a renamed, moved or deleted
 // task or attachment is mirrored too. Only .DS_Store files are left out, and files over 5 MB and
-// folders over 10 MB (never a task folder itself) are not pushed. A tasks folder that does not exist
+// folders over 10 MB or with more than 10 files (never a task folder itself) are not pushed. A tasks folder that does not exist
 // is left as it is on the server.
 // More threads for the file system calls, which go out side by side (see snapshot); must be set
 // before the first one.
@@ -37,14 +37,15 @@ const crypto = require('crypto');
 const { loadDotenv, parseConfig, DEFAULT_CONFIG_PATH } = require('./server/config');
 const { spaceKey } = require('./server/sync');
 const syncState = require('./server/syncstate');
-const { TASK_FILE, STATUS_DIRS, TASK_FOLDER_RE, ensureTaskFile } = require('./utils/taskUtils');
+const {
+  TASK_FILE, STATUS_DIRS, TASK_FOLDER_RE, ensureTaskFile,
+  SYNC_MAX_FILE_BYTES: MAX_FILE_BYTES, SYNC_MAX_FOLDER_BYTES: MAX_FOLDER_BYTES,
+  SYNC_MAX_FOLDER_FILES: MAX_FOLDER_FILES, SYNC_SKIPPED_FILES: SKIPPED_FILES
+} = require('./utils/taskUtils');
 const { appendLog } = require('./utils/logfile');
 
 const REQUEST_TIMEOUT_MS = 30 * 1000;
 const UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;  // one attachment
-const MAX_FILE_BYTES = 5 * 1024 * 1024;     // a larger file is not pushed
-const MAX_FOLDER_BYTES = 10 * 1024 * 1024;  // a folder (inside a tasks folder) whose content is larger is not pushed
-const SKIPPED_FILES = new Set(['.DS_Store']);  // never pushed: Finder rewrites it all the time
 
 loadDotenv();
 const SERVER = String(process.env.SYNC_SERVER || '').trim().replace(/\/+$/, '');
@@ -163,11 +164,11 @@ async function fileHash(abs, stat) {
 //
 // The folder is read in one pass, each folder listed once and only files (and links) stat'ed, and
 // the calls go out side by side: on a Windows drive under WSL every one costs milliseconds, most of
-// it waiting. A folder's size comes from that same pass, and files are read (task.txt) or hashed only
+// it waiting. A folder's size and number of files come from that same pass, and files are read (task.txt) or hashed only
 // once they are known to be kept. What is left out for its size goes to the sync log as a warning,
 // unless `warnings` is false (the pull takes a snapshot too, to compare, and says nothing).
 async function snapshot(root, { warnings = true } = {}) {
-  // { files: [{ rel, abs, stat }], dirs: [rel], warnings: [message], size, isTask }, or null when
+  // { files: [{ rel, abs, stat }], dirs: [rel], warnings: [message], size, fileCount, isTask }, or null when
   // `dir` cannot be listed. `task` says `dir` is a task folder of a listing (see below).
   const walk = async (dir, rel, inTask, task = false) => {
     let dirents;
@@ -176,7 +177,7 @@ async function snapshot(root, { warnings = true } = {}) {
     } catch (e) {
       return null;
     }
-    const out = { files: [], dirs: [], warnings: [], size: 0, isTask: dirents.some(d => d.name === TASK_FILE) };
+    const out = { files: [], dirs: [], warnings: [], size: 0, fileCount: 0, isTask: dirents.some(d => d.name === TASK_FILE) };
     // A task folder of a listing without a task file gets one, with the title from its name (what
     // follows the id; nothing for a bare id) as its text, as the web UI does when it opens one
     // (ensureTaskFile), so every task pushed has its text.
@@ -189,7 +190,7 @@ async function snapshot(root, { warnings = true } = {}) {
         out.warnings.push(`cannot create ${path.join(dir, TASK_FILE)}: ${e.message}`);
       }
     }
-    // Only a folder inside a task can be skipped for its size; the task's own folder (and done/,
+    // Only a folder inside a task can be skipped for its size or number of files; the task's own folder (and done/,
     // pending/, aborted/ and the like around it) always goes, minus whatever is too large in it.
     inTask = inTask || out.isTask;
     // The tasks folder itself and its done, pending and aborted folders list tasks: only the task
@@ -236,8 +237,13 @@ async function snapshot(root, { warnings = true } = {}) {
       if (!f) continue;
       if (f.sub) {
         out.size += f.sub.size;
+        out.fileCount += f.sub.fileCount;
         if (inTask && !f.sub.isTask && f.sub.size > MAX_FOLDER_BYTES) {
           out.warnings.push(`skipped folder ${f.abs}: larger than 10 MB`);
+          continue;
+        }
+        if (inTask && !f.sub.isTask && f.sub.fileCount > MAX_FOLDER_FILES) {
+          out.warnings.push(`skipped folder ${f.abs}: more than ${MAX_FOLDER_FILES} files`);
           continue;
         }
         out.files.push(...f.sub.files);
@@ -245,6 +251,7 @@ async function snapshot(root, { warnings = true } = {}) {
         out.warnings.push(...f.sub.warnings);
       } else {
         out.size += f.file.stat.size;
+        out.fileCount++;
         if (f.file.stat.size > MAX_FILE_BYTES) {
           out.warnings.push(`skipped file ${f.abs}: larger than 5 MB`);
           continue;

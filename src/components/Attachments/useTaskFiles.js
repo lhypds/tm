@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
+import { fileRows } from "@utils/task";
 
 const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 
@@ -13,11 +14,14 @@ const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 // `version` re-reads them when it changes (e.g. after the task list reloads); the files shown stay
 // until the fresh ones arrive, so nothing flickers. Another task (by work, repository and rel, not
 // by the identity of `space`, which the list remakes) starts from no files.
+// `open` holds the rels of the folders opened in the list, toggleDir(rel) opens or closes one, and
+// `rows` is the list as shown (see fileRows), which the keyboard walks; another task starts closed.
 export default function useTaskFiles(space, rel, version) {
   const [files, setFiles] = useState([]);
   const [prompt, setPrompt] = useState(undefined);
   const [runs, setRuns] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [open, setOpen] = useState(() => new Set());
   const taskKey = space && rel ? `${space.work}/${space.repository || ""}/${rel}` : null;
   const shown = useRef(null); // the taskKey the files are of
 
@@ -27,6 +31,7 @@ export default function useTaskFiles(space, rel, version) {
       setFiles([]);
       setPrompt(undefined);
       setRuns([]);
+      setOpen(new Set());
     }
     if (!taskKey) return;
     let stale = false;
@@ -106,5 +111,16 @@ export default function useTaskFiles(space, rel, version) {
     [space, rel, taskKey],
   );
 
-  return { files, prompt, runs, uploading, add, remove, savePrompt, forgetRun };
+  const toggleDir = useCallback(
+    (dirRel) =>
+      setOpen((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(dirRel)) next.add(dirRel);
+        return next;
+      }),
+    [],
+  );
+  const rows = useMemo(() => fileRows(files, open), [files, open]);
+
+  return { files, rows, open, toggleDir, prompt, runs, uploading, add, remove, savePrompt, forgetRun };
 }

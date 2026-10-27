@@ -7,6 +7,7 @@ import { Checkbox } from "@ui";
 import * as api from "@utils/api";
 import { formatIncome, formatIncomeShort } from "@utils/income";
 import { groupWorksByOrigin } from "@utils/works";
+import { useWheelScroll } from "@utils/keys";
 import styles from "./tree.module.css";
 
 // A small button at the right of a row's name line, shown while the row is hovered.
@@ -220,6 +221,8 @@ export default function SpaceTree({
   const groups = groupWorksByOrigin(works, origins);
   const { dragProps, dropProps } = useReorder(onMove);
   const originNames = groups.filter((g) => g.origin).map((g) => g.origin);
+  const [listEl, setListEl] = useState(null);
+  useWheelScroll(listEl);
   return (
     <div className={styles.panel}>
       <div className={styles.head} data-focused={focused}>
@@ -242,7 +245,7 @@ export default function SpaceTree({
       <Checkbox className={styles.showHidden} checked={showHidden} onChange={onShowHidden}>
         {t("tree.showHidden", { count: hiddenCount })}
       </Checkbox>
-      <div className={styles.list}>
+      <div className={styles.list} ref={setListEl}>
         {error ? (
           <p className={styles.error}>{error}</p>
         ) : works === null ? (

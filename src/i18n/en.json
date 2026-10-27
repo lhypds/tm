@@ -108,6 +108,8 @@
     "dropFiles": "Drop files to attach them to this task"
   },
   "attach": {
+    "expand": "Expand {{name}}",
+    "collapse": "Collapse {{name}}",
     "title": "Files",
     "folder": "folder",
     "remove": "Remove {{name}}",

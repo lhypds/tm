@@ -14,6 +14,9 @@ const {
   TASK_FILE,
   PROMPT_FILE,
   STATUS_DIRS,
+  SYNC_MAX_FOLDER_BYTES,
+  SYNC_MAX_FOLDER_FILES,
+  SYNC_SKIPPED_FILES,
   readPrompt,
   listDirOf,
   isTaskFolder,
@@ -301,6 +304,40 @@ function spacesBody() {
   return { works: listSpaces(), origins: config.getOrigins() };
 }
 
+// The content of a folder inside a task, as `tm push` would sync it: its entries ({ name, rel,
+// isDir, size, children for a folder }), folders first, or null when the folder is not synced
+// (larger than 10 MB or with more than 10 files, see SYNC_MAX_FOLDER_BYTES in taskUtils), so the
+// web UI shows it closed. Sized and counted as push does; hidden files are not listed.
+function syncedTree(root, dirAbs) {
+  let size = 0;
+  let count = 0;
+  const walk = (dir) => {
+    const out = [];
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (SYNC_SKIPPED_FILES.has(e.name)) continue;
+      const abs = path.join(dir, e.name);
+      let stat;
+      try { stat = fs.statSync(abs); } catch (err) { continue; }  // a broken link
+      if (stat.isDirectory()) {
+        const children = walk(abs);
+        if (!children) return null;
+        if (!e.name.startsWith('.')) out.push({ name: e.name, rel: toRel(root, abs), isDir: true, size: 0, children });
+      } else if (stat.isFile()) {
+        size += stat.size;
+        count++;
+        if (size > SYNC_MAX_FOLDER_BYTES || count > SYNC_MAX_FOLDER_FILES) return null;
+        if (!e.name.startsWith('.')) out.push({ name: e.name, rel: toRel(root, abs), isDir: false, size: stat.size });
+      }
+    }
+    return out.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : (a.isDir ? -1 : 1)));
+  };
+  try {
+    return walk(dirAbs);
+  } catch (err) {
+    return null;
+  }
+}
+
 function listFiles(root, taskDirAbs) {
   const entries = fs.readdirSync(taskDirAbs, { withFileTypes: true });
   const files = [];
@@ -311,13 +348,13 @@ function listFiles(root, taskDirAbs) {
     const abs = path.join(taskDirAbs, e.name);
     let size = 0;
     try { size = fs.statSync(abs).size; } catch (err) { /* ignore */ }
-    files.push({
-      name: e.name,
-      rel: toRel(root, abs),
-      isDir: e.isDirectory(),
-      isSubtask: e.isDirectory() && isTaskFolder(abs),
-      size
-    });
+    const isSubtask = e.isDirectory() && isTaskFolder(abs);
+    const file = { name: e.name, rel: toRel(root, abs), isDir: e.isDirectory(), isSubtask, size };
+    if (file.isDir && !isSubtask) {
+      const children = syncedTree(root, abs);
+      if (children) file.children = children;
+    }
+    files.push(file);
   }
   files.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : (a.isDir ? -1 : 1)));
   return files;
@@ -763,25 +800,40 @@ app.post('/api/task/file', express.raw({ type: () => true, limit: '200mb' }), (r
   res.status(201).json({ files: listFiles(root, taskDir) });
 });
 
-// Delete one attachment (a file directly inside a task folder, not the task file).
+// The task folder an attachment is in: a file right inside a task folder (not its task file), or in
+// a folder in it (not one of its done / pending / aborted folders, which hold subtasks). Throws when
+// `abs` is no such file.
+function taskDirOfAttachment(root, abs) {
+  const notAttachment = () => new HttpError(400, 'Not an attachment.');
+  if (path.basename(abs) === TASK_FILE && isTaskFolder(path.dirname(abs))) throw notAttachment();
+  let dir = path.dirname(abs);
+  let child = abs;
+  while (!isTaskFolder(dir)) {
+    child = dir;
+    dir = path.dirname(dir);
+    if (dir === child || !path.relative(root, dir) || path.relative(root, dir).startsWith('..')) throw notAttachment();
+  }
+  if (child !== abs && STATUS_DIRS.includes(path.basename(child))) throw notAttachment();
+  return dir;
+}
+
+// Delete one attachment (see taskDirOfAttachment).
 app.delete('/api/file', (req, res) => {
   const { root } = spaceFrom(req.query);
   const abs = resolveInsideRoot(root, String(req.query.rel || ''));
-  const taskDir = path.dirname(abs);
-  if (!isTaskFolder(taskDir) || path.basename(abs) === TASK_FILE) throw new HttpError(400, 'Not an attachment.');
+  const taskDir = taskDirOfAttachment(root, abs);
   if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new HttpError(404, 'File not found.');
   fs.unlinkSync(abs);
   res.json({ files: listFiles(root, taskDir) });
 });
 
-// Write an attachment as text, as typed in the preview's editor (a file directly inside a task
-// folder, not the task file). Answers the task's attachments, with the file's new size.
+// Write an attachment as text, as typed in the preview's editor (see taskDirOfAttachment). Answers
+// the task's attachments, with the file's new size.
 app.put('/api/file', (req, res) => {
   const body = req.body || {};
   const { root } = spaceFrom(body);
   const abs = resolveInsideRoot(root, String(body.rel || ''));
-  const taskDir = path.dirname(abs);
-  if (!isTaskFolder(taskDir) || path.basename(abs) === TASK_FILE) throw new HttpError(400, 'Not an attachment.');
+  const taskDir = taskDirOfAttachment(root, abs);
   if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new HttpError(404, 'File not found.');
   if (typeof body.text !== 'string') throw new HttpError(400, 'Missing text.');
   fs.writeFileSync(abs, body.text.replace(/\r\n/g, '\n'), 'utf8');

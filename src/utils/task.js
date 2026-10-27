@@ -135,3 +135,17 @@ export function previewKind(name) {
   if (TEXT_EXT.test(name)) return "text";
   return null;
 }
+
+// The rows of a task's file list as shown: its attachments (see listFiles in server/index.js) and,
+// under each folder opened (`open`, a Set of rels), what is in it, each with its `depth`.
+export function fileRows(files, open) {
+  const rows = [];
+  const add = (list, depth) => {
+    for (const f of list) {
+      rows.push({ ...f, depth });
+      if (f.children && open.has(f.rel)) add(f.children, depth + 1);
+    }
+  };
+  add(files, 0);
+  return rows;
+}

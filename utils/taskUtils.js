@@ -23,6 +23,14 @@ function readPrompt(taskDirAbs) {
 // folder's "done", "pending" or "aborted" folder it is done, pending or aborted.
 const STATUS_DIRS = ['done', 'pending', 'aborted'];
 
+// What `tm push` leaves out of a task (see snapshot in push.js): a file larger than this, and a
+// folder inside it (not a task folder) larger than this or with more files than this, its
+// subfolders' included. Such a folder is not synced, and the web UI does not open it either.
+const SYNC_MAX_FILE_BYTES = 5 * 1024 * 1024;
+const SYNC_MAX_FOLDER_BYTES = 10 * 1024 * 1024;
+const SYNC_MAX_FOLDER_FILES = 10;
+const SYNC_SKIPPED_FILES = new Set(['.DS_Store']);  // never pushed: Finder rewrites it all the time
+
 // task.txt is just the task's details, the first line being its title. Older files start
 // with a front matter block (---, status:, labels:, ..., ---); its status is returned as
 // oldStatus so readTasks can move the task into its status folder.
@@ -332,6 +340,10 @@ module.exports = {
   TASK_FILE,
   PROMPT_FILE,
   STATUS_DIRS,
+  SYNC_MAX_FILE_BYTES,
+  SYNC_MAX_FOLDER_BYTES,
+  SYNC_MAX_FOLDER_FILES,
+  SYNC_SKIPPED_FILES,
   TASK_FOLDER_RE,
   readPrompt,
   listDirOf,

@@ -494,7 +494,8 @@ export default function Home({ all = false }) {
     setLoads((n) => n + 1); // whatever the run left in the task folder (its record, its files) shows now
   };
   const [fileRel, setFileRel] = useState(null);
-  const fileList = attachments.files.filter((f) => !f.isDir);
+  // the panel's file list as shown, folders and what is in the open ones included (see fileRows)
+  const fileList = attachments.rows;
   const fileIndex = fileList.findIndex((f) => f.rel === fileRel);
   const selectedFile = fileList[fileIndex] || null;
   // The run record the keyboard is on, among those listed under the prompt (j / k walk them after
@@ -977,7 +978,7 @@ export default function Home({ all = false }) {
     }
     if (preview) {
       // j / k step to the next / previous file of the task the preview came from
-      const list = (peek ? peekFiles : fileList).filter((f) => previewKind(f.name));
+      const list = (peek ? peekFiles : fileList).filter((f) => !f.isDir && previewKind(f.name));
       const move = moveIndex(name, list.findIndex((f) => f.rel === preview.rel), list.length);
       if (move !== null) {
         if (move >= 0 && list[move].rel !== preview.rel) {
@@ -1118,11 +1119,14 @@ export default function Home({ all = false }) {
         return true;
       }
       if (selectedFile) {
+        // on a folder, space / enter open and close it (one not synced has nothing to show), d does nothing
         if (["space", "enter"].includes(name)) {
-          openFile(selectedFile);
+          if (!selectedFile.isDir) openFile(selectedFile);
+          else if (selectedFile.children) attachments.toggleDir(selectedFile.rel);
           return true;
         }
         if (name === "d") {
+          if (selectedFile.isDir) return true;
           deleteFile(attachments, fileList, selectedFile, setFileRel);
           return true;
         }

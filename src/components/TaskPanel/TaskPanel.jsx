@@ -163,6 +163,8 @@ export default function TaskPanel({
               space={task.space}
               files={attachments.files}
               selectedRel={selectedFile}
+              open={attachments.open}
+              onToggle={attachments.toggleDir}
               busy={attachments.uploading}
               onAdd={attachments.add}
               onRemove={onDeleteFile}

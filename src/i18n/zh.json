@@ -108,6 +108,8 @@
     "dropFiles": "拖放文件以添加到此任务"
   },
   "attach": {
+    "expand": "展开 {{name}}",
+    "collapse": "折叠 {{name}}",
     "title": "文件",
     "folder": "文件夹",
     "remove": "移除 {{name}}",
