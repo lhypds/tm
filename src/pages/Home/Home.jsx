@@ -75,6 +75,20 @@ function readRunAfter() {
   }
 }
 
+// The list bar's filters, each space (every task, an origin, a work, a repository) with its own,
+// kept by the space's path: { [path]: { month, showDone, showPending, showAbort } }. A space not
+// filtered yet shows every task.
+const FILTER_DEFAULTS = { month: ALL_MONTHS, showDone: true, showPending: true, showAbort: true };
+
+function readFilters() {
+  try {
+    const v = JSON.parse(localStorage.getItem("tasks.filters"));
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
 // The task view: "list", or "board" (the progress view).
 function readView() {
   try {
@@ -188,10 +202,15 @@ export default function Home({ all = false }) {
   const [showHidden, setShowHidden] = useState(() => readFlag("tree.showHidden", false)); // the tree shows hidden works too
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [view, setView] = useState(readView);
-  const [month, setMonth] = useState(ALL_MONTHS); // when the tasks were created: all, last / this week, or a month
-  const [showDone, setShowDone] = useState(() => readFlag("tasks.showDone", true)); // the list shows done tasks too
-  const [showPending, setShowPending] = useState(() => readFlag("tasks.showPending", true)); // and pending ones
-  const [showAbort, setShowAbort] = useState(() => readFlag("tasks.showAbort", true)); // and aborted ones (the board's aborted column too)
+  // This space's filters: when the tasks were created (all, last / this week, or a month), and
+  // whether the list shows done, pending and aborted tasks too (the board's aborted column too).
+  const [filters, setFilters] = useState(readFilters);
+  const { month, showDone, showPending, showAbort } = { ...FILTER_DEFAULTS, ...filters[spaceTo] };
+  const setFilter = (patch) => setFilters((f) => ({ ...f, [spaceTo]: { ...FILTER_DEFAULTS, ...f[spaceTo], ...patch } }));
+  const setMonth = (v) => setFilter({ month: v });
+  const setShowDone = (v) => setFilter({ showDone: v });
+  const setShowPending = (v) => setFilter({ showPending: v });
+  const setShowAbort = (v) => setFilter({ showAbort: v });
 
   // The panels' state is not kept from a narrow window, where they start closed anyway: what a
   // wide window had stays for the next wide one.
@@ -211,9 +230,13 @@ export default function Home({ all = false }) {
     }
   }, [runAfter]);
   useEffect(() => writeFlag("tree.showHidden", showHidden), [showHidden]);
-  useEffect(() => writeFlag("tasks.showDone", showDone), [showDone]);
-  useEffect(() => writeFlag("tasks.showPending", showPending), [showPending]);
-  useEffect(() => writeFlag("tasks.showAbort", showAbort), [showAbort]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("tasks.filters", JSON.stringify(filters));
+    } catch {
+      /* ignore */
+    }
+  }, [filters]);
   useEffect(() => {
     try {
       localStorage.setItem("tasks.view", view);
