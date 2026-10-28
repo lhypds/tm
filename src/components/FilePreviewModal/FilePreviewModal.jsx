@@ -27,7 +27,6 @@ function Editor({ value, textRef, onSave, onEndEdit }) {
       ref={textRef}
       className={styles.text}
       value={draft}
-      spellCheck={false}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
         save();

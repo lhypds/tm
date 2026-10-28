@@ -51,7 +51,6 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
           value={text ?? ""}
           placeholder={text === null ? t("common.loading") : ""}
           disabled={text === null}
-          spellCheck={false}
           autoFocus
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

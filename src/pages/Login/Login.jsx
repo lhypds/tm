@@ -87,7 +87,6 @@ export default function Login() {
                 autoCapitalize="none"
                 autoCorrect="off"
                 enterKeyHint="next"
-                spellCheck={false}
                 autoFocus
                 onChange={(e) => {
                   setName(e.target.value);

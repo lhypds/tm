@@ -44,7 +44,6 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
           minHeight={320}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          spellCheck={false}
           aria-label={title}
         />
 

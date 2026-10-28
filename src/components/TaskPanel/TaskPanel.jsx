@@ -246,7 +246,6 @@ function TaskText({ task, textRef, focus, onFocused, onFocus, onSave }) {
       className={styles.text}
       value={draft}
       placeholder={t("common.untitled")}
-      spellCheck={false}
       onChange={(e) => setDraft(e.target.value)}
       onFocus={onFocus}
       onBlur={save}
@@ -296,7 +295,6 @@ function PromptText({ task, prompt, textRef, focus, onFocused, onFocus, onSave }
       ref={textRef}
       className={styles.text}
       value={draft}
-      spellCheck={false}
       onChange={(e) => setDraft(e.target.value)}
       onFocus={onFocus}
       onBlur={save}
