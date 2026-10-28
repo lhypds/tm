@@ -26,6 +26,7 @@ const {
   createTask,
   saveTask,
   markTask,
+  moveTask,
   normalizeTaskFile,
   deleteTask,
   renameTaskByFirstLine,
@@ -784,6 +785,19 @@ app.post('/api/task/status', (req, res) => {
   if (!STATUSES.includes(status)) throw new HttpError(400, 'Invalid status.');
   const task = taskFromDir(taskDir);
   markTask(task, status);
+  res.json({ task: serializeTask(root, taskFromDir(path.dirname(task.path))) });
+});
+
+// Move a task into `into`: another task's folder (it becomes a subtask of that task) or a folder
+// of tasks ("" the space's root), keeping its status (see moveTask).
+app.post('/api/task/move', (req, res) => {
+  const body = req.body || {};
+  const { root } = spaceFrom(body);
+  const taskDir = resolveTaskDir(root, body.rel);
+  const intoDir = resolveDir(root, String(body.into || ''));
+  if (STATUS_DIRS.includes(path.basename(intoDir))) throw new HttpError(400, 'Not a folder of tasks.');
+  const task = taskFromDir(taskDir);
+  moveTask(task, intoDir);
   res.json({ task: serializeTask(root, taskFromDir(path.dirname(task.path))) });
 });
 

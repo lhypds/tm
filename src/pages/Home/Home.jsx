@@ -488,6 +488,11 @@ export default function Home({ all = false }) {
     }
   }
 
+  function unselectAll() {
+    setSelectedKey(null);
+    setGroupKeys([]);
+  }
+
   // The runs of Claude Code on tasks (started by the run button beside a prompt), followed live by
   // useRuns.
   // The run button opens the run's dialog (`runKey`: the task whose run it shows), starting a run
@@ -715,6 +720,37 @@ export default function Home({ all = false }) {
       setGroupKeys([]);
       setSelectedKey(at(list[0].key));
     }
+    try {
+      await reload();
+    } catch (e) {
+      showToast(e.message);
+    }
+  }
+
+  // A drag in the list (see TaskList): `list` into `target`, as its subtasks, or with target null
+  // out to the top of the list (this folder, or the space's root in a list of several), each with
+  // its status and its own subtasks. The tasks stay selected (and chosen) in their new places.
+  async function moveTasks(list, target) {
+    const parentOf = (rel) => {
+      const parts = rel.split("/").slice(0, -1);
+      if (BOARD_STATUSES.includes(parts.at(-1))) parts.pop();
+      return parts.join("/");
+    };
+    const into = target ? target.rel : data.dir;
+    const moving = list.filter((task) => (target ? parentOf(task.rel) !== into : task.depth > 0));
+    const moved = new Map(); // key before -> key after
+    try {
+      for (const task of moving) {
+        const { task: updated } = await api.moveTask(task.space, task.rel, into);
+        moved.set(task.key, keyOf(task.space, updated.rel));
+      }
+    } catch (e) {
+      showToast(e.message);
+    }
+    if (!moved.size) return;
+    const at = (k) => moved.get(k) ?? k;
+    setGroupKeys((g) => g.map(at));
+    setSelectedKey((k) => k && at(k));
     try {
       await reload();
     } catch (e) {
@@ -1186,8 +1222,7 @@ export default function Home({ all = false }) {
     }
     // esc drops the selection, so the next a / n adds a task at the top, not a subtask
     if (name === "escape" && selected && pane !== "detail") {
-      setSelectedKey(null);
-      setGroupKeys([]);
+      unselectAll();
       return true;
     }
     if (view === "list" && ["h", "left", "l", "right"].includes(name)) {
@@ -1382,7 +1417,13 @@ export default function Home({ all = false }) {
       );
     }
     content = (
-      <div className={styles.scroll} ref={setScrollEl}>
+      // a click on the blank area of the list (not on a task, nor a button in the empty message)
+      // drops the selection, as esc does
+      <div
+        className={styles.scroll}
+        ref={setScrollEl}
+        onClick={(e) => !e.target.closest('[role="button"], button, a') && unselectAll()}
+      >
         <TaskList
           tasks={visible}
           selectedKey={selected?.key}
@@ -1391,6 +1432,7 @@ export default function Home({ all = false }) {
           onSelect={selectTask}
           onPreview={setPeek}
           onToggleDone={toggleDone}
+          onMove={moveTasks}
           empty={empty}
         />
       </div>
@@ -1513,7 +1555,6 @@ export default function Home({ all = false }) {
           {treeOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
         </button>
 
-        {/* a click on the blank area keeps the selection; only esc drops it */}
         <main className={styles.main} onMouseDown={() => setPane("tasks")}>
           {(all || origin || space) && (
             <nav className={styles.section} aria-label={t("header.location")}>

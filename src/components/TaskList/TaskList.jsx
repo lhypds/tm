@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import * as api from "@utils/api";
 import TreeLines from "@components/TreeLines";
@@ -58,15 +58,56 @@ export const keepFocus = (e) => {
 // work or repository it lives in, in a list of several) shows before its title, on its subtasks
 // too (they are from the same place). With no rows the column header still shows, and `empty`
 // (the "no tasks" message) sits centred under it.
-export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, empty }) {
+// Dragging a row onto another of the same space makes it a subtask of that one, dragging it onto
+// the blank area of the list (or its header) takes it out to the top of the list
+// (`onMove(tasks, target)`, target null for the top); dragging one of the rows chosen together
+// takes them all along, each subtask among them going with its task. A row does not take a task
+// that is dragged, nor one under it.
+export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, onMove, empty }) {
   const { t: tr } = useTranslation();
   const selectedRef = useRef(null);
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: "nearest" });
   }, [selectedKey]);
 
+  const [dragKeys, setDragKeys] = useState([]);
+  const [over, setOver] = useState(null); // the row the drag would drop into, "" the top of the list
+  const dragged = tasks.filter((t) => dragKeys.includes(t.key));
+  const under = (t, of) => t.key.startsWith(`${of.key}/`); // keys start with the space, then the rel
+  const sameSpace = (a, b) => a.space.work === b.space.work && (a.space.repository || "") === (b.space.repository || "");
+  const takes = (target) =>
+    target
+      ? dragged.length > 0 && dragged.every((d) => d.key !== target.key && !under(target, d) && sameSpace(d, target))
+      : dragged.some((d) => d.depth > 0);
+
+  const dragOver = (e, target) => {
+    e.stopPropagation();
+    if (!dragged.length) return;
+    if (!takes(target)) return setOver(null);
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setOver(target ? target.key : "");
+  };
+  const drop = (e, target) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const ok = takes(target);
+    const moving = dragged.filter((d) => !dragged.some((a) => under(d, a)));
+    setDragKeys([]);
+    setOver(null);
+    if (ok) onMove(moving, target);
+  };
+
   return (
-    <div className={styles.table} role="table" data-empty={tasks.length === 0}>
+    <div
+      className={styles.table}
+      role="table"
+      data-empty={tasks.length === 0}
+      data-drop={over === ""}
+      onDragOver={(e) => dragOver(e, null)}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setOver(null)}
+      onDrop={(e) => drop(e, null)}
+    >
       <div className={`${styles.row} ${styles.head}`} data-focused={focused} role="row">
         <div />
         <div>{tr("field.created")}</div>
@@ -81,8 +122,23 @@ export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSe
             className={`${styles.row}${chosenKeys.has(t.key) ? ` ${styles.selected}` : ""}`}
             data-status={t.status}
             data-depth={t.depth}
+            data-dragging={dragKeys.includes(t.key)}
+            data-drop={over === t.key}
             role="button"
             tabIndex={0}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", t.title || t.id);
+              setDragKeys(chosenKeys.has(t.key) ? [...chosenKeys] : [t.key]);
+              onSelect(t); // a row not chosen is selected alone; the chosen ones stay chosen
+            }}
+            onDragEnd={() => {
+              setDragKeys([]);
+              setOver(null);
+            }}
+            onDragOver={(e) => dragOver(e, t)}
+            onDrop={(e) => drop(e, t)}
             onMouseDown={keepFocus}
             onFocus={() => onSelect(t)}
             onClick={(e) => onSelect(t, e)}

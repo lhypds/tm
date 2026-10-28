@@ -292,6 +292,24 @@ function markTask(task, status) {
   task.path = path.join(dest, path.basename(task.path));
 }
 
+// Move a task into the list of `dir` (another task's folder, making it a subtask, or a folder of
+// tasks), keeping its status: right in dir for todo, else in dir's status folder. Its subtasks go
+// along in its folder. Updates task.path.
+function moveTask(task, dir) {
+  const taskDir = path.dirname(task.path);
+  const rel = path.relative(taskDir, dir);
+  if (!rel || (!rel.startsWith('..') && !path.isAbsolute(rel))) throw new Error('A task cannot go into itself or its own subtask.');
+  const from = path.dirname(taskDir);
+  const to = task.status === 'todo' ? dir : path.join(dir, task.status);
+  if (to === from) return;
+  const dest = path.join(to, path.basename(taskDir));
+  if (fs.existsSync(dest)) throw new Error(`Already exists: ${dest}`);
+  fs.mkdirSync(to, { recursive: true });
+  renameFolder(taskDir, dest);
+  removeIfEmptyStatusDir(from);
+  task.path = path.join(dest, path.basename(task.path));
+}
+
 // Rewrite a task file as it was typed into its well-formed shape: just the
 // details, so a pasted front matter block goes away.
 function normalizeTaskFile(taskPath) {
@@ -365,6 +383,7 @@ module.exports = {
   createTask,
   saveTask,
   markTask,
+  moveTask,
   normalizeTaskFile,
   deleteTask,
   renameTaskByFirstLine,
