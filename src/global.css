@@ -207,7 +207,7 @@ p {
   }
 
   /* the mouse wins: the keyboard-focused option goes back to white while another is hovered */
-  .select::picker(select):hover option:focus:not(:hover) {
+  .select:has(option:hover) option:focus:not(:hover) {
     background: var(--bg);
     color: var(--fg);
   }
