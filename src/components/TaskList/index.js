@@ -1,1 +1,1 @@
-export { default, FromTag } from "./TaskList";
+export { default, FromTag, keepFocus } from "./TaskList";

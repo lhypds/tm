@@ -24,8 +24,10 @@ import styles from "./run.module.css";
 // dialog (esc, ×, onClose) leaves the run going. Under the transcript, "Prompts": the task.txt and
 // prompt.txt Claude was given, a click previewing one (onPreview(file); shown while `file` is set,
 // onPreview(null) closes it) as they were: for a record, the copies kept in it; for the run going,
-// the texts it was given (`run.files`), whatever became of the files since.
-export default function RunModal({ task, run, saved, folder, file, onPreview, onClose, onStop, onAnswer }) {
+// the texts it was given (`run.files`), whatever became of the files since. They are handed up as
+// listed (onPrompts(files)), for j / k to walk; `selectedPrompt` is the rel of the one the keyboard
+// is on, shaded as a chosen file is.
+export default function RunModal({ task, run, saved, folder, file, selectedPrompt, onPrompts, onPreview, onClose, onStop, onAnswer }) {
   const { t } = useTranslation();
 
   // The record to show: the one picked, while the task still has it. Read when it changes.
@@ -69,6 +71,10 @@ export default function RunModal({ task, run, saved, folder, file, onPreview, on
       : Object.entries(shown?.files || {})
           .filter(([, text]) => typeof text === "string")
           .map(([name, text]) => ({ name, rel: `${task.rel}/${name}`, url: `data:text/plain;charset=utf-8,${encodeURIComponent(text)}` }));
+  const promptsKey = prompts.map((f) => `${f.rel}\n${f.url || ""}`).join("\n");
+  useEffect(() => {
+    onPrompts(prompts);
+  }, [promptsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const where = shown?.machine && !queued ? ` · ${shown.machine}` : "";
   const when = record ? ` · ${formatDateTime(record.startedAt)}` : "";
 
@@ -111,7 +117,7 @@ export default function RunModal({ task, run, saved, folder, file, onPreview, on
               <div className="muted">{t("ai.prompts")}</div>
               <ul className={styles.promptList}>
                 {prompts.map((f) => (
-                  <li key={f.rel}>
+                  <li key={f.rel} data-selected={f.rel === selectedPrompt}>
                     <button
                       type="button"
                       className={styles.promptName}

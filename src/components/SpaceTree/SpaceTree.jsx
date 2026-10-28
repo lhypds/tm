@@ -47,6 +47,14 @@ function Top({ label, income, actions }) {
   );
 }
 
+// Focus from a click shows no ring: a browser counts a held key (Shift for a click) as keyboard
+// input and would draw the :focus-visible ring. A key pressed on the element brings it back.
+const pointerFocus = {
+  onPointerDown: (e) => (e.currentTarget.dataset.pointer = "true"),
+  onKeyDown: (e) => delete e.currentTarget.dataset.pointer,
+  onBlur: (e) => delete e.currentTarget.dataset.pointer,
+};
+
 // One space in the tree. `depth` is 0 for a work without an origin, 1 for a work under its origin
 // or a repository of a depth-0 work, and 2 for a repository of a work under an origin.
 // `machine` (see MachineDot) is the machine a remote folder was pushed from, shown as a dot after `root`.
@@ -70,6 +78,7 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
       role="button"
       tabIndex={0}
       onClick={() => onSelect(to)}
+      {...pointerFocus}
       {...rest}
     >
       <TreeLines depth={depth} through={through} last={last} />
@@ -104,6 +113,7 @@ function Origin({ name, to, active, focused, income, actions, onSelect, ...rest 
       role="button"
       tabIndex={0}
       onClick={() => onSelect(to)}
+      {...pointerFocus}
       {...rest}
     >
       <Top label={name} income={income} actions={actions} />

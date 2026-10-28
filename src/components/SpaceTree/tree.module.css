@@ -133,7 +133,7 @@
   }
 }
 
-.origin:focus-visible {
+.origin:focus-visible:not([data-pointer]) {
   outline: var(--line) solid var(--focus);
   outline-offset: -2px;
 }
@@ -160,7 +160,7 @@
   background: var(--bg-hover);
 }
 
-.row:focus-visible {
+.row:focus-visible:not([data-pointer]) {
   outline: var(--line) solid var(--focus);
   outline-offset: -2px;
 }

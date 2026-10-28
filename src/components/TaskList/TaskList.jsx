@@ -43,14 +43,22 @@ export function FromTag({ task }) {
   );
 }
 
+// A press with ctrl / cmd or shift adds to the chosen tasks on its click: the row must not take the
+// focus first, which would select it alone (nor shift select text).
+export const keepFocus = (e) => {
+  if (e.ctrlKey || e.metaKey || e.shiftKey) e.preventDefault();
+};
+
 // The tasks as a tree, like the origins tree: `tasks` are the rows in order, each subtask under
 // its task with its `depth`, `through` and `last` (see flattenTasks), drawn with tree lines before
 // its title. `selectedKey` is the row the keyboard shortcuts act on; it is kept scrolled into
-// view. A click selects a row, a double click opens its preview (`onPreview`). A task's `from` (the
+// view. A click selects a row (onSelect(task, click), the click saying whether ctrl / cmd or shift
+// were held, see Home), a double click opens its preview (`onPreview`); `chosenKeys` are the rows
+// chosen together, shaded as the selected one is. A task's `from` (the
 // work or repository it lives in, in a list of several) shows before its title, on its subtasks
 // too (they are from the same place). With no rows the column header still shows, and `empty`
 // (the "no tasks" message) sits centred under it.
-export default function TaskList({ tasks, selectedKey, focused, onSelect, onPreview, onToggleDone, empty }) {
+export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, empty }) {
   const { t: tr } = useTranslation();
   const selectedRef = useRef(null);
   useEffect(() => {
@@ -70,13 +78,14 @@ export default function TaskList({ tasks, selectedKey, focused, onSelect, onPrev
           <div
             key={t.key}
             ref={t.key === selectedKey ? selectedRef : null}
-            className={`${styles.row}${t.key === selectedKey ? ` ${styles.selected}` : ""}`}
+            className={`${styles.row}${chosenKeys.has(t.key) ? ` ${styles.selected}` : ""}`}
             data-status={t.status}
             data-depth={t.depth}
             role="button"
             tabIndex={0}
+            onMouseDown={keepFocus}
             onFocus={() => onSelect(t)}
-            onClick={() => onSelect(t)}
+            onClick={(e) => onSelect(t, e)}
             onDoubleClick={() => onPreview(t)}
           >
             <div>

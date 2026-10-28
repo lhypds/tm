@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { FromTag } from "@components/TaskList";
+import { FromTag, keepFocus } from "@components/TaskList";
 import { describe, formatStamp } from "@utils/task";
 import styles from "./board.module.css";
 
@@ -16,12 +16,15 @@ export const boardStatus = (task) => (BOARD_STATUSES.includes(task.status) ? tas
 // the top of the folder are cards (`tasks`, in order): a task's subtasks are not shown under it,
 // as the list does; its card has a subtasks button instead (how many, at its bottom right), which opens that task's
 // folder (`onSubtasks`), so its subtasks show on a board of their own. Dragging a card into another
-// column sets the task to that status (`onMove`). As in the list, a click only selects and a double
-// click opens the preview (`onPreview`).
+// column sets the task to that status (`onMove(tasks, status)`); dragging one of the cards chosen
+// together (`chosenKeys`, by ctrl / cmd and shift clicks as in the list) takes them all along. As
+// in the list, a click only selects (onSelect(task, click)) and a double click opens the preview
+// (`onPreview`).
 export default function TaskBoard({
   tasks,
   statuses = BOARD_STATUSES,
   selectedKey,
+  chosenKeys,
   focusedStatus,
   onFocusStatus,
   onSelect,
@@ -29,16 +32,16 @@ export default function TaskBoard({
   onMove,
   onSubtasks,
 }) {
-  const [dragKey, setDragKey] = useState(null);
+  const [dragKeys, setDragKeys] = useState([]);
   const selectedRef = useRef(null);
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: "nearest" });
   }, [selectedKey]);
 
   function drop(status) {
-    const task = tasks.find((t) => t.key === dragKey);
-    setDragKey(null);
-    if (task && boardStatus(task) !== status) onMove(task, status);
+    const moving = tasks.filter((t) => dragKeys.includes(t.key) && boardStatus(t) !== status);
+    setDragKeys([]);
+    if (moving.length) onMove(moving, status);
   }
 
   return (
@@ -49,12 +52,13 @@ export default function TaskBoard({
           status={status}
           cards={tasks.filter((t) => boardStatus(t) === status)}
           selectedKey={selectedKey}
+          chosenKeys={chosenKeys}
           selectedRef={selectedRef}
           focused={status === focusedStatus}
-          dragKey={dragKey}
+          dragKeys={dragKeys}
           onFocus={() => onFocusStatus(status)}
           onDragOver={(e) => {
-            if (!dragKey) return;
+            if (!dragKeys.length) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
           }}
@@ -65,10 +69,10 @@ export default function TaskBoard({
           onDragStart={(e, t) => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("text/plain", t.title || t.id);
-            setDragKey(t.key);
-            onSelect(t);
+            setDragKeys(chosenKeys.has(t.key) ? [...chosenKeys] : [t.key]);
+            onSelect(t); // a card not chosen is selected alone; the chosen ones stay chosen
           }}
-          onDragEnd={() => setDragKey(null)}
+          onDragEnd={() => setDragKeys([])}
           onSelect={onSelect}
           onPreview={onPreview}
           onSubtasks={onSubtasks}
@@ -83,9 +87,10 @@ function Column({
   status,
   cards,
   selectedKey,
+  chosenKeys,
   selectedRef,
   focused,
-  dragKey,
+  dragKeys,
   onFocus,
   onDragOver,
   onDrop,
@@ -122,15 +127,16 @@ function Column({
               key={t.key}
               ref={t.key === selectedKey ? selectedRef : null}
               className={styles.card}
-              data-selected={t.key === selectedKey}
-              data-dragging={t.key === dragKey}
+              data-selected={chosenKeys.has(t.key)}
+              data-dragging={dragKeys.includes(t.key)}
               role="button"
               tabIndex={0}
               draggable
               onDragStart={(e) => onDragStart(e, t)}
               onDragEnd={onDragEnd}
+              onMouseDown={keepFocus}
               onFocus={() => onSelect(t)}
-              onClick={() => onSelect(t)}
+              onClick={(e) => onSelect(t, e)}
               onDoubleClick={() => onPreview(t)}
             >
               <div className={styles.cardTitle}>

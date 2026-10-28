@@ -265,6 +265,17 @@ function removeIfEmptyStatusDir(dir) {
 
 // Set a task's status by moving its folder: into its list's "done", "pending" or "aborted"
 // folder, or back into the list itself for todo. Updates task.path and task.status.
+// Rename a task folder. On Windows a folder something has open (a file in it open in a program, an
+// Explorer window or a terminal in it, a Claude run working in it) cannot be renamed: say so plainly.
+function renameFolder(from, to) {
+  try {
+    fs.renameSync(from, to);
+  } catch (e) {
+    if (!['EPERM', 'EACCES', 'EBUSY'].includes(e.code)) throw e;
+    throw new Error(`The folder is in use, close what has it open (a file in it, an Explorer window, a terminal, a Claude run) and try again: ${from}`);
+  }
+}
+
 function markTask(task, status) {
   if (!task) return;
   const taskDir = path.dirname(task.path);
@@ -275,7 +286,7 @@ function markTask(task, status) {
   const dest = path.join(to, path.basename(taskDir));
   if (fs.existsSync(dest)) throw new Error(`Already exists: ${dest}`);
   fs.mkdirSync(to, { recursive: true });
-  fs.renameSync(taskDir, dest);
+  renameFolder(taskDir, dest);
   removeIfEmptyStatusDir(from);
   task.status = status;
   task.path = path.join(dest, path.basename(task.path));
@@ -312,7 +323,7 @@ function renameTaskByFirstLine(taskPath) {
     const newName = taskFolderName(folderId(oldName), firstLine);
     if (oldName === newName) return taskPath;
     const newDir = path.join(parentDir, newName);
-    fs.renameSync(taskDir, newDir);
+    renameFolder(taskDir, newDir);
     return path.join(newDir, path.basename(taskPath));
   } catch (e) {
     return taskPath;

@@ -184,6 +184,10 @@ export default function Home({ all = false }) {
   const [confirm, setConfirm] = useState(null); // task to delete
   const [deleting, setDeleting] = useState(false);
   const [selectedKey, setSelectedKey] = useState(null); // the task the shortcuts act on
+  // The tasks chosen together with it by ctrl / cmd and shift clicks (it among them), which the
+  // checkbox, x / p / w and a drag on the board act on all at once; empty while it is alone.
+  const [groupKeys, setGroupKeys] = useState([]);
+  const anchorKey = useRef(null); // where a shift click's range starts: the task last clicked
   const [help, setHelp] = useState(false);
   const [command, setCommand] = useState(null); // text after ":" while in command mode
   const [preview, setPreview] = useState(null); // attachment shown in the preview modal
@@ -439,6 +443,51 @@ export default function Home({ all = false }) {
   const selectedIndex = visible.findIndex((t) => t.key === selectedKey);
   const selected = visible[selectedIndex] || null;
 
+  // The tasks chosen, in the order shown: the group, or the selected task alone. Selecting a task
+  // outside the group (the keys, a new folder) ends it.
+  const chosen = useMemo(
+    () => (groupKeys.length ? visible.filter((t) => groupKeys.includes(t.key)) : selected ? [selected] : []),
+    [groupKeys, visible, selected],
+  );
+  const chosenKeys = useMemo(() => new Set(chosen.map((t) => t.key)), [chosen]);
+  useEffect(() => {
+    if (groupKeys.length && !groupKeys.includes(selectedKey)) setGroupKeys([]);
+  }, [groupKeys, selectedKey]);
+
+  // A click on a task (`e`, the click), or its taking the focus (no `e`: a tab, a press, a drag
+  // picking a card up). A plain click selects it alone; ctrl / cmd adds it to the chosen tasks or
+  // takes it out; shift chooses every task from the one last clicked to it (with ctrl / cmd, on
+  // top of those chosen). The focus selects a task only when it is not chosen already, so pressing
+  // on one of several chosen (to drag them) keeps them.
+  function selectTask(task, e) {
+    if (!e) {
+      if (!chosenKeys.has(task.key)) selectTask(task, {});
+      return;
+    }
+    const adding = e.ctrlKey || e.metaKey;
+    const keys = chosen.map((t) => t.key);
+    const from = visible.findIndex((t) => t.key === (keys.includes(anchorKey.current) ? anchorKey.current : selectedKey));
+    const to = visible.findIndex((t) => t.key === task.key);
+    if (e.shiftKey && from >= 0 && to >= 0) {
+      const range = visible.slice(Math.min(from, to), Math.max(from, to) + 1).map((t) => t.key);
+      setGroupKeys(adding ? [...new Set([...keys, ...range])] : range);
+      setSelectedKey(task.key);
+      return;
+    }
+    anchorKey.current = task.key;
+    if (!adding) {
+      setGroupKeys([]);
+      setSelectedKey(task.key);
+    } else if (!keys.includes(task.key)) {
+      setGroupKeys([...keys, task.key]);
+      setSelectedKey(task.key);
+    } else {
+      const rest = keys.filter((k) => k !== task.key);
+      setGroupKeys(rest.length > 1 ? rest : []);
+      setSelectedKey(task.key === selectedKey ? (rest.at(-1) ?? null) : selectedKey);
+    }
+  }
+
   // The runs of Claude Code on tasks (started by the run button beside a prompt), followed live by
   // useRuns.
   // The run button opens the run's dialog (`runKey`: the task whose run it shows), starting a run
@@ -469,6 +518,8 @@ export default function Home({ all = false }) {
   const [runKey, setRunKey] = useState(null);
   const [runFolder, setRunFolder] = useState(null); // a record picked from the list under the prompt, shown whatever run is going
   const [runFile, setRunFile] = useState(null); // the task.txt or prompt.txt previewed from the run dialog
+  const [runPrompts, setRunPrompts] = useState([]); // those the run dialog lists, in its order (see RunModal)
+  const [runPromptRel, setRunPromptRel] = useState(null); // the one of them the keyboard is on
   const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
   // The records are the selected task's: the dialog shows them for that task only.
   const savedRuns = runTask && runTask.key === selected?.key ? attachments.runs : [];
@@ -478,6 +529,7 @@ export default function Home({ all = false }) {
     setRunKey(task.key);
     setRunFolder(folder);
     setRunFile(null);
+    setRunPromptRel(null);
     if (folder) {
       selectRun(folder); // the keyboard is on the record opened, so space closes and opens it again
       return;
@@ -494,6 +546,7 @@ export default function Home({ all = false }) {
     setRunKey(null);
     setRunFolder(null);
     setRunFile(null);
+    setRunPromptRel(null);
     setLoads((n) => n + 1); // whatever the run left in the task folder (its record, its files) shows now
   };
   const [fileRel, setFileRel] = useState(null);
@@ -616,6 +669,7 @@ export default function Home({ all = false }) {
   // "nothing chosen" state: up from the first row drops the selection, as esc does, further up
   // stays there, and down from there comes back to the first row.
   function stepListSelection(name) {
+    setGroupKeys([]);
     if (["k", "up"].includes(name) && selectedIndex <= 0) setSelectedKey(null);
     else {
       const move = moveIndex(name, selectedIndex, visible.length);
@@ -640,19 +694,41 @@ export default function Home({ all = false }) {
     setFocusing({ key: task.key, area });
   };
 
-  async function setStatus(task, status) {
+  // Set the status of `list`, one task or several chosen together. A subtask goes before its task,
+  // whose folder takes it along when it moves. The tasks stay selected (and chosen) in their new places.
+  async function setStatus(list, status) {
+    const moved = new Map(); // key before -> key after
     try {
-      const { task: updated } = await api.setStatus(task.space, task.rel, status);
-      setSelectedKey(keyOf(task.space, updated.rel)); // keep the task selected in its new place
+      for (const task of [...list].sort((a, b) => b.rel.length - a.rel.length)) {
+        const { task: updated } = await api.setStatus(task.space, task.rel, status);
+        moved.set(task.key, keyOf(task.space, updated.rel));
+      }
+    } catch (e) {
+      showToast(e.message);
+    }
+    if (!moved.size) return;
+    const at = (k) => moved.get(k) ?? k;
+    if (list.length > 1) {
+      setGroupKeys((g) => g.map(at));
+      setSelectedKey((k) => k && at(k));
+    } else {
+      setGroupKeys([]);
+      setSelectedKey(at(list[0].key));
+    }
+    try {
       await reload();
     } catch (e) {
       showToast(e.message);
     }
   }
 
-  const toggleDone = (task) => setStatus(task, task.status === "done" ? "todo" : "done");
-  const togglePending = (task) => setStatus(task, task.status === "pending" ? "todo" : "pending");
-  const toggleAbort = (task) => setStatus(task, task.status === "aborted" ? "todo" : "aborted");
+  // x / p / w, and the list's checkbox: on the task, or on all the chosen tasks when it is one of
+  // them, each set as the task itself goes (done, or back to todo when it is done already).
+  const toggleStatus = (task, status) =>
+    setStatus(chosenKeys.has(task.key) ? chosen : [task], task.status === status ? "todo" : status);
+  const toggleDone = (task) => toggleStatus(task, "done");
+  const togglePending = (task) => toggleStatus(task, "pending");
+  const toggleAbort = (task) => toggleStatus(task, "aborted");
 
   const goTo = (rel) => setSearchParams(rel ? { dir: rel } : {});
 
@@ -964,20 +1040,34 @@ export default function Home({ all = false }) {
     )
       return false;
     if (runKey !== null && runFile) {
-      // A file previewed from the run dialog: q, enter and space close it, as they close a file's preview.
+      // A file previewed from the run dialog: j / k step to the next / previous of the run's
+      // prompts, as they step through a task's files; q, enter and space close it, as they close
+      // a file's preview.
+      const move = moveIndex(name, runPrompts.findIndex((f) => f.rel === runFile.rel), runPrompts.length);
+      if (move !== null) {
+        if (move >= 0) {
+          setRunFile(runPrompts[move]);
+          setRunPromptRel(runPrompts[move].rel);
+        }
+        return true;
+      }
       if (!["q", "enter", "space"].includes(name)) return false;
       setRunFile(null);
       return true;
     }
     if (runKey !== null) {
-      // The run dialog: space and q close it, as they close a file's preview; j / k step to the
-      // next / previous record of the task while one is shown (not while a run is).
-      if (runFolder && savedRuns.length) {
-        const move = moveIndex(name, savedRuns.findIndex((r) => r.folder === runFolder), savedRuns.length);
-        if (move !== null) {
-          if (savedRuns[move].folder !== runFolder) openRun(runTask, savedRuns[move].folder);
-          return true;
-        }
+      // The run dialog: j / k walk the prompts listed under the transcript (task.txt, prompt.txt),
+      // and space / enter preview the one chosen. With none chosen, space and q close the dialog,
+      // as they close a file's preview.
+      const move = moveIndex(name, runPrompts.findIndex((f) => f.rel === runPromptRel), runPrompts.length);
+      if (move !== null) {
+        if (move >= 0) setRunPromptRel(runPrompts[move].rel);
+        return true;
+      }
+      const prompt = runPrompts.find((f) => f.rel === runPromptRel);
+      if (prompt && ["space", "enter"].includes(name)) {
+        setRunFile(prompt);
+        return true;
       }
       if (!["q", "space"].includes(name)) return false;
       closeRun();
@@ -1097,6 +1187,7 @@ export default function Home({ all = false }) {
     // esc drops the selection, so the next a / n adds a task at the top, not a subtask
     if (name === "escape" && selected && pane !== "detail") {
       setSelectedKey(null);
+      setGroupKeys([]);
       return true;
     }
     if (view === "list" && ["h", "left", "l", "right"].includes(name)) {
@@ -1176,7 +1267,10 @@ export default function Home({ all = false }) {
     const move = moveIndex(name, moveFrom, movable.length);
     if (move !== null) {
       if (view === "list") stepListSelection(name); // with the "nothing chosen" state above the first row
-      else if (move >= 0) setSelectedKey(movable[move].key);
+      else if (move >= 0) {
+        setGroupKeys([]);
+        setSelectedKey(movable[move].key);
+      }
       return true;
     }
     const t = selected;
@@ -1248,11 +1342,12 @@ export default function Home({ all = false }) {
         tasks={visible}
         statuses={boardStatuses}
         selectedKey={selected?.key}
+        chosenKeys={chosenKeys}
         focusedStatus={boardStatuses.includes(pane) ? pane : null}
         onFocusStatus={setPane}
-        onSelect={(t) => {
+        onSelect={(t, e) => {
           setPane(boardStatus(t));
-          setSelectedKey(t.key);
+          selectTask(t, e);
         }}
         onPreview={setPeek}
         onMove={setStatus}
@@ -1291,8 +1386,9 @@ export default function Home({ all = false }) {
         <TaskList
           tasks={visible}
           selectedKey={selected?.key}
+          chosenKeys={chosenKeys}
           focused={pane === "tasks"}
-          onSelect={(t) => setSelectedKey(t.key)}
+          onSelect={selectTask}
           onPreview={setPeek}
           onToggleDone={toggleDone}
           empty={empty}
@@ -1701,7 +1797,12 @@ export default function Home({ all = false }) {
         saved={savedRuns}
         folder={runFolder}
         file={runFile}
-        onPreview={setRunFile}
+        selectedPrompt={runPromptRel}
+        onPrompts={setRunPrompts}
+        onPreview={(f) => {
+          setRunFile(f);
+          if (f) setRunPromptRel(f.rel);
+        }}
         onClose={closeRun}
         onStop={ai.stop}
         onAnswer={ai.answer}

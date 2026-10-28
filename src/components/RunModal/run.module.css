@@ -58,6 +58,10 @@
   gap: 4px 16px;
 }
 
+.promptList li[data-selected="true"] {
+  background: var(--bg-hover);
+}
+
 .promptName {
   padding: 0;
   border: none;
