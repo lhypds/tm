@@ -146,11 +146,13 @@ function listRecords(taskDir) {
   return runs;
 }
 
-// One record, transcript included, as listRecords lists it.
+// One record, transcript included, as listRecords lists it, plus `files`: the task's own files the
+// record has a copy of (task.txt, prompt.txt), for the run dialog to show.
 function readRecord(taskDir, folder) {
   const dir = recordDir(taskDir, folder);
   try {
-    return { ...readRun(dir), folder, saved: true };
+    const files = COPIED_FILES.filter(f => fs.existsSync(path.join(dir, f)));
+    return { ...readRun(dir), folder, saved: true, files };
   } catch (e) {
     throw httpError(404, 'No such run record.');
   }

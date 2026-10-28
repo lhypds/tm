@@ -162,6 +162,7 @@ async function startRun({ machine, task, taskDir, files, after = null }) {
     sessionId: null,
     cost: null,
     billed: false,
+    files,
     items: []
   };
   runs.set(run.id, run);

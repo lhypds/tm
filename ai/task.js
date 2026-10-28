@@ -214,8 +214,10 @@ function afterOf(after) {
 }
 
 // The first prompt for claude: what to do, the task text, the prompt text, where the files are, and
-// what to do with the changes after (`after`: a key of AFTER, or null).
+// what to do with the changes after (`after`: a key of AFTER, or null). A blank prompt.txt (the web UI
+// makes one as the prompt is opened) counts as none: the task text is what to do.
 function buildPrompt(space, task, prompt, taskDir, cwd, after = null) {
+  if (prompt !== null && !trimBlank(prompt)) prompt = null;
   const where = space.repository
     ? `repository "${space.repository}" of work "${space.work}"`
     : space.work ? `work "${space.work}"` : `folder ${space.root}`;

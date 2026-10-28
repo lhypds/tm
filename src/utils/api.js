@@ -111,7 +111,7 @@ export const createTask = (space, dir, fields) => request("/api/tasks", json("PO
 // records newest first, each a run without its transcript plus `folder` (see getSavedRun).
 export const getTask = (space, rel) => request(`/api/task?${q({ ...sp(space), rel })}`);
 
-// Write the task's prompt.txt as typed; a blank text deletes it. Resolves to { prompt, files } as
+// Write the task's prompt.txt as typed, a blank text too. Resolves to { prompt, files } as
 // they are after the write (prompt null when there is no file).
 export const saveTaskPrompt = (space, rel, text) => request("/api/task/prompt", json("PUT", { ...sp(space), rel, text }));
 

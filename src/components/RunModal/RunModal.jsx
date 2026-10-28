@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@ui";
+import FilePreviewModal from "@components/FilePreviewModal";
 import { PlayIcon, StopIcon } from "@components/icons";
 import * as api from "@utils/api";
 import { duration, formatDateTime } from "@utils/task";
@@ -20,8 +21,11 @@ import styles from "./run.module.css";
 // followed as it grows: Claude's text, the tools it calls (a click shows the output), and what it asks,
 // answered right there: a permission, with allow / deny, or a question, with its options and a line
 // for an answer of one's own (onAnswer(run, body), body { decision } or { answers }). Closing the
-// dialog (esc, ×, onClose) leaves the run going.
-export default function RunModal({ task, run, saved, folder, onClose, onStop, onAnswer }) {
+// dialog (esc, ×, onClose) leaves the run going. Under the transcript, "Prompts": the task.txt and
+// prompt.txt Claude was given, a click previewing one (onPreview(file); shown while `file` is set,
+// onPreview(null) closes it) as they were: for a record, the copies kept in it; for the run going,
+// the texts it was given (`run.files`), whatever became of the files since.
+export default function RunModal({ task, run, saved, folder, file, onPreview, onClose, onStop, onAnswer }) {
   const { t } = useTranslation();
 
   // The record to show: the one picked, while the task still has it. Read when it changes.
@@ -58,6 +62,13 @@ export default function RunModal({ task, run, saved, folder, onClose, onStop, on
             : shown.status === "stopped"
               ? t("ai.stopped")
               : t("ai.failed");
+  const prompts = !task
+    ? []
+    : wanted
+      ? (record?.files || []).map((name) => ({ name, rel: `${task.rel}/${wanted}/${name}` }))
+      : Object.entries(shown?.files || {})
+          .filter(([, text]) => typeof text === "string")
+          .map(([name, text]) => ({ name, rel: `${task.rel}/${name}`, url: `data:text/plain;charset=utf-8,${encodeURIComponent(text)}` }));
   const where = shown?.machine && !queued ? ` · ${shown.machine}` : "";
   const when = record ? ` · ${formatDateTime(record.startedAt)}` : "";
 
@@ -91,11 +102,38 @@ export default function RunModal({ task, run, saved, folder, onClose, onStop, on
   );
 
   return (
-    <Modal isOpen={!!task} onClose={onClose} title={task ? t("ai.titleOf", { title: task.title }) : ""} className={styles.modal} titleActions={actions} headerActions={stateTag} tight>
-      <div className={styles.body}>
-        <Transcript run={shown} loading={!!wanted && !record} onAnswer={(body) => onAnswer(run, body)} />
-      </div>
-    </Modal>
+    <>
+      <Modal isOpen={!!task} onClose={onClose} title={task ? t("ai.titleOf", { title: task.title }) : ""} className={styles.modal} titleActions={actions} headerActions={stateTag} tight>
+        <div className={styles.body}>
+          <Transcript run={shown} loading={!!wanted && !record} onAnswer={(body) => onAnswer(run, body)} />
+          {prompts.length > 0 && (
+            <div className={styles.prompts}>
+              <div className="muted">{t("ai.prompts")}</div>
+              <ul className={styles.promptList}>
+                {prompts.map((f) => (
+                  <li key={f.rel}>
+                    <button
+                      type="button"
+                      className={styles.promptName}
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.currentTarget.blur(); // a focused button would keep space and q from the page
+                        onPreview(f);
+                      }}
+                    >
+                      {f.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </Modal>
+      {/* after the dialog, so it stacks in front of it; read only: a record's copies are what Claude
+          was given, and the task's own are edited in its panel */}
+      <FilePreviewModal space={task?.space} file={task ? file : null} onClose={() => onPreview(null)} />
+    </>
   );
 }
 

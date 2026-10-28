@@ -82,7 +82,8 @@ function TextView({ url, editing, onEdit, onEndEdit, onSave, textRef }) {
 // turns it into a textarea; `editing` says it is one, onEndEdit that the edit is over (a blur, or
 // esc). The text is written as typed, and onSaved is called so the file's size is re-read. Beside
 // the name, download and delete (onDelete, which asks first; greyed out without it). `file` is
-// { name, rel } from a task's files.
+// { name, rel } from a task's files, with `url` when its content is from elsewhere than the file
+// at `rel` (a run's copy of a text, see RunModal).
 export default function FilePreviewModal({ space, file, editing, onEdit, onEndEdit, onSaved, onDelete, onClose }) {
   const { t } = useTranslation();
   const [zoom, setZoom] = useState(false);
@@ -90,7 +91,7 @@ export default function FilePreviewModal({ space, file, editing, onEdit, onEndEd
   useEffect(() => setZoom(false), [file]);
 
   const kind = file ? previewKind(file.name) : null;
-  const url = file ? fileUrl(space, file.rel) : "";
+  const url = file ? file.url || fileUrl(space, file.rel) : "";
 
   // Write the text as typed; says whether it did (a failure is shown as a toast).
   async function save(text) {
@@ -118,7 +119,8 @@ export default function FilePreviewModal({ space, file, editing, onEdit, onEndEd
             {/* neither keeps the focus, so space, enter and q stay the preview's keys */}
             <a
               className="btn"
-              href={fileUrl(space, file.rel, true)}
+              href={file.url || fileUrl(space, file.rel, true)}
+              download={file.url ? file.name : undefined}
               tabIndex={-1}
               onClick={(e) => e.currentTarget.blur()}
               title={t("preview.download")}

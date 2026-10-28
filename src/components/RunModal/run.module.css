@@ -39,6 +39,34 @@
   color: var(--warn);
 }
 
+/* The task's files Claude was given, under the transcript: a muted head, then the names as links
+   in a row (see the run list under the prompt, RunList). */
+.prompts {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.promptList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.promptName {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+}
+
 .list {
   flex: 1;
   min-height: 0;

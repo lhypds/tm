@@ -104,7 +104,6 @@
     "prompt": "Prompt",
     "showPrompt": "显示 prompt（prompt.txt）",
     "hidePrompt": "隐藏 prompt",
-    "deletePrompt": "删除 prompt",
     "dropFiles": "拖放文件以添加到此任务"
   },
   "attach": {
@@ -348,6 +347,7 @@
     "thinking": "思考中",
     "using": "正在使用 {{tool}}",
     "runs": "运行记录",
+    "prompts": "Prompts",
     "forget": "删除 {{when}} 的运行记录",
     "forgetConfirm": "删除 {{when}} 的运行记录？",
     "forgetTitle": "删除运行记录"

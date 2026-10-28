@@ -90,8 +90,7 @@ function HeaderButton({ label, dot, disabled, onClick, children }) {
 // show the task's prompt (the brain, `onTogglePrompt`: with `promptOpen`, `prompt`, its prompt.txt
 // text, null for none, undefined until read, is shown under the text, as the Task panel shows it;
 // the brain carries a dot while the task has one) and delete the task (`onDelete`, which asks
-// first). The prompt's head carries its own delete (`onDeletePrompt(task)`, which asks first), as
-// the panel's divider does.
+// first). The prompt is under a head that says "Prompt", as the panel's divider does.
 // `section` is the text the keyboard is on, "task" or "prompt" (null while an attachment is, and
 // until j / k chose one: the preview opens with nothing chosen); that text is highlighted, as a
 // chosen attachment's row is. Opened with space or a double click on the task and closed with
@@ -108,7 +107,6 @@ export default function TaskPreviewModal({
   onOpenFile,
   onOpenFolder,
   onDelete,
-  onDeletePrompt,
   onClose,
   prompt,
   promptOpen,
@@ -152,14 +150,9 @@ export default function TaskPreviewModal({
         )}
         {promptOpen && task && (
           <>
-            {/* the prompt's head, as the panel's divider: its name, with its delete beside it */}
+            {/* the prompt's head, as the panel's divider: its name */}
             <div className={styles.promptHead}>
               <span>{t("panel.prompt")}</span>
-              <div className={styles.headerButtons}>
-                <HeaderButton label={t("panel.deletePrompt")} disabled={prompt == null} onClick={() => onDeletePrompt(task)}>
-                  <TrashIcon />
-                </HeaderButton>
-              </div>
             </div>
             {editing === "prompt" ? (
               <Editor

@@ -104,7 +104,6 @@
     "prompt": "Prompt",
     "showPrompt": "Show the prompt (prompt.txt)",
     "hidePrompt": "Hide the prompt",
-    "deletePrompt": "Delete the prompt",
     "dropFiles": "Drop files to attach them to this task"
   },
   "attach": {
@@ -348,6 +347,7 @@
     "thinking": "Thinking",
     "using": "Using {{tool}}",
     "runs": "Runs",
+    "prompts": "Prompts",
     "forget": "Remove the run of {{when}}",
     "forgetConfirm": "Remove the run of {{when}}?",
     "forgetTitle": "Remove run"

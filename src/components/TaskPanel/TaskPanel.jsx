@@ -15,8 +15,8 @@ import styles from "./panel.module.css";
 // preview's title has them; onOpenFolder(task) opens the task's folder in the OS file manager,
 // onDelete(task) asks before deleting. The brain (onTogglePrompt) shows and hides the task's prompt, its
 // prompt.txt (`promptOpen`): the text is then split in two, the prompt under a divider that says
-// "Prompt" and carries the prompt's own delete (onDeletePrompt(task) asks first).
-// Typing a prompt creates the file, onSavePrompt(task, text) writing it; a blank one deletes it.
+// "Prompt". Opening it makes the file (blank) when the task has none; onSavePrompt(task, text)
+// overwrites it as typed, and nothing deletes it.
 // The divider also carries the run button (RunButton), greyed out until the task has a prompt, or
 // while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
 // text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
@@ -52,7 +52,6 @@ export default function TaskPanel({
   section,
   onSection,
   onSavePrompt,
-  onDeletePrompt,
   run,
   noRunner,
   onRun,
@@ -177,20 +176,6 @@ export default function TaskPanel({
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
                   <RunButton run={run} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
-                  <button
-                    type="button"
-                    className="btn"
-                    tabIndex={-1}
-                    disabled={!hasPrompt}
-                    onClick={(e) => {
-                      e.currentTarget.blur();
-                      onDeletePrompt(task);
-                    }}
-                    title={t("panel.deletePrompt")}
-                    aria-label={t("panel.deletePrompt")}
-                  >
-                    <TrashIcon />
-                  </button>
                 </div>
               </div>
               {/* The prompt's part: its text, with the task's runs under it when it has had any. */}

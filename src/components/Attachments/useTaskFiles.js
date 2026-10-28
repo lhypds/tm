@@ -8,8 +8,7 @@ const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 // The attachments of one task folder, loaded while `rel` is set, with upload and delete (remove says
 // whether it deleted; asking first is the caller's, the app's delete popup),
 // and the task's prompt, its prompt.txt: `prompt` is undefined until the folder is read, null when
-// there is no file, else its text; savePrompt(text) writes it (a blank text deletes the file) and
-// says whether it did. Also `runs`, the records of the task's runs of Claude Code kept in the folder
+// there is no file, else its text; savePrompt(text) writes it, a blank text too, and says whether it did. Also `runs`, the records of the task's runs of Claude Code kept in the folder
 // (newest first, each without its transcript, see api.getTask), and forgetRun(folder), which removes one.
 // `version` re-reads them when it changes (e.g. after the task list reloads); the files shown stay
 // until the fresh ones arrive, so nothing flickers. Another task (by work, repository and rel, not

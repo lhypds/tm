@@ -152,7 +152,7 @@ folders, see AI below), newest first, each a run as `GET /api/ai/runs` answers o
 record's name) and `saved: true`.  
 
 `PUT /api/task/prompt` `{ work, repository?, rel, text }`  
-Write the task's `prompt.txt` as typed; a blank `text` deletes the file instead. `{ prompt, files }` as they are after it.  
+Write the task's `prompt.txt` as typed, overwriting it; a blank `text` too. `{ prompt, files }` as they are after it.  
 
 `PUT /api/task` `{ work, repository?, rel, details?, status? }`  
 Set a task's details and status; the folder is renamed after the first line and moved by the status. `{ task }`.  

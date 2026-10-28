@@ -104,7 +104,6 @@
     "prompt": "プロンプト",
     "showPrompt": "プロンプトを表示（prompt.txt）",
     "hidePrompt": "プロンプトを隠す",
-    "deletePrompt": "プロンプトを削除",
     "dropFiles": "ファイルをドロップしてこのタスクに添付"
   },
   "attach": {
@@ -348,6 +347,7 @@
     "thinking": "考え中",
     "using": "{{tool}} を使用中",
     "runs": "実行履歴",
+    "prompts": "Prompts",
     "forget": "{{when}} の実行を削除",
     "forgetConfirm": "{{when}} の実行を削除しますか？",
     "forgetTitle": "実行履歴を削除"

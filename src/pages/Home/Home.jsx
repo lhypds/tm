@@ -468,6 +468,7 @@ export default function Home({ all = false }) {
   const attachments = useTaskFiles(selected?.space, selected?.rel, loads);
   const [runKey, setRunKey] = useState(null);
   const [runFolder, setRunFolder] = useState(null); // a record picked from the list under the prompt, shown whatever run is going
+  const [runFile, setRunFile] = useState(null); // the task.txt or prompt.txt previewed from the run dialog
   const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
   // The records are the selected task's: the dialog shows them for that task only.
   const savedRuns = runTask && runTask.key === selected?.key ? attachments.runs : [];
@@ -476,6 +477,7 @@ export default function Home({ all = false }) {
   const openRun = async (task, folder = null) => {
     setRunKey(task.key);
     setRunFolder(folder);
+    setRunFile(null);
     if (folder) {
       selectRun(folder); // the keyboard is on the record opened, so space closes and opens it again
       return;
@@ -491,6 +493,7 @@ export default function Home({ all = false }) {
   const closeRun = () => {
     setRunKey(null);
     setRunFolder(null);
+    setRunFile(null);
     setLoads((n) => n + 1); // whatever the run left in the task folder (its record, its files) shows now
   };
   const [fileRel, setFileRel] = useState(null);
@@ -531,27 +534,17 @@ export default function Home({ all = false }) {
     setPeekSection(null);
   };
   // d on a file asks in a popup; confirming (d again, or the button) deletes it and moves the highlight to its neighbour.
-  // The same popup asks before the task's prompt.txt is deleted (`prompt`: the divider's delete, or
-  // d on the prompt); deleting it is saving a blank prompt (see useTaskFiles). And before a run's
-  // record is removed (`record`, see forgetRecord).
-  const [removingFile, setRemovingFile] = useState(null); // { hook, list, file, setRel }, { hook, file, prompt: true } or { hook, record }
+  // The same popup asks before a run's record is removed (`record`, see forgetRecord).
+  const [removingFile, setRemovingFile] = useState(null); // { hook, list, file, setRel } or { hook, record }
   const deleteFile = (hook, list, file, setRel) => setRemovingFile({ hook, list, file, setRel });
-  // `after` runs once the prompt is deleted: the panel or the preview it was deleted from hides the prompt.
-  const deletePrompt = (hook, task, after) => setRemovingFile({ hook, file: { name: "prompt.txt", rel: `${task.rel}/prompt.txt` }, prompt: true, after });
   const confirmDeleteFile = async () => {
-    const { hook, list, file, setRel, prompt, after, record } = removingFile;
+    const { hook, list, file, setRel, record } = removingFile;
     setRemovingFile(null);
     if (record) {
       const runs = hook.runs;
       const i = runs.findIndex((r) => r.folder === record.folder);
       if (!(await hook.forgetRun(record.folder))) return;
       if (pickedRun === record.folder) selectRun((runs[i + 1] || runs[i - 1])?.folder || null);
-      return;
-    }
-    if (prompt) {
-      if (!(await hook.savePrompt(""))) return;
-      setLoads((n) => n + 1); // the other reader of the folder (panel or preview) follows
-      after?.();
       return;
     }
     const i = list.indexOf(file);
@@ -574,17 +567,25 @@ export default function Home({ all = false }) {
   // The brain on the panel shows and hides the prompt under the task's text, the one on the preview
   // the prompt there, each on its own (and kept across sessions, as the panes are); hidden, the
   // keyboard is back on the task's text (in the preview only when it was on the prompt: a file
-  // chosen there, or nothing yet, stays). Deleting a prompt hides it too (see confirmDeleteFile).
+  // chosen there, or nothing yet, stays). Opening it makes the task's prompt.txt, blank, when it has
+  // none (see makePrompt); nothing deletes it after.
   function showPrompt(open) {
     setPromptOpen(open);
-    if (!open) {
+    if (open) makePrompt(attachments);
+    else {
       setSection("task");
       setPickedRun(null); // the runs under the prompt go with it
     }
   }
   function showPeekPrompt(open) {
     setPeekPromptOpen(open);
-    if (!open) setPeekSection((s) => (s === "prompt" ? "task" : s));
+    if (open) makePrompt(peekAttachments);
+    else setPeekSection((s) => (s === "prompt" ? "task" : s));
+  }
+  // A blank prompt.txt for the task of `hook` (a useTaskFiles) when it has none (null: read, and no
+  // file); the folder is re-read after, so the other reader of it (panel or preview) shows it too.
+  async function makePrompt(hook) {
+    if (hook.prompt === null && (await hook.savePrompt(""))) setLoads((n) => n + 1);
   }
 
   // The text the keyboard is on in the panel, also when a text is clicked into: the task's or its
@@ -599,7 +600,7 @@ export default function Home({ all = false }) {
   const detailSection = selectedFile || pickedRecord ? null : promptOpen ? section : "task";
 
   // The prompt edited under the task's text, in the panel or the preview, its prompt.txt: typing
-  // one creates the file, a blank one deletes it (see useTaskFiles.savePrompt). `hook` is the
+  // overwrites the file, a blank one too (see useTaskFiles.savePrompt). `hook` is the
   // editor's useTaskFiles; the folder is re-read after, so the other one shows the new prompt too.
   async function savePrompt(hook, task, text) {
     if (!(await hook.savePrompt(text))) return;
@@ -962,6 +963,12 @@ export default function Home({ all = false }) {
       command !== null
     )
       return false;
+    if (runKey !== null && runFile) {
+      // A file previewed from the run dialog: q, enter and space close it, as they close a file's preview.
+      if (!["q", "enter", "space"].includes(name)) return false;
+      setRunFile(null);
+      return true;
+    }
     if (runKey !== null) {
       // The run dialog: space and q close it, as they close a file's preview; j / k step to the
       // next / previous record of the task while one is shown (not while a run is).
@@ -1025,12 +1032,10 @@ export default function Home({ all = false }) {
         return true;
       }
       if (name === "d") {
-        // the chosen attachment or prompt (nothing to delete without a prompt.txt), else the task
-        // itself; each asks first
+        // the chosen attachment, else the task itself (not on the prompt, which is not deleted);
+        // each asks first
         if (peekFile) deleteFile(peekAttachments, peekFiles, peekFile, setPeekFileRel);
-        else if (text === "prompt") {
-          if (peekAttachments.prompt != null) deletePrompt(peekAttachments, peekTask, () => showPeekPrompt(false));
-        } else setConfirm(peekTask);
+        else if (text !== "prompt") setConfirm(peekTask);
         return true;
       }
       if (["enter", "space"].includes(name) && peekFile) {
@@ -1154,11 +1159,7 @@ export default function Home({ all = false }) {
           return true;
         }
         if (name === "space") return true; // the preview is for the list; here nothing is chosen to open
-        if (name === "d" && detailSection === "prompt") {
-          // the prompt, not the task; nothing to delete without a prompt.txt
-          if (selected && attachments.prompt != null) deletePrompt(attachments, selected, () => showPrompt(false));
-          return true;
-        }
+        if (name === "d" && detailSection === "prompt") return true; // not the task: the prompt is not deleted
       }
     }
 
@@ -1527,7 +1528,6 @@ export default function Home({ all = false }) {
               section={detailSection}
               onSection={selectSection}
               onSavePrompt={(task, text) => savePrompt(attachments, task, text)}
-              onDeletePrompt={(task) => deletePrompt(attachments, task, () => showPrompt(false))}
               run={selectedRun}
               noRunner={noRunner}
               onRun={openRun}
@@ -1685,7 +1685,6 @@ export default function Home({ all = false }) {
         onOpenFile={(file) => openFile(file, peek)}
         onOpenFolder={openFolder}
         onDelete={setConfirm}
-        onDeletePrompt={(task) => deletePrompt(peekAttachments, task, () => showPeekPrompt(false))}
         files={peekFiles}
         selectedRel={peekFile?.rel}
         onClose={closePeek}
@@ -1701,6 +1700,8 @@ export default function Home({ all = false }) {
         run={starting ? null : ai.runFor(runTask)}
         saved={savedRuns}
         folder={runFolder}
+        file={runFile}
+        onPreview={setRunFile}
         onClose={closeRun}
         onStop={ai.stop}
         onAnswer={ai.answer}

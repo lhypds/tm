@@ -124,12 +124,10 @@ const taskFromDir = readTaskDir;
 // with `tm run`): edited under the task's text in the web UI's Task panel. It is not an attachment
 // (listFiles leaves it out); GET /api/task answers it and PUT /api/task/prompt writes it.
 
-// Write a task's prompt.txt as typed; a blank text removes the file instead, so an emptied prompt
-// leaves nothing behind.
+// Write a task's prompt.txt as typed, overwriting it; a blank text too (the web UI makes the file,
+// blank, as the prompt is opened), so the file stays once made.
 function writePrompt(taskDirAbs, text) {
-  const p = path.join(taskDirAbs, PROMPT_FILE);
-  if (text.trim()) fs.writeFileSync(p, text, 'utf8');
-  else if (readPrompt(taskDirAbs) !== null) fs.unlinkSync(p);
+  fs.writeFileSync(path.join(taskDirAbs, PROMPT_FILE), text, 'utf8');
 }
 
 function firstDetailLine(details) {
@@ -683,8 +681,8 @@ app.get('/api/task', (req, res) => {
   res.json({ task: serializeTask(root, taskFromDir(taskDir)), files: listFiles(root, taskDir), prompt: readPrompt(taskDir), runs: listRecords(taskDir) });
 });
 
-// Write a task's prompt.txt as typed; a blank text deletes it. Answers the prompt as it is now
-// (null when there is no file) and the task's attachments.
+// Write a task's prompt.txt as typed (see writePrompt). Answers the prompt as it is now and the
+// task's attachments.
 app.put('/api/task/prompt', (req, res) => {
   const body = req.body || {};
   const { root } = spaceFrom(body);

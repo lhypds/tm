@@ -117,10 +117,12 @@ function summarizeTool(name, input) {
 }
 
 // A run as the browser sees it; with its transcript when `withItems`.
+// `files` are the task's own files as the run was given them ({ "task.txt": text, "prompt.txt": text
+// | null }), for the run dialog to show while the run is not yet a record.
 function publicRun(run, withItems = false) {
-  const { id, task, cwd, taskDir, status, startedAt, endedAt, error, model, sessionId, cost, billed, after } = run;
+  const { id, task, cwd, taskDir, status, startedAt, endedAt, error, model, sessionId, cost, billed, after, files } = run;
   const pending = run.pending ? { id: run.pending.id, kind: run.pending.kind, i: run.pending.i } : null;
-  return { id, task, cwd, taskDir, status, startedAt, endedAt, error, pending, model, sessionId, cost, billed, after, ...(withItems ? { items: run.items } : {}) };
+  return { id, task, cwd, taskDir, status, startedAt, endedAt, error, pending, model, sessionId, cost, billed, after, files, ...(withItems ? { items: run.items } : {}) };
 }
 
 function listRuns(withItems = false) {
@@ -216,7 +218,8 @@ function end(run, status, error = null) {
   run.error = error;
   log(run, `end: ${status}${error ? ` (${error})` : ''}`);
   try {
-    const folder = record.saveRun(run.taskDir, { ...publicRun(run, true), input: run.input, machine }, run.files);
+    const { files, ...pub } = publicRun(run, true);  // the files go beside run.json, not in it
+    const folder = record.saveRun(run.taskDir, { ...pub, input: run.input, machine }, files);
     log(run, `recorded in ${folder}`);
   } catch (e) {
     log(run, `cannot record the run: ${e.message}`);
