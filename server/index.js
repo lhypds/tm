@@ -766,8 +766,9 @@ app.get('/api/file', (req, res) => {
   const abs = resolveInsideRoot(root, String(req.query.rel || ''));
   if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new HttpError(404, 'File not found.');
   res.set('Cache-Control', 'no-store');
-  if (req.query.download === '1') return res.download(abs);
-  res.sendFile(abs);
+  // dotfiles allowed: a run's record is a hidden folder (.claude_<time>) and sendFile 404s any path through one
+  if (req.query.download === '1') return res.download(abs, { dotfiles: 'allow' });
+  res.sendFile(abs, { dotfiles: 'allow' });
 });
 
 // A file name for an attachment: a plain name, never the task file or a hidden file.
