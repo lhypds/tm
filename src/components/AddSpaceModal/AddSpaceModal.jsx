@@ -9,7 +9,8 @@ const TYPES = ["origin", "work", "repository"];
 
 // Add an origin, a work or a repository to taskmgr.json, chosen at the top. `add` is what to start
 // with: { type, origin } (a work, into that origin) or { type, work } (a repository, into that
-// work). An origin has a name and income; a work an origin, name, tasks folder and income; a
+// work), and may come with a `name`, a work with a `tasksPath`, a repository with a `sourcePath` (a
+// folder dropped on the tree). An origin has a name and income; a work an origin, name, tasks folder and income; a
 // repository a work, name, source folder and tasks folder (one of them at least; the tasks folder
 // defaults to the source folder's "tasks"). onSaved gets the new
 // { works, origins } and what was added ({ type, name, origin, work }).
@@ -31,9 +32,9 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
     setType(add.type);
     setOrigin(add.origin || origins?.[0]?.origin || "");
     setWork(add.work || works?.[0]?.work || "");
-    setName("");
-    setTasksPath("");
-    setSourcePath("");
+    setName(add.name || "");
+    setTasksPath(add.tasksPath || "");
+    setSourcePath(add.sourcePath || "");
     reset(null);
     setError("");
     // the lists are only read when the modal opens

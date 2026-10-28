@@ -47,6 +47,12 @@
   padding-bottom: 12px;
 }
 
+/* A folder dragged over the list from outside: the origin or work it would be added to is lit. */
+.group[data-filedrop="true"],
+.work[data-filedrop="true"] {
+  background: var(--bg-hover);
+}
+
 .empty,
 .error {
   padding: 16px 12px;

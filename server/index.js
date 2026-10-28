@@ -7,6 +7,7 @@
 // The works and repositories (each a folder of tasks) come from taskmgr.json, see server/config.js.
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 const express = require('express');
 
@@ -628,6 +629,82 @@ app.post('/api/space/open', (req, res) => {
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new HttpError(404, `Folder not found: ${dir}`);
   openFolder(dir);
   res.json({ ok: true });
+});
+
+// Where a folder dropped on the web UI is: the browser gives only its name and what is in it, so
+// it is looked for by those, first around the folders in taskmgr.json (their parents and
+// grandparents, two levels down), then under the home folder (four levels down), skipping hidden
+// folders and node_modules. The first folder of that name holding all of `entries` is taken.
+const LOCATE_SKIPPED = new Set(['node_modules', 'AppData', 'Library', '$RECYCLE.BIN']);
+const LOCATE_MAX_DIRS = 30000;
+
+function locateFolder(name, entries) {
+  const sameName = process.platform === 'win32' || process.platform === 'darwin'
+    ? (a, b) => a.toLowerCase() === b.toLowerCase()
+    : (a, b) => a === b;
+  const holds = (dir) => {
+    try {
+      const names = new Set(fs.readdirSync(dir));
+      return entries.every(e => names.has(e));
+    } catch {
+      return false;
+    }
+  };
+  const seen = new Set();
+  let visited = 0;
+  // Breadth first from `start`, `depth` levels down.
+  const search = (start, depth) => {
+    let level = [start];
+    for (let d = 0; d <= depth && level.length; d++) {
+      const next = [];
+      for (const dir of level) {
+        if (seen.has(dir) || ++visited > LOCATE_MAX_DIRS) continue;
+        seen.add(dir);
+        let children;
+        try {
+          children = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+        for (const c of children) {
+          if (!c.isDirectory() || c.name.startsWith('.') || LOCATE_SKIPPED.has(c.name)) continue;
+          const child = path.join(dir, c.name);
+          if (sameName(c.name, name) && holds(child)) return child;
+          next.push(child);
+        }
+      }
+      level = next;
+    }
+    return null;
+  };
+
+  const near = new Set();
+  for (const w of config.getWorks()) {
+    for (const p of [w.root, ...w.repositories.flatMap(r => [r.root, r.sourcePath])]) {
+      if (!p) continue;
+      near.add(path.dirname(p));
+      near.add(path.dirname(path.dirname(p)));
+    }
+  }
+  for (const dir of near) {
+    const found = search(dir, 2);
+    if (found) return found;
+  }
+  return search(os.homedir(), 4);
+}
+
+// The path of a folder dropped on the web UI, from its name and the names in it: { path }, with
+// the home folder written "~" as in taskmgr.json.
+app.post('/api/folder/locate', (req, res) => {
+  const name = String(req.body?.name || '');
+  const entries = Array.isArray(req.body?.entries) ? req.body.entries.map(String).slice(0, 50) : [];
+  if (!name || name.includes('/') || name.includes('\\')) throw new HttpError(400, 'Missing name.');
+  const found = locateFolder(name, entries);
+  if (!found) throw new HttpError(404, `Folder "${name}" not found.`);
+  const home = os.homedir();
+  const rel = path.relative(home, found);
+  const shown = path.sep === '/' && !rel.startsWith('..') && !path.isAbsolute(rel) ? `~/${rel}` : found;
+  res.json({ path: shown });
 });
 
 // Create the missing tasks folder of a work or a repository.

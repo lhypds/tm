@@ -54,6 +54,10 @@ export const listSpaces = () => request("/api/spaces");
 // Open the folder a tree row shows (a work's tasks folder, or a repository's source folder) in the OS file manager.
 export const openSpaceFolder = (space) => request("/api/space/open", json("POST", sp(space)));
 
+// The path of a folder dropped on the page, found by the server from its name and the names of
+// what is in it: { path }.
+export const locateFolder = ({ name, entries }) => request("/api/folder/locate", json("POST", { name, entries }));
+
 // Make a space's missing tasks folder; resolves to { works, origins }.
 export const createSpaceFolder = (space) => request("/api/space/create", json("POST", sp(space)));
 

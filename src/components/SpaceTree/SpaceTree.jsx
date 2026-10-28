@@ -200,6 +200,44 @@ function useReorder(onMove) {
   return { dragProps, dropProps };
 }
 
+// The names of what is in a dropped folder (a directory entry), up to `max`.
+async function entryNames(entry, max = 200) {
+  const reader = entry.createReader();
+  const names = [];
+  for (;;) {
+    const batch = await new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
+    if (!batch.length || names.length >= max) return names;
+    names.push(...batch.map((x) => x.name));
+  }
+}
+
+// The folder dragged in from outside the page, as { name, path, git } (`git`: it has a .git), or
+// null when it is no folder. A browser does not give a dropped folder's path: it is read from the
+// file:// URI some file managers (and editors) add, else the server looks for the folder by its
+// name and what is in it, and is "" when not found. The drag data is read before anything awaits,
+// as it is gone after the drop event.
+async function droppedFolder(dt) {
+  const item = [...dt.items].find((x) => x.kind === "file");
+  const entry = item?.webkitGetAsEntry?.();
+  if (!entry?.isDirectory) return null;
+  const uri = (dt.getData("text/uri-list") || "").split(/\r?\n/).find((l) => l.startsWith("file:"));
+  const names = await entryNames(entry);
+  let path = "";
+  if (uri) {
+    const u = new URL(uri);
+    path = decodeURIComponent(u.pathname).replace(/\/$/, "");
+    // file:///C:/a → C:\a, file://host/share → \\host\share
+    if (/^\/[A-Za-z]:/.test(path)) path = path.slice(1).replaceAll("/", "\\");
+    else if (u.host) path = `\\\\${u.host}${path.replaceAll("/", "\\")}`;
+  } else {
+    path = await api
+      .locateFolder({ name: entry.name, entries: names.slice(0, 50) })
+      .then((r) => r.path)
+      .catch(() => "");
+  }
+  return { name: entry.name, path, git: names.includes(".git") };
+}
+
 // "All origins", then the origins as trees, each with its works and their repositories; works
 // without an origin come last. `activeTo` is what is shown on the right; `focused` says the keyboard is on the tree rather
 // than the task list. `onAdd` opens the add modal with what to start with: { type: "origin" } from
@@ -207,7 +245,10 @@ function useReorder(onMove) {
 // unless `showHidden`; the checkbox under the head (with `hiddenCount`) turns that on and off.
 // Dragging reorders (see useReorder): `onMove` gets { kind: "origin", origin }, { kind: "work",
 // work } or { kind: "repository", work, name } with `before`, the name of the sibling it now goes
-// before (null: last).
+// before (null: last). A folder dropped on the list from outside opens the add modal with the
+// folder's name and path: on a work's block, on a repository of that work; elsewhere, on a work,
+// into the origin it was dropped in. The path is the source folder when the folder has a .git,
+// else the tasks folder.
 export default function SpaceTree({
   works,
   origins,
@@ -233,6 +274,13 @@ export default function SpaceTree({
   const originNames = groups.filter((g) => g.origin).map((g) => g.origin);
   const [listEl, setListEl] = useState(null);
   useWheelScroll(listEl);
+  // Where a folder dragged in from outside would go: { origin } or { work }, or null.
+  const [fileOver, setFileOver] = useState(null);
+  const isFiles = (e) => e.dataTransfer.types.includes("Files");
+  const fileTarget = (e) => {
+    const work = e.target.closest("[data-work]")?.dataset.work;
+    return work ? { work } : { origin: e.target.closest("[data-origin]")?.dataset.origin || "" };
+  };
   return (
     <div className={styles.panel}>
       <div className={styles.head} data-focused={focused}>
@@ -255,7 +303,34 @@ export default function SpaceTree({
       <Checkbox className={styles.showHidden} checked={showHidden} onChange={onShowHidden}>
         {t("tree.showHidden", { count: hiddenCount })}
       </Checkbox>
-      <div className={styles.list} ref={setListEl}>
+      <div
+        className={styles.list}
+        ref={setListEl}
+        onDragOver={(e) => {
+          if (!isFiles(e)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          const to = fileTarget(e);
+          setFileOver((cur) => (cur?.work === to.work && cur?.origin === to.origin ? cur : to));
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setFileOver(null);
+        }}
+        onDrop={async (e) => {
+          if (!isFiles(e)) return;
+          e.preventDefault();
+          setFileOver(null);
+          const to = fileTarget(e);
+          const folder = await droppedFolder(e.dataTransfer);
+          if (!folder) return;
+          const paths = folder.git ? { sourcePath: folder.path } : { tasksPath: folder.path };
+          onAdd(
+            to.work
+              ? { type: "repository", work: to.work, name: folder.name, ...paths }
+              : { type: "work", origin: to.origin, name: folder.name, ...paths },
+          );
+        }}
+      >
         {error ? (
           <p className={styles.error}>{error}</p>
         ) : works === null ? (
@@ -285,7 +360,12 @@ export default function SpaceTree({
               };
               const workNames = g.works.map((w) => w.work);
               return (
-                <div key={g.origin} className={styles.group} {...(originItem ? dropProps(originItem) : {})}>
+                <div
+                  key={g.origin}
+                  className={styles.group}
+                  data-origin={g.origin}
+                  data-filedrop={!!g.origin && fileOver?.origin === g.origin}
+                  {...(originItem ? dropProps(originItem) : {})}>
                   {g.origin && (
                     <Origin
                       name={g.origin}
@@ -325,7 +405,13 @@ export default function SpaceTree({
                     const repositoryNames = w.repositories.map((p) => p.name);
                     return (
                       // The work and its repositories are one block.
-                      <div key={w.work} className={styles.work} {...dropProps(workItem)}>
+                      <div
+                        key={w.work}
+                        className={styles.work}
+                        data-work={w.work}
+                        data-filedrop={fileOver?.work === w.work}
+                        {...dropProps(workItem)}
+                      >
                         <Row
                           to={api.spacePath(g.origin, w.work)}
                           exists={w.exists}
