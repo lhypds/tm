@@ -171,6 +171,48 @@ p {
   background-repeat: no-repeat;
 }
 
+/* The open list drawn by the page, not the system, so the highlighted option is black on white
+   instead of the system blue. Browsers without base-select keep the native list. */
+@supports (appearance: base-select) {
+  .select,
+  .select::picker(select) {
+    appearance: base-select;
+  }
+
+  .select::picker-icon {
+    display: none; /* the triangle above stays */
+  }
+
+  .select::picker(select) {
+    border: var(--line) solid var(--border);
+    background: var(--bg);
+    padding: 0;
+  }
+
+  .select option {
+    padding: 2px 8px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+
+  .select option::checkmark {
+    display: none;
+  }
+
+  .select option:hover,
+  .select option:focus {
+    background: var(--fg);
+    color: var(--bg);
+    outline: none;
+  }
+
+  /* the mouse wins: the keyboard-focused option goes back to white while another is hovered */
+  .select::picker(select):hover option:focus:not(:hover) {
+    background: var(--bg);
+    color: var(--fg);
+  }
+}
+
 .mono {
   font-family: var(--font);
   font-variant-numeric: tabular-nums;

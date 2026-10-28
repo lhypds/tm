@@ -287,7 +287,7 @@
     "type": "添加什么",
     "origin": "Origin",
     "work": "Work",
-    "repository": "Repository",
+    "repository": "Sub / Repository",
     "workInto": "添加 work",
     "repositoryInto": "添加 repository",
     "sourcePath": "源代码文件夹",
