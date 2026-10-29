@@ -57,7 +57,7 @@ const pointerFocus = {
 };
 
 // The names of the machines that sync a remote folder, as its row shows them ("" for none).
-const machineNames = (s) => (s.machines || []).map((m) => m.name).join(" · ");
+const machineNames = (s) => (s.machines || []).map((m) => m.name).join(" ");
 
 // One space in the tree. `depth` is 0 for a work without an origin, 1 for a work under its origin
 // or a repository of a depth-0 work, and 2 for a repository of a work under an origin.
@@ -95,7 +95,7 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
           {machines.length
             ? machines.map((m, i) => (
                 <Fragment key={m.name}>
-                  {i > 0 && " · "}
+                  {i > 0 && " "}
                   {m.name}
                   <MachineDot machine={m} />
                 </Fragment>
