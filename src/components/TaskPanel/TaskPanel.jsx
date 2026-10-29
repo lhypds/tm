@@ -67,6 +67,10 @@ export default function TaskPanel({
   const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
   const hasPrompt = attachments.prompt != null; // not while unread (undefined) or without a file (null)
   const focusOf = (area) => !!task && focusKey === task.key && focusArea === area;
+  // The task's run when it is newer than its latest record (going, or over and not yet re-read): its
+  // prompt is the one carried out, greyed from the start of the run (see PromptText).
+  const latest = attachments.runs?.[0];
+  const live = run && (!latest || run.startedAt > latest.startedAt) ? run : null;
 
   return (
     <div
@@ -184,8 +188,8 @@ export default function TaskPanel({
                   key={`prompt:${task.space.work}/${task.space.repository || ""}/${task.id}`}
                   task={task}
                   prompt={attachments.prompt}
-                  lastPrompt={attachments.lastPrompt}
-                  lastRun={attachments.runs?.[0]?.folder}
+                  lastPrompt={live ? live.files?.["prompt.txt"] ?? null : attachments.lastPrompt}
+                  lastRun={live ? live.id : attachments.runs?.[0]?.folder}
                   textRef={promptRef}
                   focus={focusOf("prompt")}
                   onFocused={onFocused}
@@ -266,8 +270,8 @@ function TaskText({ task, textRef, focus, onFocused, onFocus, onSave }) {
 // The task's prompt.txt under its text, edited the same way: saved on blur, cmd/ctrl+s and esc.
 // `prompt` is the saved text, null for no file and undefined until the folder is read (the text is
 // empty until then, and takes what is read). A blank prompt leaves no file (see useTaskFiles).
-// While the prompt is `lastPrompt`, the prompt.txt the latest run (`lastRun`, its record's folder) was
-// given, it is carried out already: the text is empty with the prompt as its placeholder, greyed, and
+// While the prompt is `lastPrompt`, the prompt.txt the latest run (`lastRun`, its id or its record's
+// folder) was given, going or over, it is carried out: the text is empty with the prompt as its placeholder, greyed, and
 // the file stays as it is when nothing is typed. Tab in the empty text takes the placeholder in as
 // typed; what is typed instead replaces the prompt once saved.
 function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocused, onFocus, onSave }) {
