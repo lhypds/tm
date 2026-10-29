@@ -178,6 +178,11 @@
   color: var(--err);
 }
 
+/* A machine's name and dot on a remote row; a little space before the second one. */
+.machine + .machine {
+  margin-left: 4px;
+}
+
 /* A hidden work (and its repositories), shown because hidden works are shown. */
 .row[data-hidden="true"] .top,
 .row[data-hidden="true"] .root {

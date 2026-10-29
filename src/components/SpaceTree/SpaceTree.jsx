@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditIcon, FolderIcon, PlusIcon, TrashIcon } from "@components/icons";
 import TreeLines from "@components/TreeLines";
 import MachineDot from "@components/MachineDot";
@@ -93,12 +93,11 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
             left-to-right, or its leading "/" would show at the end. */}
         <bdi dir="ltr">
           {machines.length
-            ? machines.map((m, i) => (
-                <Fragment key={m.name}>
-                  {i > 0 && " "}
+            ? machines.map((m) => (
+                <span key={m.name} className={styles.machine}>
                   {m.name}
                   <MachineDot machine={m} />
-                </Fragment>
+                </span>
               ))
             : root}
         </bdi>
