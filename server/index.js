@@ -197,23 +197,32 @@ function crumbsFor(root, abs) {
   return crumbs;
 }
 
-// A machine as the web UI shows it: syncApp.machineInfo plus `runner`, whether its taskmgrd is
-// connected to run Claude Code for this server (AI_RUNNER=1 there, see ai/remote.js); a machine so
-// connected is in touch.
-function withRunner(m) {
-  if (!m) return null;
-  const runner = isRunnerConnected(m.name);
-  return { ...m, runner, online: m.online || runner };
+// The machines that sync a space as the web UI shows them: syncApp.machinesInfo, each with `runner`,
+// whether its taskmgrd is connected to run Claude Code for this server (AI_RUNNER=1 there, see
+// ai/remote.js); a machine so connected is in touch.
+function machinesWithRunner(space) {
+  return syncApp.machinesInfo(space).map(m => {
+    const runner = isRunnerConnected(m.name);
+    return { ...m, runner, online: m.online || runner };
+  });
 }
 
-// The machine a mirror folder (see isMirrored) was pushed from, as the last push of the space said:
-// { name, seenAt, online, runner } (see withRunner), or null (shown as plain "remote"). A space is
-// found by work and repository; the origin comes from the config, as a work is in one origin only.
-function machineOf({ work, repository, root }) {
-  if (!isMirrored(config.dataDir, root)) return null;
+// Of a space's machines (see machinesWithRunner), the one its tasks run on: one whose runner is
+// connected, or else the first; null when there is none.
+const runMachine = (machines) => machines.find(m => m.runner) || machines[0] || null;
+
+// The machines a mirror folder (see isMirrored) is synced by (see machinesWithRunner), [] when it is
+// not a mirror or no push said. A space is found by work and repository; the origin comes from the
+// config, as a work is in one origin only.
+function machinesOf({ work, repository, root }) {
+  if (!isMirrored(config.dataDir, root)) return [];
   const w = config.getWorks().find(x => x.work === work);
-  return w ? withRunner(syncApp.machineInfo({ origin: w.origin, work: w.work, repository: repository || '' })) : null;
+  return w ? machinesWithRunner({ origin: w.origin, work: w.work, repository: repository || '' }) : [];
 }
+
+// The machine a mirror folder's tasks run on: { name, seenAt, online, runner }, or null (shown as
+// plain "remote").
+const machineOf = (space) => runMachine(machinesOf(space));
 
 // How many tasks are todo, done, pending and aborted, subtasks included.
 function countTasks(tasks, counts = { todo: 0, done: 0, pending: 0, aborted: 0 }) {
@@ -237,6 +246,7 @@ function listDir(space, rel) {
     absDir: abs,
     remote: isMirrored(config.dataDir, root),
     machine: machineOf(space),
+    machines: machinesOf(space),
     isRoot,
     parent,
     crumbs: crumbsFor(root, abs),
@@ -257,8 +267,8 @@ function listSpacesTasks(spaces, absDir) {
   sortTasks(tasks);
   const remote = isMirrored(config.dataDir, absDir);
   // absDir, when given, is the root of the first space (a work's common tasks).
-  const machine = remote && spaces[0] && spaces[0].root === absDir ? machineOf(spaces[0]) : null;
-  return { dir: '', absDir, remote, machine, isRoot: true, parent: null, crumbs: [], tasks, counts: countTasks(tasks) };
+  const machines = remote && spaces[0] && spaces[0].root === absDir ? machinesOf(spaces[0]) : [];
+  return { dir: '', absDir, remote, machine: runMachine(machines), machines, isRoot: true, parent: null, crumbs: [], tasks, counts: countTasks(tasks) };
 }
 
 // A work's common tasks and those of all its repositories.
@@ -270,8 +280,8 @@ function workSpaces(w) {
 }
 
 // The works/repositories list with, for each folder, whether it exists, whether it is a copy
-// pushed by taskmgrd (remote) and, then, the machine it was pushed from. A work without a tasks
-// folder of its own (root "") is not missing one.
+// pushed by taskmgrd (remote) and, then, the machines that sync it and the one its tasks run on. A
+// work without a tasks folder of its own (root "") is not missing one.
 function listSpaces() {
   const describe = (root, space) => {
     const remote = isMirrored(config.dataDir, root);
@@ -280,11 +290,13 @@ function listSpaces() {
     if (remote && !fs.existsSync(root)) {
       try { fs.mkdirSync(root, { recursive: true }); } catch (e) { /* shown as missing below */ }
     }
+    const machines = remote ? machinesWithRunner(space) : [];
     return {
       root,
       exists: !root || (fs.existsSync(root) && fs.statSync(root).isDirectory()),
       remote,
-      machine: remote ? withRunner(syncApp.machineInfo(space)) : null
+      machines,
+      machine: runMachine(machines)
     };
   };
   return config.getWorks().map(w => ({

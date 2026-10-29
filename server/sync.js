@@ -22,7 +22,10 @@
 // in both .env files. Without SYNC_SERVER_TOKEN in this server's .env, pushes are refused (503).
 // It also carries `X-Machine-Id` (the MACHINE_ID of the machine, URI-encoded): the time of each
 // machine's last request is kept, in memory, so the web UI can show whether it is in touch (see
-// machineInfo, below), and what it pushes and polls is logged to logs/<MACHINE_ID>.log (see machineLog).
+// machinesInfo, below), and what it pushes and polls is logged to logs/<MACHINE_ID>.log (see machineLog).
+// At most MAX_MACHINES machines sync one space (push it, or pull it): the first ones to do so. Any
+// other is refused, 409 TOO_MANY_MACHINES, until one of them lets go of it (its pushed taskmgr.json
+// no longer lists the space).
 //
 //   GET /api/sync                                            -> { ok, config, spaces }
 //       what is here: the sha1 of the last pushed config, and of each space's last snapshot
@@ -32,23 +35,26 @@
 //       mergeConfigs), with the pushed tasks_path set to the copies under data/origins/ (see
 //       toMirror), and removes, under data/origins/, the origins, works and repositories not in it.
 //       A space the pushing machine pushed before and no longer lists (renamed or removed there)
-//       is kept, but no longer as that machine's (see machineInfo).
+//       is kept, but no longer as that machine's (see machinesInfo).
 //   POST /api/sync/blobs  { blobs: [sha1] }                  -> { ok, missing }
 //       which of these files the server does not have yet (see the blob store below).
 //   PUT /api/sync/blob/<sha1>   (the raw file)               -> { ok }
 //       stores one file by the sha1 of its content; refused when the content does not hash to it.
 //   PUT /api/sync/space   { origin, work, repository, machine, entries }  -> { ok, files, dirs }
 //       brings one space's folder to the snapshot (tasks that changed status moved first): entries are [{ path, content }] for task
-//       `machine` (MACHINE_ID of the pushing machine, optional) is remembered for the space and shown
-//       in the web UI here as where its copy comes from (see machineInfo, below).
 //       files (text), [{ path, blob: sha1 }] for every other file, taken from the blob store, and
 //       [{ path, dir: true }] for an empty folder, paths relative to the space's folder. When a blob
 //       is not in the store, nothing is written and the answer is 409 MISSING_BLOBS { missing }.
+//       `machine` (MACHINE_ID of the pushing machine, optional) is remembered as one of the space's
+//       machines, shown in the web UI here as where its copy comes from (see machinesInfo, below);
+//       409 TOO_MANY_MACHINES when the space already has MAX_MACHINES others.
 //   GET /api/sync/pull/config                                -> { ok, text }
 //   GET /api/sync/pull/space?origin=&work=&repository=       -> { ok, entries }
 //   GET /api/sync/pull/file?origin=&work=&repository=&path=  -> the raw file
 //       what `tm pull` reads: this server's taskmgr.json, a space's task folders listed like a push
-//       (task files as text, the others by sha1 and size), and one file of it. Nothing is changed.
+//       (task files as text, the others by sha1 and size), and one file of it. Nothing is changed,
+//       but the pulling machine (X-Machine-Id) counts as one of the space's machines, and is refused
+//       (409 TOO_MANY_MACHINES) as a push would be.
 //
 // Attachments go through the blob store, data/.sync-blobs/<sha1>, so that a file the server already
 // has (unchanged since the last push, or the same file under a renamed task) is never sent again:
@@ -60,7 +66,7 @@
 // Files are written into data/.sync-tmp/ first and renamed into place, so a file is never half
 // written; a push cut short leaves the space part done, and the next one finishes it.
 // data/.sync-state.json remembers the hashes GET answers with, the blobs each space refers to, and the
-// machine each space was last pushed from.
+// machines that sync each space.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -82,6 +88,7 @@ const BLOB_KEEP_MS = 60 * 60 * 1000; // how long an unreferenced blob is kept be
 const BLOB_RE = /^[0-9a-f]{40}$/;
 const MACHINE_MAX = 80;             // the longest MACHINE_ID kept (longer ones are cut)
 const ONLINE_MS = 3 * 60 * 1000;    // how long after its last request a machine counts as in touch
+const MAX_MACHINES = 2;             // how many machines may sync one space
 
 class SyncError extends Error {
   constructor(status, message, extra) { super(message); this.status = status; Object.assign(this, extra || {}); }
@@ -420,7 +427,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
         config: typeof s.config === 'string' ? s.config : null,
         spaces: s.spaces && typeof s.spaces === 'object' ? s.spaces : {},
         blobs: s.blobs && typeof s.blobs === 'object' ? s.blobs : {},  // space key -> the blobs of its snapshot
-        machines: s.machines && typeof s.machines === 'object' ? s.machines : {}  // space key -> MACHINE_ID of its last push
+        machines: machinesOf(s.machines)  // space key -> the MACHINE_IDs that sync it, the first to first
       };
     } catch (e) {
       return { config: null, spaces: {}, blobs: {}, machines: {} };
@@ -445,6 +452,30 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
         if (now - fs.statSync(abs).mtimeMs > BLOB_KEEP_MS) fs.rmSync(abs, { force: true });
       } catch (e) { /* gone meanwhile */ }
     }
+  }
+
+  // The machines of each space, as read: a state written before a space could have two machines has
+  // one MACHINE_ID per space instead of a list.
+  function machinesOf(v) {
+    const out = {};
+    if (!v || typeof v !== 'object') return out;
+    for (const [k, m] of Object.entries(v)) {
+      const list = (Array.isArray(m) ? m : [m]).filter(x => typeof x === 'string' && x);
+      if (list.length) out[k] = list;
+    }
+    return out;
+  }
+
+  // Count `machine` as one of the space's (`key`) machines, in `state`: refused when it is not one yet
+  // and the space has MAX_MACHINES already. Returns whether it was added (state to be written).
+  function claim(state, key, machine, what) {
+    const list = state.machines[key] || [];
+    if (!machine || list.includes(machine)) return false;
+    if (list.length >= MAX_MACHINES) {
+      throw new SyncError(409, `${what} is synced by ${[...list].sort((x, y) => x.localeCompare(y)).join(' and ')} already: at most ${MAX_MACHINES} machines can sync it. Remove it from taskmgr.json on one of them first.`, { code: 'TOO_MANY_MACHINES' });
+    }
+    state.machines[key] = [...list, machine];
+    return true;
   }
 
   function writeState(state) {
@@ -537,7 +568,10 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     if (req.machine) {
       const pushed = spaceKeys(pushedWorks);
       for (const k of Object.keys(state.machines)) {
-        if (state.machines[k] === req.machine && !pushed.has(k)) { delete state.machines[k]; delete state.spaces[k]; }
+        if (!state.machines[k].includes(req.machine) || pushed.has(k)) continue;
+        state.machines[k] = state.machines[k].filter(m => m !== req.machine);
+        if (!state.machines[k].length) delete state.machines[k];
+        delete state.spaces[k];
       }
     }
     writeState(state);
@@ -578,14 +612,13 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const target = spaceDir(dataDir, { origin, work, repository });
     if (!Array.isArray(entries)) throw new SyncError(400, '"entries" must be an array.');
     const list = entries.map(checkEntry);
+    const key = spaceKey({ origin: origin.trim(), work: work.trim(), repository: repository.trim() });
+    claim(readState(), key, machineName(machine), label({ origin, work, repository }));  // refused before anything is written
     const { files, dirs } = writeSnapshot(dataDir, target, list);
     const state = readState();
-    const key = spaceKey({ origin: origin.trim(), work: work.trim(), repository: repository.trim() });
     state.spaces[key] = sha1(JSON.stringify(entries));
     state.blobs[key] = [...new Set(list.filter(e => e.blob).map(e => e.blob))];
-    const name = machineName(machine);
-    if (name) state.machines[key] = name;
-    else delete state.machines[key];
+    claim(state, key, machineName(machine), label({ origin, work, repository }));
     writeState(state);
     pruneBlobs(state);
     machineLog(req, 'success', `pushed ${label({ origin, work, repository })} (${files} file${files === 1 ? '' : 's'}, ${dirs} empty folder${dirs === 1 ? '' : 's'})`);
@@ -595,8 +628,10 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   // ---------- pull: what `tm pull` reads ----------
 
   // The folder of a space as this server's taskmgr.json has it (a copy of a pushed folder, or a folder
-  // of its own), or a 404 when the config does not list it or it has no tasks folder.
-  function rootOf(q) {
+  // of its own), or a 404 when the config does not list it or it has no tasks folder. The pulling
+  // machine is counted as one of the space's machines (see claim).
+  function rootOf(req) {
+    const q = req.query;
     const { works } = parseConfig(readConfig(), 'taskmgr.json');
     const origin = String(q.origin || '').trim();
     const work = String(q.work || '').trim();
@@ -604,6 +639,8 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const w = works.find(x => x.work === work && (x.origin || '') === origin);
     const root = w && (repository ? (w.repositories.find(p => p.name === repository) || {}).root : w.root);
     if (!root) throw new SyncError(404, `No tasks folder for "${[origin, work, repository].filter(Boolean).join(' / ')}" here.`);
+    const state = readState();
+    if (claim(state, spaceKey({ origin, work, repository }), req.machine, label({ origin, work, repository }))) writeState(state);
     return root;
   }
 
@@ -617,7 +654,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   // out, as a push leaves it out; see taskEntries): { path, content } for a task file, { path, blob:
   // sha1, size } for any other file (fetched with /pull/file), { path, dir: true } for an empty folder.
   app.get('/api/sync/pull/space', (req, res) => {
-    const root = rootOf(req.query);
+    const root = rootOf(req);
     const listed = [];
     const walk = (dir, rel) => {
       let names;
@@ -665,7 +702,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
 
   // One file of a space, raw. `path` is relative to the space's folder.
   app.get('/api/sync/pull/file', (req, res) => {
-    const root = path.resolve(rootOf(req.query));
+    const root = path.resolve(rootOf(req));
     const rel = String(req.query.path || '');
     const parts = rel.split('/');
     if (!rel || parts.some(s => !s || s === '.' || s === '..' || s.includes('\0'))) throw new SyncError(400, `Invalid path "${rel}".`);
@@ -690,16 +727,14 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}), ...(err.missing ? { missing: err.missing } : {}) });
   });
 
-  // The machine the space (see spaceKey) was last pushed from: { name, seenAt, online }, with its
-  // MACHINE_ID, when (ms) it last made a request (null: not since the server started) and whether that
-  // was within ONLINE_MS. null when the space was never pushed or the push did not say. Read from the
-  // state file each time, as pushes come in between.
-  app.machineInfo = (space) => {
-    const name = readState().machines[spaceKey(space)] || '';
-    if (!name) return null;
+  // The machines that sync the space (see spaceKey), by name: [{ name, seenAt, online }],
+  // each with its MACHINE_ID, when (ms) it last made a request (null: not since the server started)
+  // and whether that was within ONLINE_MS. Empty when the space was never synced or no push or pull
+  // said which machine it was. Read from the state file each time, as pushes come in between.
+  app.machinesInfo = (space) => [...(readState().machines[spaceKey(space)] || [])].sort((x, y) => x.localeCompare(y)).map(name => {
     const seenAt = seen.get(name) || null;
     return { name, seenAt, online: !!seenAt && Date.now() - seenAt < ONLINE_MS };
-  };
+  });
 
   // Forget the hashes of the pushed snapshots, so the next push sends every space whole: to be called
   // when the tasks are changed here (the web UI), which leaves the copies no longer what was pushed.

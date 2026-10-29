@@ -80,9 +80,11 @@ These change `taskmgr.json` and answer the tree. Removing one never removes its 
 
 `GET /api/spaces`  
 The tree. Each work and repository says whether its folder `exists`, whether it is a copy pushed by taskmgrd (`remote`)  
-and, then, `machine`: `{ name, seenAt, online }` for the machine it was pushed from (`null` when the push did not say),  
-its `MACHINE_ID`, when (ms) it last pushed or polled this server (`null`: not since the server started) and whether that  
-was within the last three minutes. The web UI shows it as a green or grey dot beside the name.  
+and, then, `machines`: `[{ name, seenAt, online, runner }]` for the machines that sync it (at most two, sorted by name;  
+`[]` when no push said), each with its `MACHINE_ID`, when (ms) it last pushed or polled this server (`null`: not since the  
+server started), whether that was within the last three minutes, and whether its runner is connected; and `machine`, the  
+one of them its tasks run on (one with its runner connected, or else the first; `null` when there is none). The web UI  
+shows every machine's name, each with a green or grey dot.  
 
 `POST /api/origin` `{ name, income? }`  
 Add an origin with no works yet. 201.  
@@ -131,8 +133,8 @@ Tasks
 
 `GET /api/tasks?work=&repository=&dir=`  
 The tasks in a folder, sorted todo, done, pending, aborted, each with its subtasks:  
-`{ work, repository, dir, absDir, remote, machine, isRoot, parent, crumbs, tasks, counts }`; `counts` counts the subtasks too;  
-`remote` says whether the folder is a copy pushed by taskmgrd and `machine` which machine pushed it, as in `GET /api/spaces` (`null` when unknown).  
+`{ work, repository, dir, absDir, remote, machine, machines, isRoot, parent, crumbs, tasks, counts }`; `counts` counts the subtasks too;  
+`remote` says whether the folder is a copy pushed by taskmgrd and `machines` / `machine` which machines sync it, as in `GET /api/spaces`.  
 
 `GET /api/tasks/all?all=1` / `?origin=` / `?work=`  
 Every task of every work, of one origin (all its works and their repositories), or of one work  
@@ -282,6 +284,11 @@ of `GET /api/spaces`, and logs what each machine pushes and polls to `logs/<MACH
 config or folder pushed, poll, config or folder pulled, and refused request; characters a file name cannot  
 hold are replaced by `_` in the name).  
 
+At most two machines sync one space (push it, or pull it), the first two to do so. Any other is refused, 409  
+`TOO_MANY_MACHINES`, by `PUT /api/sync/space` and the pull routes of that space, until one of the two lets go of it: its  
+pushed `taskmgr.json` no longer lists the space (see `PUT /api/sync/config`). taskmgrd logs the refusal and goes on with the  
+other spaces; `tm push` does too, and ends with an error.  
+
 `GET /api/sync`  
 What the server has: `{ ok, config, spaces }`, the sha1 of the last pushed `taskmgr.json` (`null` when there is none)  
 and of each space's last snapshot, keyed `origin/work/repository` (`""` for no origin, or the work's common tasks).  
@@ -294,8 +301,8 @@ Origins, works and repositories only on the server are kept, those only pushed a
 for a repository in both). A work pushed without `tasks_path` loses the one it has on the server, and the copy  
 of its common tasks under `data/origins/` is removed (listed in `pruned`). A work pushed under another origin  
 moves there. A space the pushing machine (`X-Machine-Id`) pushed before and no longer lists (a work or repository  
-renamed or removed there) is kept, but is no longer that machine's: its `machine` becomes `null` (plain "remote",  
-no dot) and its snapshot is forgotten, so it is pushed whole should the machine list it again. 409 when the merge is invalid.  
+renamed or removed there) is kept, but is no longer that machine's: it leaves the space's `machines` (plain "remote",  
+no dot, when none is left), freeing its place for another machine, and the space's snapshot is forgotten, so it is pushed whole should the machine list it again. 409 when the merge is invalid.  
 
 `POST /api/sync/blobs` `{ blobs }`  
 Which of these files (sha1 hashes of their content) the server does not have yet: `{ ok, missing }`.  
@@ -310,7 +317,8 @@ The server's `taskmgr.json` as it is: `{ ok, text }`. Used by `tm pull`.
 A space's task folders listed like a push (what is beside them in the folder, a file right in it or a folder not named by a task id, is left out as a push leaves it out): `{ ok, entries }` with `{ path, content }` for a task file, `{ path, blob: sha1, size }` for any other file and `{ path, dir: true }` for an empty folder. 404 when the server has no tasks folder for it.  
 
 `GET /api/sync/pull/file?origin=&work=&repository=&path=`  
-One file of a space, raw. Nothing on the server is changed by the pull routes.  
+One file of a space, raw. Nothing on the server is changed by the pull routes, but the pulling machine counts as one  
+of the space's machines (409 `TOO_MANY_MACHINES` when it has two others).  
 
 `PUT /api/sync/space` `{ origin, work, repository, machine, entries }`  
 Bring one tasks folder to the snapshot, in place (a task that changed status is moved first, then only what differs is written, and what the snapshot lacks removed): `entries` are `{ path, content }` for task files (text),  
@@ -318,6 +326,7 @@ Bring one tasks folder to the snapshot, in place (a task that changed status is 
 `{ path, dir: true }` for an empty folder, paths relative to the tasks folder. After it, the server's copy  
 is the pushed folder exactly. `{ ok, files, dirs }`. 409 `MISSING_BLOBS` `{ missing }` when a blob is not in the  
 store; nothing is written then. A blob no space refers to any more is removed once it is an hour old.  
-`machine` (optional, the pusher's `MACHINE_ID`, or its hostname) is remembered for the space, in `data/.sync-state.json`,  
-and the web UI shows it as where the copy comes from (`machine` in `GET /api/spaces` and `GET /api/tasks`), with a dot  
-that is green while that machine has pushed or polled within the last three minutes.  
+`machine` (optional, the pusher's `MACHINE_ID`, or its hostname) is remembered as one of the space's machines, in  
+`data/.sync-state.json` (409 `TOO_MANY_MACHINES`, nothing written, when it has two others), and the web UI shows it as  
+where the copy comes from (`machines` in `GET /api/spaces` and `GET /api/tasks`), with a dot that is green while that  
+machine has pushed or polled within the last three minutes.  

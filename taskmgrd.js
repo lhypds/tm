@@ -127,6 +127,14 @@ async function drainQueue() {
     try {
       done = await pushJob(job);
     } catch (e) {
+      // A space synced by enough other machines (see MAX_MACHINES in server/sync.js) is not tried
+      // again until the next rescan, nor does it hold up the others.
+      if (e.code === 'TOO_MANY_MACHINES') {
+        syncLog(false, `${name(job)}: ${e.message}`);
+        warn(`${name(job)}: ${e.message}`);
+        if (queue.get(job.key) === job) queue.delete(job.key);
+        continue;
+      }
       failures++;
       const wait = RETRY_MS[Math.min(failures - 1, RETRY_MS.length - 1)];
       syncLog(false, `${name(job)}: ${e.message}; trying again in ${wait / 1000}s`);

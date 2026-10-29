@@ -391,7 +391,9 @@ module.exports = { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncL
 
 // Push taskmgr.json, then every tasks folder, whatever the server says it has: a change made on the
 // server since the last push leaves it a folder that is not the one pushed, which only a push
-// mends (the attachments it has are not sent again). Exit with an error at the first push that fails.
+// mends (the attachments it has are not sent again). Exit with an error at the first push that fails;
+// a folder the server refuses as synced by enough other machines already is told and skipped, and
+// the run ends with an error once the others are pushed.
 // The start and the end of the run go to the sync log, as does each folder pushed (see syncLog).
 async function main() {
   log('tm push');
@@ -401,13 +403,17 @@ async function main() {
   syncLog('info', `tm push started (server ${SERVER}, machine ${MACHINE_ID})`);
   const config = readConfig();
   if (!config) fail(`${CONFIG_PATH} could not be read, or is invalid (see above).`);
+  const refused = [];
   const push = async (what, run) => {
     try {
       const done = await run();
       log(done);
       syncLog(true, done);
     } catch (e) {
-      fail(`${what}: ${e.message}`);
+      if (e.code !== 'TOO_MANY_MACHINES') fail(`${what}: ${e.message}`);
+      warn(`${what}: ${e.message}`);
+      syncLog(false, `${what}: ${e.message}`);
+      refused.push(what);
     }
   };
   // taskmgr.json goes first: the server prunes by it.
@@ -425,6 +431,7 @@ async function main() {
     const snap = await snapshot(root);
     for (const s of spaces) await push(label(s), () => pushSpace(s, snap));
   }
+  if (refused.length) fail(`not pushed, synced by other machines already: ${refused.join(', ')}`);
   log('done');
   syncLog('info', 'tm push finished');
 }

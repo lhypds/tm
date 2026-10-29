@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { EditIcon, FolderIcon, PlusIcon, TrashIcon } from "@components/icons";
 import TreeLines from "@components/TreeLines";
 import MachineDot from "@components/MachineDot";
@@ -56,11 +56,15 @@ const pointerFocus = {
   onBlur: (e) => delete e.currentTarget.dataset.pointer,
 };
 
+// The names of the machines that sync a remote folder, as its row shows them ("" for none).
+const machineNames = (s) => (s.machines || []).map((m) => m.name).join(" · ");
+
 // One space in the tree. `depth` is 0 for a work without an origin, 1 for a work under its origin
 // or a repository of a depth-0 work, and 2 for a repository of a work under an origin.
-// `machine` (see MachineDot) is the machine a remote folder was pushed from, shown as a dot after `root`.
+// `machines` (see MachineDot) are the machines that sync a remote folder (at most two, by name), each
+// shown by its name and a dot in place of `root`.
 // Anything else (`rest`: the drag and drop handlers and data attributes) goes on the row itself.
-function Row({ to, exists, hidden, depth, through = [], last, active, focused, label, root, machine, income, actions, onSelect, ...rest }) {
+function Row({ to, exists, hidden, depth, through = [], last, active, focused, label, root, machines = [], income, actions, onSelect, ...rest }) {
   const ref = useRef(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
@@ -88,8 +92,15 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
         {/* The line is right-to-left so a long path is cut at its start; this keeps the path itself
             left-to-right, or its leading "/" would show at the end. */}
         <bdi dir="ltr">
-          {root}
-          <MachineDot machine={machine} />
+          {machines.length
+            ? machines.map((m, i) => (
+                <Fragment key={m.name}>
+                  {i > 0 && " · "}
+                  {m.name}
+                  <MachineDot machine={m} />
+                </Fragment>
+              ))
+            : root}
         </bdi>
       </div>
     </div>
@@ -463,8 +474,8 @@ export default function SpaceTree({
                           active={activeTo === api.spacePath(g.origin, w.work)}
                           focused={focused}
                           label={w.work}
-                          root={w.remote ? w.machine?.name || t("tree.remote") : w.shownPath}
-                          machine={w.remote ? w.machine : null}
+                          root={w.remote ? machineNames(w) || t("tree.remote") : w.shownPath}
+                          machines={w.remote ? w.machines : []}
                           income={w.income}
                           onSelect={onSelect}
                           actions={
@@ -511,8 +522,8 @@ export default function SpaceTree({
                               active={activeTo === api.spacePath(g.origin, w.work, p.name)}
                               focused={focused}
                               label={p.name}
-                              root={p.remote ? p.machine?.name || t("tree.remote") : p.shownPath}
-                              machine={p.remote ? p.machine : null}
+                              root={p.remote ? machineNames(p) || t("tree.remote") : p.shownPath}
+                              machines={p.remote ? p.machines : []}
                               onSelect={onSelect}
                               actions={
                                 <>
