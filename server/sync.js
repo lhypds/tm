@@ -67,7 +67,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { parseConfig, upgradeRaw } = require('./config');
 const { appendLog } = require('../utils/logfile');
-const { STATUS_DIRS, taskEntries } = require('../utils/taskUtils');
+const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/taskUtils');
 
 const ORIGINS_DIR = 'origins';
 const NO_ORIGIN_DIR = '_';
@@ -628,7 +628,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       }
       let count = 0;
       for (const name of names) {
-        if (name === '.DS_Store') continue;
+        if (isSyncSkipped(name)) continue;
         const abs = path.join(dir, name);
         let stat;
         try {

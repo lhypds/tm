@@ -19,6 +19,7 @@ const {
   PROMPT_FILE,
   STATUS_DIRS,
   isTaskFolder,
+  isSyncSkipped,
   readTaskDir,
   readTasks,
   readPrompt,
@@ -171,14 +172,15 @@ function formatSize(n) {
   return `${(n / 1048576).toFixed(1)} MB`;
 }
 
-// The task's other files, as the web UI lists them: not task.txt, prompt.txt, dot files or the status
-// folders (which hold subtasks); a folder that is a task is a subtask. Folders first, then by name.
+// The task's other files, as the web UI lists them: not task.txt, prompt.txt, dot files, lock or cache
+// files (isSyncSkipped) or the status folders (which hold subtasks); a folder that is a task is a
+// subtask. Folders first, then by name.
 function listFiles(taskDir) {
   let entries;
   try { entries = fs.readdirSync(taskDir, { withFileTypes: true }); } catch (e) { return []; }
   const files = [];
   for (const e of entries) {
-    if (e.name === TASK_FILE || e.name === PROMPT_FILE || e.name.startsWith('.')) continue;
+    if (e.name === TASK_FILE || e.name === PROMPT_FILE || e.name.startsWith('.') || isSyncSkipped(e.name)) continue;
     if (e.isDirectory() && STATUS_DIRS.includes(e.name)) continue;
     const abs = path.join(taskDir, e.name);
     let size = 0;

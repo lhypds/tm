@@ -17,7 +17,7 @@ const {
   STATUS_DIRS,
   SYNC_MAX_FOLDER_BYTES,
   SYNC_MAX_FOLDER_FILES,
-  SYNC_SKIPPED_FILES,
+  isSyncSkipped,
   readPrompt,
   listDirOf,
   isTaskFolder,
@@ -314,7 +314,7 @@ function syncedTree(root, dirAbs) {
   const walk = (dir) => {
     const out = [];
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (SYNC_SKIPPED_FILES.has(e.name)) continue;
+      if (isSyncSkipped(e.name)) continue;
       const abs = path.join(dir, e.name);
       let stat;
       try { stat = fs.statSync(abs); } catch (err) { continue; }  // a broken link
@@ -343,7 +343,7 @@ function listFiles(root, taskDirAbs) {
   const files = [];
   for (const e of entries) {
     if (e.name === TASK_FILE || e.name === PROMPT_FILE) continue;  // the task's own files, not attachments
-    if (e.name.startsWith('.')) continue;
+    if (e.name.startsWith('.') || isSyncSkipped(e.name)) continue;  // hidden, or a lock or cache file
     if (e.isDirectory() && STATUS_DIRS.includes(e.name)) continue;  // holds done / pending / aborted subtasks
     const abs = path.join(taskDirAbs, e.name);
     let size = 0;
@@ -888,11 +888,14 @@ function freeFileName(dir, name) {
 }
 
 // Upload an attachment into a task folder. The body is the raw file; space, task and file name
-// are in the query, so no multipart parser is needed.
+// are in the query, so no multipart parser is needed. A lock or cache file (see isSyncSkipped)
+// dropped along with the others is not written.
 app.post('/api/task/file', express.raw({ type: () => true, limit: '200mb' }), (req, res) => {
   const { root } = spaceFrom(req.query);
   const taskDir = resolveTaskDir(root, String(req.query.rel || ''));
-  const name = freeFileName(taskDir, attachmentName(req.query.name));
+  const wanted = attachmentName(req.query.name);
+  if (isSyncSkipped(wanted)) return res.status(201).json({ files: listFiles(root, taskDir) });
+  const name = freeFileName(taskDir, wanted);
   fs.writeFileSync(path.join(taskDir, name), Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
   res.status(201).json({ files: listFiles(root, taskDir) });
 });

@@ -29,7 +29,23 @@ const STATUS_DIRS = ['done', 'pending', 'aborted'];
 const SYNC_MAX_FILE_BYTES = 5 * 1024 * 1024;
 const SYNC_MAX_FOLDER_BYTES = 10 * 1024 * 1024;
 const SYNC_MAX_FOLDER_FILES = 10;
-const SYNC_SKIPPED_FILES = new Set(['.DS_Store']);  // never pushed: Finder rewrites it all the time
+// Never pushed, nor listed: lock files and caches the OS or an app writes beside a file, rewritten
+// all the time and of no use on another machine. Told by name alone, a file or a folder.
+const SYNC_SKIPPED_NAMES = new Set([
+  '.DS_Store', '.AppleDouble', '.Spotlight-V100', '.Trashes', '.fseventsd',  // macOS
+  'Thumbs.db', 'ehthumbs.db', 'desktop.ini',  // Windows
+  '__pycache__', '.pytest_cache', '.mypy_cache', '.ipynb_checkpoints', '.sass-cache',
+]);
+const SYNC_SKIPPED_PATTERNS = [
+  /^~\$/,                // Office lock file (~$report.docx)
+  /^\._/,                // macOS resource fork on a non-Mac drive
+  /^\.~lock\..*#$/,      // LibreOffice lock file
+  /^\..*\.sw[a-p]$/,     // Vim swap file
+  /\.(tmp|temp|crdownload|part)$/i,  // a file still being written or downloaded
+];
+function isSyncSkipped(name) {
+  return SYNC_SKIPPED_NAMES.has(name) || SYNC_SKIPPED_PATTERNS.some(re => re.test(name));
+}
 
 // task.txt is just the task's details, the first line being its title. Older files start
 // with a front matter block (---, status:, labels:, ..., ---); its status is returned as
@@ -115,6 +131,14 @@ function migrateTask(task) {
   return task;
 }
 
+// A task folder made by hand as "<id> <title>", without a task file: write one, the title from the
+// folder name as its first line. A bare "<id>" is left as it is (it would only get an empty file).
+function writeMissingTaskFile(task) {
+  if (!task.details || fs.existsSync(task.path)) return task;
+  try { saveTask(task); } catch (e) { /* a read-only folder: it still reads as a task */ }
+  return task;
+}
+
 // Make sure the task file of a task folder exists, so an editor or a write
 // finds a well-formed file. Returns the task file path.
 function ensureTaskFile(taskPath) {
@@ -134,7 +158,7 @@ function readTasks(dir) {
       if (e.isDirectory() && isTaskFolder(dirAbs)) dirs.push(dirAbs);
     }
   }
-  const tasks = dirs.map(d => migrateTask(readTaskDir(d)));
+  const tasks = dirs.map(d => writeMissingTaskFile(migrateTask(readTaskDir(d))));
 
   // sort by id descending (newest first)
   tasks.sort(compareIdsDesc);
@@ -382,7 +406,7 @@ module.exports = {
   SYNC_MAX_FILE_BYTES,
   SYNC_MAX_FOLDER_BYTES,
   SYNC_MAX_FOLDER_FILES,
-  SYNC_SKIPPED_FILES,
+  isSyncSkipped,
   TASK_FOLDER_RE,
   readPrompt,
   listDirOf,

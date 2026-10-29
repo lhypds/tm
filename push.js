@@ -23,7 +23,7 @@
 // pushed has its text. A file right in the tasks folder, or in a status folder, and a folder there
 // named some other way are not tasks: not pushed, not looked at. The server brings its copy to the
 // snapshot, so after a push its copy is the tasks as they are here, and a renamed, moved or deleted
-// task or attachment is mirrored too. Only .DS_Store files are left out, and files over 5 MB and
+// task or attachment is mirrored too. Lock and cache files (.DS_Store, ~$ Office locks, ...; see isSyncSkipped) are left out, and files over 5 MB and
 // folders over 10 MB or with more than 10 files (never a task folder itself) are not pushed. A tasks folder that does not exist
 // is left as it is on the server.
 // More threads for the file system calls, which go out side by side (see snapshot); must be set
@@ -40,7 +40,7 @@ const syncState = require('./server/syncstate');
 const {
   TASK_FILE, STATUS_DIRS, TASK_FOLDER_RE, ensureTaskFile,
   SYNC_MAX_FILE_BYTES: MAX_FILE_BYTES, SYNC_MAX_FOLDER_BYTES: MAX_FOLDER_BYTES,
-  SYNC_MAX_FOLDER_FILES: MAX_FOLDER_FILES, SYNC_SKIPPED_FILES: SKIPPED_FILES
+  SYNC_MAX_FOLDER_FILES: MAX_FOLDER_FILES, isSyncSkipped
 } = require('./utils/taskUtils');
 const { appendLog } = require('./utils/logfile');
 
@@ -159,7 +159,7 @@ async function fileHash(abs, stat) {
 // taskEntries in utils/taskUtils.js for which folders those are), relative to the tasks folder, a
 // task.txt as text and any other file (attachments, whatever else is there) by the sha1 of its
 // content, which the server fetches from its blob store (see pushSpace); an empty folder as a bare
-// folder. Symbolic links are followed; .DS_Store files are left out. Sorted, so the same folder
+// folder. Symbolic links are followed; lock and cache files are left out. Sorted, so the same folder
 // always gives the same hash. `blobs` maps each sha1 to one file that has it, for the upload.
 //
 // The folder is read in one pass, each folder listed once and only files (and links) stat'ed, and
@@ -200,7 +200,7 @@ async function snapshot(root, { warnings = true } = {}) {
     const listing = rel === '' || STATUS_DIRS.includes(rel);
     // Each entry looked at side by side: { sub } for a folder, { file } for a file, null for none.
     const found = await Promise.all(dirents.map(async (d) => {
-      if (SKIPPED_FILES.has(d.name)) return null;
+      if (isSyncSkipped(d.name)) return null;
       const abs = path.join(dir, d.name);
       const entryRel = rel ? `${rel}/${d.name}` : d.name;
       let stat = null;
