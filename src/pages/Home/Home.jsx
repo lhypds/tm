@@ -758,6 +758,36 @@ export default function Home({ all = false }) {
     }
   }
 
+  // A drag from the list onto a work or repository of the tree (see SpaceTree): the tasks of `keys`
+  // go to the top of that space, each with its status and its own subtasks (one under another of
+  // them goes along with it). Those still in the list stay selected in their new places.
+  async function moveTasksToSpace(keys, to) {
+    const dragged = tasks.filter((task) => keys.includes(task.key));
+    const sameSpace = (s) => s.work === to.work && (s.repository || "") === to.repository;
+    const moving = dragged.filter(
+      (task) =>
+        !dragged.some((d) => task.key.startsWith(`${d.key}/`)) && !(sameSpace(task.space) && task.depth === 0),
+    );
+    const moved = new Map(); // key before -> key after
+    try {
+      for (const task of moving) {
+        const { task: updated } = await api.moveTask(task.space, task.rel, "", to);
+        moved.set(task.key, keyOf(to, updated.rel));
+      }
+    } catch (e) {
+      showToast(e.message);
+    }
+    if (!moved.size) return;
+    const at = (k) => moved.get(k) ?? k;
+    setGroupKeys((g) => g.map(at));
+    setSelectedKey((k) => k && at(k));
+    try {
+      await reload();
+    } catch (e) {
+      showToast(e.message);
+    }
+  }
+
   // x / p / w, and the list's checkbox: on the task, or on all the chosen tasks when it is one of
   // them, each set as the task itself goes (done, or back to todo when it is done already).
   const toggleStatus = (task, status) =>
@@ -1536,6 +1566,7 @@ export default function Home({ all = false }) {
             onOpenFolder={openSpaceFolder}
             onDelete={setRemoving}
             onMove={moveSpace}
+            onMoveTasks={moveTasksToSpace}
           />
         </aside>
         {/* The fold bars are never left focused (not in the tab order; the focus is let go after the

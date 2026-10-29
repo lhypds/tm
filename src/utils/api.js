@@ -130,8 +130,10 @@ export const createTaskText = (space, dir, text) => request("/api/tasks/text", j
 
 export const setStatus = (space, rel, status) => request("/api/task/status", json("POST", { ...sp(space), rel, status }));
 
-// Move a task into `into`, another task's rel (as its subtask) or a folder of tasks ("" the root).
-export const moveTask = (space, rel, into) => request("/api/task/move", json("POST", { ...sp(space), rel, into }));
+// Move a task into `into`, another task's rel (as its subtask) or a folder of tasks ("" the root),
+// in its own space or, with `to`, in that space.
+export const moveTask = (space, rel, into, to) =>
+  request("/api/task/move", json("POST", { ...sp(space), rel, into, ...(to ? { to: sp(to) } : {}) }));
 
 export const openInFileManager = (space, rel) => request("/api/task/open", json("POST", { ...sp(space), rel }));
 

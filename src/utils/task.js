@@ -17,6 +17,10 @@ export function describe(details) {
   return i === -1 ? "" : (lines[i + 1] || "").trim();
 }
 
+// The drag data type of tasks dragged from the list: their keys, as JSON. The tree takes them into
+// a work or repository (see SpaceTree).
+export const TASKS_DRAG_TYPE = "application/x-taskmgr-tasks";
+
 // A folder of tasks is a tree: each task has its `subtasks`. The list shows it as rows, depth
 // first, each under its parent; a row gets its `depth`, `last` (the last of its siblings) and
 // `through`, which ancestor levels have rows below it, so their tree lines run on past it (see

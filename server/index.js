@@ -40,7 +40,7 @@ const { resolveConfig, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
 const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
-const { listRecords } = require('../ai/record');
+const { listRecords, lastPrompt } = require('../ai/record');
 const { trimLogs } = require('../utils/logfile');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -752,11 +752,12 @@ app.post('/api/tasks', (req, res) => {
   res.status(201).json({ task: serializeTask(root, taskFromDir(taskDir)) });
 });
 
-// One task with its attachments and its prompt (the prompt.txt text, null when it has none).
+// One task with its attachments and its prompt (the prompt.txt text, null when it has none), and
+// `lastPrompt`, the prompt its latest run was given (see ai/record.js lastPrompt).
 app.get('/api/task', (req, res) => {
   const { root } = spaceFrom(req.query);
   const taskDir = resolveTaskDir(root, String(req.query.rel || ''));
-  res.json({ task: serializeTask(root, taskFromDir(taskDir)), files: listFiles(root, taskDir), prompt: readPrompt(taskDir), runs: listRecords(taskDir) });
+  res.json({ task: serializeTask(root, taskFromDir(taskDir)), files: listFiles(root, taskDir), prompt: readPrompt(taskDir), lastPrompt: lastPrompt(taskDir), runs: listRecords(taskDir) });
 });
 
 // Write a task's prompt.txt as typed (see writePrompt). Answers the prompt as it is now and the
@@ -789,16 +790,22 @@ app.post('/api/task/status', (req, res) => {
 });
 
 // Move a task into `into`: another task's folder (it becomes a subtask of that task) or a folder
-// of tasks ("" the space's root), keeping its status (see moveTask).
+// of tasks ("" the space's root), keeping its status (see moveTask). With `to` ({ work, repository })
+// `into` is in that space instead, and the task leaves its own; the answer's rel is then in `to`.
 app.post('/api/task/move', (req, res) => {
   const body = req.body || {};
   const { root } = spaceFrom(body);
   const taskDir = resolveTaskDir(root, body.rel);
-  const intoDir = resolveDir(root, String(body.into || ''));
+  const toRoot = body.to ? spaceFrom(body.to).root : root;
+  const intoDir = resolveDir(toRoot, String(body.into || ''));
   if (STATUS_DIRS.includes(path.basename(intoDir))) throw new HttpError(400, 'Not a folder of tasks.');
   const task = taskFromDir(taskDir);
-  moveTask(task, intoDir);
-  res.json({ task: serializeTask(root, taskFromDir(path.dirname(task.path))) });
+  try {
+    moveTask(task, intoDir);
+  } catch (e) {
+    throw new HttpError(400, e.message);
+  }
+  res.json({ task: serializeTask(toRoot, taskFromDir(path.dirname(task.path))) });
 });
 
 // The task file as text, for the web editor (the terminal opens the same file in $EDITOR).

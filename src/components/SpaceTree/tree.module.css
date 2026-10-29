@@ -49,7 +49,8 @@
 
 /* A folder dragged over the list from outside: the origin or work it would be added to is lit. */
 .group[data-filedrop="true"],
-.work[data-filedrop="true"] {
+.work[data-filedrop="true"],
+.row[data-taskdrop="true"] {
   background: var(--bg-hover);
 }
 

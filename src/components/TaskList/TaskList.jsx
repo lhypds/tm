@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import * as api from "@utils/api";
 import TreeLines from "@components/TreeLines";
-import { describe, formatStamp } from "@utils/task";
+import { TASKS_DRAG_TYPE, describe, formatStamp } from "@utils/task";
 import styles from "./tasklist.module.css";
 
 // The status box: a tick for done, a "p" for pending, an "a" for aborted, empty for todo.
@@ -130,7 +130,9 @@ export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSe
             onDragStart={(e) => {
               e.dataTransfer.effectAllowed = "move";
               e.dataTransfer.setData("text/plain", t.title || t.id);
-              setDragKeys(chosenKeys.has(t.key) ? [...chosenKeys] : [t.key]);
+              const keys = chosenKeys.has(t.key) ? [...chosenKeys] : [t.key];
+              e.dataTransfer.setData(TASKS_DRAG_TYPE, JSON.stringify(keys)); // for a drop on the tree
+              setDragKeys(keys);
               onSelect(t); // a row not chosen is selected alone; the chosen ones stay chosen
             }}
             onDragEnd={() => {

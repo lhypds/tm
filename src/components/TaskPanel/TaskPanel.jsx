@@ -184,6 +184,8 @@ export default function TaskPanel({
                   key={`prompt:${task.space.work}/${task.space.repository || ""}/${task.id}`}
                   task={task}
                   prompt={attachments.prompt}
+                  lastPrompt={attachments.lastPrompt}
+                  lastRun={attachments.runs?.[0]?.folder}
                   textRef={promptRef}
                   focus={focusOf("prompt")}
                   onFocused={onFocused}
@@ -264,10 +266,17 @@ function TaskText({ task, textRef, focus, onFocused, onFocus, onSave }) {
 // The task's prompt.txt under its text, edited the same way: saved on blur, cmd/ctrl+s and esc.
 // `prompt` is the saved text, null for no file and undefined until the folder is read (the text is
 // empty until then, and takes what is read). A blank prompt leaves no file (see useTaskFiles).
-function PromptText({ task, prompt, textRef, focus, onFocused, onFocus, onSave }) {
-  const [draft, setDraft] = useState(prompt ?? "");
+// While the prompt is `lastPrompt`, the prompt.txt the latest run (`lastRun`, its record's folder) was
+// given, it is carried out already: the text is empty with the prompt as its placeholder, greyed, and
+// the file stays as it is when nothing is typed. Tab in the empty text takes the placeholder in as
+// typed; what is typed instead replaces the prompt once saved.
+function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocused, onFocus, onSave }) {
+  const ranOf = (p) => !!p?.trim() && p === lastPrompt;
+  const [taken, setTaken] = useState(false); // the placeholder taken in by tab
+  const ran = !taken && ranOf(prompt);
+  const saved = ran ? "" : prompt ?? ""; // the file as the text shows it
+  const [draft, setDraft] = useState(saved);
   const sent = useRef(null); // the text last saved, until the folder is re-read with it
-  const saved = prompt ?? "";
 
   useEffect(() => {
     const el = textRef.current;
@@ -277,12 +286,14 @@ function PromptText({ task, prompt, textRef, focus, onFocused, onFocus, onSave }
     onFocused();
   }, [focus, onFocused, textRef]);
 
-  // Take the read or reloaded text unless it was typed on since saving.
+  // Take the read or reloaded text unless it was typed on since saving; a new run greys it again.
   useEffect(() => {
     if (prompt === undefined) return;
-    setDraft((d) => (sent.current === null || d === sent.current ? prompt ?? "" : d));
+    setTaken(false);
+    const shown = ranOf(prompt) ? "" : prompt ?? "";
+    setDraft((d) => (sent.current === null || d === sent.current ? shown : d));
     sent.current = null;
-  }, [prompt]);
+  }, [prompt, lastPrompt, lastRun]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function save() {
     if (draft === saved || draft === sent.current) return;
@@ -295,6 +306,7 @@ function PromptText({ task, prompt, textRef, focus, onFocused, onFocus, onSave }
       ref={textRef}
       className={styles.text}
       value={draft}
+      placeholder={ran ? prompt : undefined}
       onChange={(e) => setDraft(e.target.value)}
       onFocus={onFocus}
       onBlur={save}
@@ -304,6 +316,10 @@ function PromptText({ task, prompt, textRef, focus, onFocused, onFocus, onSave }
           save();
         } else if (e.key === "Escape") {
           e.currentTarget.blur(); // saved by onBlur
+        } else if (e.key === "Tab" && ran && draft === "") {
+          e.preventDefault();
+          setTaken(true);
+          setDraft(prompt);
         }
       }}
     />

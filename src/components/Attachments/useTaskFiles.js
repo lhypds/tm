@@ -8,7 +8,8 @@ const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 // The attachments of one task folder, loaded while `rel` is set, with upload and delete (remove says
 // whether it deleted; asking first is the caller's, the app's delete popup),
 // and the task's prompt, its prompt.txt: `prompt` is undefined until the folder is read, null when
-// there is no file, else its text; savePrompt(text) writes it, a blank text too, and says whether it did. Also `runs`, the records of the task's runs of Claude Code kept in the folder
+// there is no file, else its text; savePrompt(text) writes it, a blank text too, and says whether it did.
+// `lastPrompt` is the prompt.txt the latest run was given (null: none), which the prompt is greyed while it still is. Also `runs`, the records of the task's runs of Claude Code kept in the folder
 // (newest first, each without its transcript, see api.getTask), and forgetRun(folder), which removes one.
 // `version` re-reads them when it changes (e.g. after the task list reloads); the files shown stay
 // until the fresh ones arrive, so nothing flickers. Another task (by work, repository and rel, not
@@ -18,6 +19,7 @@ const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
 export default function useTaskFiles(space, rel, version) {
   const [files, setFiles] = useState([]);
   const [prompt, setPrompt] = useState(undefined);
+  const [lastPrompt, setLastPrompt] = useState(null);
   const [runs, setRuns] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [open, setOpen] = useState(() => new Set());
@@ -29,6 +31,7 @@ export default function useTaskFiles(space, rel, version) {
       shown.current = taskKey;
       setFiles([]);
       setPrompt(undefined);
+      setLastPrompt(null);
       setRuns([]);
       setOpen(new Set());
     }
@@ -40,6 +43,7 @@ export default function useTaskFiles(space, rel, version) {
         if (stale) return;
         setFiles(attachmentsOf(d.files));
         setPrompt(d.prompt ?? null);
+        setLastPrompt(d.lastPrompt ?? null);
         setRuns(d.runs || []);
       })
       .catch(() => {});
@@ -121,5 +125,5 @@ export default function useTaskFiles(space, rel, version) {
   );
   const rows = useMemo(() => fileRows(files, open), [files, open]);
 
-  return { files, rows, open, toggleDir, prompt, runs, uploading, add, remove, savePrompt, forgetRun };
+  return { files, rows, open, toggleDir, prompt, lastPrompt, runs, uploading, add, remove, savePrompt, forgetRun };
 }

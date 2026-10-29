@@ -8,6 +8,7 @@ import * as api from "@utils/api";
 import { formatIncome, formatIncomeShort } from "@utils/income";
 import { groupWorksByOrigin } from "@utils/works";
 import { useWheelScroll } from "@utils/keys";
+import { TASKS_DRAG_TYPE } from "@utils/task";
 import styles from "./tree.module.css";
 
 // A small button at the right of a row's name line, shown while the row is hovered.
@@ -248,7 +249,8 @@ async function droppedFolder(dt) {
 // before (null: last). A folder dropped on the list from outside opens the add modal with the
 // folder's name and path: on a work's block, on a repository of that work; elsewhere, on a work,
 // into the origin it was dropped in. The path is the source folder when the folder has a .git,
-// else the tasks folder.
+// else the tasks folder. Tasks dragged from the list onto a work or repository row go into it:
+// `onMoveTasks(keys, { work, repository })`.
 export default function SpaceTree({
   works,
   origins,
@@ -267,6 +269,7 @@ export default function SpaceTree({
   onOpenFolder,
   onDelete,
   onMove,
+  onMoveTasks,
 }) {
   const { t } = useTranslation();
   const groups = groupWorksByOrigin(works, origins);
@@ -281,6 +284,22 @@ export default function SpaceTree({
     const work = e.target.closest("[data-work]")?.dataset.work;
     return work ? { work } : { origin: e.target.closest("[data-origin]")?.dataset.origin || "" };
   };
+  // Tasks dragged from the list go into the work or repository row they are dropped on (one with a
+  // tasks folder): `taskOver` is its key, "work/repository", meanwhile.
+  const [taskOver, setTaskOver] = useState(null);
+  const isTasks = (e) => e.dataTransfer.types.includes(TASKS_DRAG_TYPE);
+  const taskTarget = (e) => {
+    const row = e.target.closest("[data-space-work]");
+    return row ? { work: row.dataset.spaceWork, repository: row.dataset.spaceRepository || "" } : null;
+  };
+  const spaceDrop = (work, repository, folder) =>
+    folder.root && folder.exists
+      ? {
+          "data-space-work": work,
+          "data-space-repository": repository,
+          "data-taskdrop": taskOver === `${work}/${repository}`,
+        }
+      : {};
   return (
     <div className={styles.panel}>
       <div className={styles.head} data-focused={focused}>
@@ -307,6 +326,14 @@ export default function SpaceTree({
         className={styles.list}
         ref={setListEl}
         onDragOver={(e) => {
+          if (isTasks(e)) {
+            const to = taskTarget(e);
+            setTaskOver(to && `${to.work}/${to.repository}`);
+            if (!to) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            return;
+          }
           if (!isFiles(e)) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
@@ -314,9 +341,24 @@ export default function SpaceTree({
           setFileOver((cur) => (cur?.work === to.work && cur?.origin === to.origin ? cur : to));
         }}
         onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget)) setFileOver(null);
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          setFileOver(null);
+          setTaskOver(null);
         }}
         onDrop={async (e) => {
+          if (isTasks(e)) {
+            e.preventDefault();
+            setTaskOver(null);
+            const to = taskTarget(e);
+            let keys = [];
+            try {
+              keys = JSON.parse(e.dataTransfer.getData(TASKS_DRAG_TYPE));
+            } catch {
+              /* not ours after all */
+            }
+            if (to && keys.length) onMoveTasks(keys, to);
+            return;
+          }
           if (!isFiles(e)) return;
           e.preventDefault();
           setFileOver(null);
@@ -447,6 +489,7 @@ export default function SpaceTree({
                             </>
                           }
                           {...dragProps(workItem)}
+                          {...spaceDrop(w.work, "", w)}
                         />
                         {w.repositories.map((p, i) => {
                           const repositoryItem = {
@@ -495,6 +538,7 @@ export default function SpaceTree({
                               }
                               {...dragProps(repositoryItem)}
                               {...dropProps(repositoryItem)}
+                              {...spaceDrop(w.work, p.name, p)}
                             />
                           );
                         })}

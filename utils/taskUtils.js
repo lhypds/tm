@@ -267,10 +267,17 @@ function removeIfEmptyStatusDir(dir) {
 // folder, or back into the list itself for todo. Updates task.path and task.status.
 // Rename a task folder. On Windows a folder something has open (a file in it open in a program, an
 // Explorer window or a terminal in it, a Claude run working in it) cannot be renamed: say so plainly.
+// Between two disks (a task moved to a space on another one) a rename cannot be done: the folder is
+// copied, then removed.
 function renameFolder(from, to) {
   try {
     fs.renameSync(from, to);
   } catch (e) {
+    if (e.code === 'EXDEV') {
+      fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });
+      fs.rmSync(from, { recursive: true, force: true });
+      return;
+    }
     if (!['EPERM', 'EACCES', 'EBUSY'].includes(e.code)) throw e;
     throw new Error(`The folder is in use, close what has it open (a file in it, an Explorer window, a terminal, a Claude run) and try again: ${from}`);
   }
@@ -293,8 +300,9 @@ function markTask(task, status) {
 }
 
 // Move a task into the list of `dir` (another task's folder, making it a subtask, or a folder of
-// tasks), keeping its status: right in dir for todo, else in dir's status folder. Its subtasks go
-// along in its folder. Updates task.path.
+// tasks, possibly of another space), keeping its status: right in dir for todo, else in dir's status
+// folder. Its subtasks go along in its folder. Ids are unique in a folder only, so a dir that has a
+// task of the same id already does not take it. Updates task.path.
 function moveTask(task, dir) {
   const taskDir = path.dirname(task.path);
   const rel = path.relative(taskDir, dir);
@@ -302,6 +310,8 @@ function moveTask(task, dir) {
   const from = path.dirname(taskDir);
   const to = task.status === 'todo' ? dir : path.join(dir, task.status);
   if (to === from) return;
+  const id = folderId(path.basename(taskDir));
+  if (listDirOf(taskDir) !== dir && isTaskIdTaken(dir, id)) throw new Error(`A task with id ${id} is there already: ${dir}`);
   const dest = path.join(to, path.basename(taskDir));
   if (fs.existsSync(dest)) throw new Error(`Already exists: ${dest}`);
   fs.mkdirSync(to, { recursive: true });

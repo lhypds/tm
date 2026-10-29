@@ -158,6 +158,18 @@ function readRecord(taskDir, folder) {
   }
 }
 
+// The prompt.txt the latest run was given, as its record keeps it; null when the task has no record
+// or that run had none. The web UI greys the prompt while it is still that text, as one carried out.
+function lastPrompt(taskDir) {
+  const latest = listRecords(taskDir)[0];
+  if (!latest) return null;
+  try {
+    return fs.readFileSync(path.join(taskDir, latest.folder, PROMPT_FILE), 'utf8');
+  } catch (e) {
+    return null;
+  }
+}
+
 // Remove a record, files and all.
 function deleteRecord(taskDir, folder) {
   const dir = recordDir(taskDir, folder);
@@ -165,4 +177,4 @@ function deleteRecord(taskDir, folder) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-module.exports = { saveRun, listRecords, readRecord, deleteRecord, isRecordName };
+module.exports = { saveRun, listRecords, readRecord, deleteRecord, lastPrompt, isRecordName };
