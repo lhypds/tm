@@ -1,16 +1,19 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { Modal, showToast } from "@ui";
+import { Highlighted, Modal, showToast, useHighlight } from "@ui";
 import { DownloadIcon, TrashIcon } from "@components/icons";
 import { fileUrl, saveFile } from "@utils/api";
+import { highlighterFor } from "@utils/highlight";
 import { noDoubleClickSelect } from "@utils/keys";
 import { previewKind } from "@utils/task";
 import styles from "./preview.module.css";
 
 // A text file in a textarea, caret at the end, as the task preview edits task.txt: a blur saves
 // (onSave(text), when it changed) and ends the edit, and so does esc; cmd/ctrl+s saves and keeps editing.
-function Editor({ value, textRef, onSave, onEndEdit }) {
+// With `highlight` the text is colored as typed.
+function Editor({ value, highlight, textRef, onSave, onEndEdit }) {
   const [draft, setDraft] = useState(value);
+  const colors = useHighlight(highlight, draft, styles.text);
 
   useEffect(() => {
     const el = textRef.current;
@@ -23,29 +26,34 @@ function Editor({ value, textRef, onSave, onEndEdit }) {
   };
 
   return (
-    <textarea
-      ref={textRef}
-      className={styles.text}
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        save();
-        onEndEdit();
-      }}
-      onKeyDown={(e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-          e.preventDefault();
+    <div className={styles.editor}>
+      {colors.layer}
+      <textarea
+        ref={textRef}
+        className={`${styles.text} ${colors.className}`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onScroll={colors.onScroll}
+        onBlur={() => {
           save();
-        }
-      }}
-    />
+          onEndEdit();
+        }}
+        onKeyDown={(e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+            e.preventDefault();
+            save();
+          }
+        }}
+      />
+    </div>
   );
 }
 
 // A text file (txt, md, ...) as it is, read from `url`. With `editing` it is in the editor instead
 // (a double click on the text asks for that through onEdit; onEndEdit says the edit is over), and
 // onSave(text) writes it, resolving to whether it did: the text shown is then the saved one.
-function TextView({ url, editing, onEdit, onEndEdit, onSave, textRef }) {
+// `highlight` colors it, read or edited.
+function TextView({ url, highlight, editing, onEdit, onEndEdit, onSave, textRef }) {
   const { t } = useTranslation();
   const [text, setText] = useState(null);
   const [error, setError] = useState("");
@@ -65,12 +73,12 @@ function TextView({ url, editing, onEdit, onEndEdit, onSave, textRef }) {
   if (text === null) return <p className={`muted ${styles.note}`}>{t("common.loading")}</p>;
   if (editing) {
     return (
-      <Editor value={text} textRef={textRef} onSave={(draft) => onSave(draft).then((ok) => ok && setText(draft))} onEndEdit={onEndEdit} />
+      <Editor value={text} highlight={highlight} textRef={textRef} onSave={(draft) => onSave(draft).then((ok) => ok && setText(draft))} onEndEdit={onEndEdit} />
     );
   }
   return (
     <pre className={styles.text} onMouseDown={noDoubleClickSelect} onDoubleClick={onEdit}>
-      {text}
+      {highlight ? <Highlighted text={text} highlight={highlight} /> : text}
     </pre>
   );
 }
@@ -154,7 +162,7 @@ export default function FilePreviewModal({ space, file, editing, onEdit, onEndEd
             </div>
           )}
           {kind === "text" && (
-            <TextView url={url} editing={editing} onEdit={onEdit} onEndEdit={onEndEdit} onSave={save} textRef={textRef} />
+            <TextView url={url} highlight={highlighterFor(file.name)} editing={editing} onEdit={onEdit} onEndEdit={onEndEdit} onSave={save} textRef={textRef} />
           )}
         </div>
       )}

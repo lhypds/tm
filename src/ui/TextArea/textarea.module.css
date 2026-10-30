@@ -2,8 +2,9 @@
   position: relative;
 }
 
-/* Drawn like the .input in global.css: a hairline box, no focus ring. The native resize grip is
-   off; the handle below resizes it, in height only. */
+/* Drawn like the .input in global.css: a hairline box, no focus ring, over the task panel's faint
+   grid (a cell is two characters wide and one line tall; it starts inside the padding and scrolls
+   with the text). The native resize grip is off; the handle below resizes it, in height only. */
 .textarea {
   display: block;
   width: 100%;
@@ -11,7 +12,13 @@
   font: inherit;
   line-height: 1.5;
   color: var(--fg);
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 2ch 1.5em;
+  background-repeat: repeat; /* ress turns it off everywhere */
+  background-origin: content-box;
+  background-attachment: local;
   border: var(--line) solid var(--border);
   outline: none;
   resize: none;

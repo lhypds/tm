@@ -179,6 +179,10 @@
       "keys": "⌘c / ctrl+c",
       "desc": "選択中のタスクの id を tm run 用にコピー（repository:id または work:id）"
     },
+    "text": {
+      "keys": "⌘x / ⌘a",
+      "desc": "テキスト編集中：カーソルの行を切り取り（選択なしのとき）/ テキストを全選択"
+    },
     "done": {
       "keys": "x",
       "desc": "完了 / 未完了を切り替え"

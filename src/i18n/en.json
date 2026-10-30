@@ -179,6 +179,10 @@
       "keys": "⌘c / ctrl+c",
       "desc": "copy the selected task's id for tm run (repository:id or work:id)"
     },
+    "text": {
+      "keys": "⌘x / ⌘a",
+      "desc": "in a text: cut the caret's line (nothing selected) / select all the text"
+    },
     "done": {
       "keys": "x",
       "desc": "mark done / undone"

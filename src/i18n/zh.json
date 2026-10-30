@@ -179,6 +179,10 @@
       "keys": "⌘c / ctrl+c",
       "desc": "复制选中任务的 id，供 tm run 使用（repository:id 或 work:id）"
     },
+    "text": {
+      "keys": "⌘x / ⌘a",
+      "desc": "编辑文本时：剪切光标所在整行（未选中文字时）/ 全选文本"
+    },
     "done": {
       "keys": "x",
       "desc": "标为完成 / 未完成"

@@ -8,18 +8,12 @@
   gap: 12px;
 }
 
-/* The whole task file: front matter and details, monospaced like the terminal editor, over the
-   task panel's grid: a cell is two characters wide and one line tall. */
+/* The whole task file: front matter and details, monospaced like the terminal editor (the grid
+   comes with the TextArea). */
 .text {
   min-height: 320px;
   font-family: var(--font);
   line-height: 1.5;
-  background-image:
-    linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
-  background-size: 2ch 1.5em;
-  background-repeat: repeat; /* ress turns it off everywhere */
-  background-origin: content-box;
-  background-attachment: local;
   white-space: pre;
   overflow-x: auto;
 }

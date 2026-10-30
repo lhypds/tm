@@ -3,6 +3,7 @@ import Home from "@pages/Home";
 import Login from "@pages/Login";
 import { Toast } from "@ui";
 import { AuthProvider, useAuth } from "@store";
+import { useTextKeys } from "@utils/keys";
 
 // The task pages only mount once someone is logged in: they load the spaces on mount, and
 // without a session that request would be refused anyway.
@@ -28,6 +29,7 @@ function Gate() {
 }
 
 export default function App() {
+  useTextKeys();
   return (
     <AuthProvider>
       <Gate />
