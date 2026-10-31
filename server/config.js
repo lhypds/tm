@@ -12,7 +12,7 @@
 //           {
 //             "work": "gcc3.com",
 //             "income": {                         // optional, what the work pays
-//               "monthly": [{ "amount": 500000, "currency": "JPY", "from": "2026-01" }],  // "from" optional
+//               "monthly": [{ "amount": 500000, "currency": "JPY", "from": "2026-01", "to": "2026-12" }],  // "from", "to" optional
 //               "once": [{ "amount": 100000, "currency": "JPY" }]
 //             },
 //             "hidden": true,                     // optional, left out of the tree unless hidden works are shown
@@ -102,18 +102,23 @@ function normalizeReward(r) {
   return { amount, currency, period: r.period };
 }
 
-// Validate one income item and return { amount, currency }, with "from" (the year and month a
-// monthly item starts, "2026-01") when it has one.
+// Validate one income item and return { amount, currency }, with "from" and "to" (the year and month
+// a monthly item starts and the last month it pays, "2026-01") when it has them.
 function normalizeIncomeItem(x, period) {
   if (!x || typeof x !== 'object' || Array.isArray(x)) throw new Error('each item must be an object { amount, currency }.');
   const amount = typeof x.amount === 'string' ? Number(x.amount.replace(/,/g, '')) : x.amount;
   if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) throw new Error('"amount" must be a positive number.');
   const currency = typeof x.currency === 'string' ? x.currency.trim().toUpperCase() : '';
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('"currency" must be a 3-letter code such as JPY.');
-  if (x.from === undefined || x.from === null || x.from === '') return { amount, currency };
-  if (period !== 'monthly') throw new Error('only a monthly item can have "from".');
-  if (typeof x.from !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(x.from)) throw new Error('"from" must be a year and month such as 2026-01.');
-  return { amount, currency, from: x.from };
+  const item = { amount, currency };
+  for (const k of ['from', 'to']) {
+    if (x[k] === undefined || x[k] === null || x[k] === '') continue;
+    if (period !== 'monthly') throw new Error(`only a monthly item can have "${k}".`);
+    if (typeof x[k] !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(x[k])) throw new Error(`"${k}" must be a year and month such as 2026-01.`);
+    item[k] = x[k];
+  }
+  if (item.from && item.to && item.to < item.from) throw new Error('"to" must not be before "from".');
+  return item;
 }
 
 // Validate an income { monthly: [...], once: [...] } and return it with both lists, or null when

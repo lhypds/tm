@@ -1,19 +1,28 @@
 // A work's income is { monthly: [...], once: [...] }, each a list of { amount, currency }; a monthly
-// item may also have "from", the year and month it starts ("2026-01").
+// item may also have "from" and "to", the year and month it starts and the last month it pays
+// ("2026-01", "2026-12").
 
 export const INCOME_PERIODS = ["monthly", "once"];
 
 export const INCOME_CURRENCIES = ["JPY", "CNY", "USD", "EUR", "GBP", "HKD", "TWD", "KRW", "SGD", "AUD", "CAD"];
 
-// The items of one period added up per currency and start month: "500,000 JPY (from 2026-01) + 1,000 USD".
+// " (from 2026-01)", " (until 2026-12)" or " (2026-01 – 2026-12)" for a monthly item; "" without either.
+function monthsOf({ from, to }, t) {
+  if (from && to) return t("income.rangeValue", { from, to });
+  if (from) return t("income.fromValue", { from });
+  if (to) return t("income.toValue", { to });
+  return "";
+}
+
+// The items of one period added up per currency and months: "500,000 JPY (from 2026-01) + 1,000 USD".
 function total(items, t) {
   const sums = new Map();
   for (const x of items) {
-    const key = `${x.currency} ${x.from || ""}`;
+    const key = `${x.currency} ${x.from || ""} ${x.to || ""}`;
     sums.set(key, { ...x, amount: (sums.get(key)?.amount || 0) + x.amount });
   }
   return [...sums.values()]
-    .map((x) => `${x.amount.toLocaleString()} ${x.currency}${x.from ? t("income.fromValue", { from: x.from }) : ""}`)
+    .map((x) => `${x.amount.toLocaleString()} ${x.currency}${monthsOf(x, t)}`)
     .join(" + ");
 }
 
@@ -36,12 +45,16 @@ export function formatIncome(income, t) {
     .join(" · ");
 }
 
-// How many months of a monthly item fall in `year`: all 12 without a start month, none when it
-// starts after the year, and from its start month on when it starts in it.
-export function monthsIn(from, year) {
-  if (!from) return 12;
-  const [y, m] = from.split("-").map(Number);
-  return y < year ? 12 : y > year ? 0 : 13 - m;
+// How many months of a monthly item fall in `year`, counting from its start month and through its
+// end month when it has them: all 12 without either, none when it starts after the year or ends before.
+export function monthsIn(from, to, year) {
+  const index = (ym) => {
+    const [y, m] = ym.split("-").map(Number);
+    return y * 12 + m - 1;
+  };
+  const first = Math.max(year * 12, from ? index(from) : -Infinity);
+  const last = Math.min(year * 12 + 11, to ? index(to) : Infinity);
+  return Math.max(0, last - first + 1);
 }
 
 // Every currency used by `entries` ({ income } each), most used first.
@@ -52,16 +65,17 @@ export function currenciesOf(entries) {
   return [...counts].sort((a, b) => b[1] - a[1]).map(([c]) => c);
 }
 
-// The years an analysis can pick: from the earliest start month (or last year) to next year.
+// The years an analysis can pick: from the earliest start or end month (or last year) to the latest
+// (or next year).
 export function yearsOf(entries, now = new Date().getFullYear()) {
-  const starts = entries.flatMap((e) => (e.income?.monthly || []).filter((x) => x.from).map((x) => Number(x.from.slice(0, 4))));
+  const starts = entries.flatMap((e) => (e.income?.monthly || []).flatMap((x) => [x.from, x.to]).filter(Boolean).map((ym) => Number(ym.slice(0, 4))));
   const first = Math.min(now - 1, ...starts);
   const last = Math.max(now + 1, ...starts);
   return Array.from({ length: last - first + 1 }, (_, i) => first + i);
 }
 
 // One entry's income in `currency` for `year`: the monthly total, that times 12 (annual), what the
-// monthly items actually pay in the year given their start months, and the one-time total.
+// monthly items actually pay in the year given their start and end months, and the one-time total.
 export function incomeFigures(income, currency, year) {
   const monthly = (income?.monthly || []).filter((x) => x.currency === currency);
   const once = (income?.once || []).filter((x) => x.currency === currency);
@@ -69,7 +83,7 @@ export function incomeFigures(income, currency, year) {
   return {
     perMonth,
     annual: perMonth * 12,
-    inYear: monthly.reduce((sum, x) => sum + x.amount * monthsIn(x.from, year), 0),
+    inYear: monthly.reduce((sum, x) => sum + x.amount * monthsIn(x.from, x.to, year), 0),
     once: once.reduce((sum, x) => sum + x.amount, 0),
   };
 }
