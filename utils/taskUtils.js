@@ -208,10 +208,17 @@ function folderTitle(name) {
   return i < 0 ? '' : name.slice(i + 1).trim();
 }
 
-// Turn a task title into the folder-name suffix: drop characters that are
-// unsafe in folder names and cap the length.
+// Turn a task title into the folder-name suffix, a name that works on Windows too: drop the
+// characters Windows does not allow in a name (\ / : * ? " < > | and control characters), make
+// every run of whitespace one space, cap the length (by characters, so an emoji is not cut in
+// half), and trim, trailing dots too (Windows drops them, and the name would no longer match).
 function folderSuffix(title) {
-  return (title || '').replace(/[\/\\:*?"<>|]/g, '').trim().slice(0, 80);
+  const clean = String(title || '')
+    .replace(/\s+/g, ' ')
+    .replace(/[\/\\:*?"<>|\u0000-\u001f\u007f]/g, '')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+  return Array.from(clean).slice(0, 80).join('').replace(/[. ]+$/, '').trim();
 }
 
 // Folder name for a task: "<id>" or "<id> <title>" when a title is given.
