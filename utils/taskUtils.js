@@ -139,6 +139,14 @@ function writeMissingTaskFile(task) {
   return task;
 }
 
+// A task file edited outside tm (in another editor, or by hand): when its first line no longer
+// matches the folder name, rename the folder after it, as an edit in tm does. Returns the task.
+function followTitle(task) {
+  if (!fs.existsSync(task.path)) return task;
+  task.path = renameTaskByFirstLine(task.path);
+  return task;
+}
+
 // Make sure the task file of a task folder exists, so an editor or a write
 // finds a well-formed file. Returns the task file path.
 function ensureTaskFile(taskPath) {
@@ -158,7 +166,7 @@ function readTasks(dir) {
       if (e.isDirectory() && isTaskFolder(dirAbs)) dirs.push(dirAbs);
     }
   }
-  const tasks = dirs.map(d => writeMissingTaskFile(migrateTask(readTaskDir(d))));
+  const tasks = dirs.map(d => followTitle(writeMissingTaskFile(migrateTask(readTaskDir(d)))));
 
   // sort by id descending (newest first)
   tasks.sort(compareIdsDesc);
@@ -367,14 +375,14 @@ function deleteTask(task) {
   removeIfEmptyStatusDir(path.dirname(taskDir));
 }
 
-// After creating/editing a task, rename its folder to "<id> <first detail line>".
-// Returns the new task path (or original if nothing to rename).
+// After creating/editing a task, rename its folder to "<id> <first detail line>", or to the bare
+// "<id>" when the details have no title line any more. Returns the new task path (or the original
+// when there is nothing to rename, or the rename cannot be done: the folder in use, say).
 function renameTaskByFirstLine(taskPath) {
   try {
     const content = fs.readFileSync(taskPath, 'utf8');
     const parsed = parseTask(content);
     const firstLine = firstDetailLine(parsed.details);
-    if (!firstLine) return taskPath;
     const taskDir = path.dirname(taskPath);
     const parentDir = path.dirname(taskDir);
     const oldName = path.basename(taskDir);
@@ -382,6 +390,8 @@ function renameTaskByFirstLine(taskPath) {
     const newName = taskFolderName(folderId(oldName), firstLine);
     if (oldName === newName) return taskPath;
     const newDir = path.join(parentDir, newName);
+    // never onto another folder (a case-only change finds this same folder on macOS and Windows)
+    if (newName.toLowerCase() !== oldName.toLowerCase() && fs.existsSync(newDir)) return taskPath;
     renameFolder(taskDir, newDir);
     return path.join(newDir, path.basename(taskPath));
   } catch (e) {
