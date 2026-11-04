@@ -77,8 +77,8 @@ function readRunAfter() {
 
 // The list bar's filters, each space (every task, an origin, a work, a repository) with its own,
 // kept by the space's path: { [path]: { month, showDone, showPending, showAbort } }. A space not
-// filtered yet shows every task.
-const FILTER_DEFAULTS = { month: ALL_MONTHS, showDone: true, showPending: true, showAbort: true };
+// filtered yet shows every task but the aborted ones.
+const FILTER_DEFAULTS = { month: ALL_MONTHS, showDone: true, showPending: true, showAbort: false };
 
 function readFilters() {
   try {

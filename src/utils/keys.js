@@ -67,6 +67,50 @@ export function useShortcuts(handler) {
   }, []);
 }
 
+// In any textarea, as in VS Code: cmd+x (ctrl+x off the Mac) with nothing selected cuts the line
+// the caret is on, newline and all, and cmd+a selects the textarea's text. Installed once, on the
+// document, so every editor has it. Ctrl on the Mac is left to its Emacs keys (ctrl+a is home).
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+
+export function useTextKeys() {
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const el = e.target;
+      if (e.defaultPrevented || el?.tagName !== "TEXTAREA" || el.readOnly || el.disabled) return;
+      if (!(isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey) || e.altKey || e.shiftKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "a") {
+        e.preventDefault();
+        el.select();
+      } else if (key === "x" && el.selectionStart === el.selectionEnd) cutLine(el);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+}
+
+// Select the caret's line and let the browser's cut go on, but put the line and one newline on the
+// clipboard (the last line has none after it, so the newline before it is the one removed) and
+// delete with the edit command, so the change is one undo step and React sees it as typing.
+function cutLine(el) {
+  const v = el.value;
+  if (!v) return;
+  const caret = el.selectionStart;
+  const start = caret === 0 ? 0 : v.lastIndexOf("\n", caret - 1) + 1;
+  const nl = v.indexOf("\n", start);
+  const last = nl === -1;
+  const line = v.slice(start, last ? v.length : nl) + "\n";
+  el.setSelectionRange(last && start > 0 ? start - 1 : start, last ? v.length : nl + 1);
+  const onCut = (e) => {
+    e.preventDefault();
+    e.clipboardData.setData("text/plain", line);
+    document.execCommand("delete");
+  };
+  el.addEventListener("cut", onCut, { once: true });
+  // The cut comes right after this keydown; should it not, the next real cut is left alone.
+  setTimeout(() => el.removeEventListener("cut", onCut));
+}
+
 // Next selection index for j / k / up / down, clamped to the list (-1 for an empty one); null for
 // any other key.
 export function moveIndex(name, index, length) {

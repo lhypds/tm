@@ -45,6 +45,14 @@
   white-space: pre;
 }
 
+/* The textarea's place, holding a colored copy under it for a JSON file (see useHighlight). */
+.editor {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+
 textarea.text {
   resize: none;
   outline: none;

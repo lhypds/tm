@@ -2,10 +2,11 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { Modal, TextArea } from "@ui";
 import * as api from "@utils/api";
+import { jsonTokens } from "@utils/highlight";
 import styles from "./config.module.css";
 
 // Edit taskmgr.json as text. The server checks it before writing, so a broken edit is refused
-// with the reason and the file stays as it was.
+// with the reason and the file stays as it was. The JSON is colored as typed.
 export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
   const { t } = useTranslation();
   const [configPath, setConfigPath] = useState("");
@@ -48,6 +49,7 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
         <TextArea
           className={styles.text}
           minHeight={200}
+          highlight={jsonTokens}
           value={text ?? ""}
           placeholder={text === null ? t("common.loading") : ""}
           disabled={text === null}

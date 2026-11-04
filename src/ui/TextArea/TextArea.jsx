@@ -1,8 +1,12 @@
 import { useRef, forwardRef } from "react";
+import { useHighlight } from "../Highlight";
 import styles from "./textarea.module.css";
 
-const TextArea = forwardRef(function TextArea({ className, minHeight = 80, ...props }, forwardedRef) {
+// `highlight` (see @utils/highlight) colors the text, as a code editor does.
+const TextArea = forwardRef(function TextArea({ className, minHeight = 80, highlight, onScroll, ...props }, forwardedRef) {
   const localRef = useRef(null);
+  const boxClass = `${styles.textarea}${className ? ` ${className}` : ""}`;
+  const colors = useHighlight(highlight, props.value, boxClass);
 
   function setRefs(el) {
     localRef.current = el;
@@ -30,7 +34,16 @@ const TextArea = forwardRef(function TextArea({ className, minHeight = 80, ...pr
 
   return (
     <div className={styles.wrapper}>
-      <textarea ref={setRefs} className={`${styles.textarea}${className ? ` ${className}` : ""}`} {...props} />
+      {colors.layer}
+      <textarea
+        ref={setRefs}
+        className={`${boxClass} ${colors.className}`}
+        onScroll={(e) => {
+          colors.onScroll?.(e);
+          onScroll?.(e);
+        }}
+        {...props}
+      />
       <div className={styles.handle} onMouseDown={onMouseDown} />
     </div>
   );

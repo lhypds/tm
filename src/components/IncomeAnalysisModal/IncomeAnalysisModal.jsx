@@ -36,7 +36,7 @@ function Pie({ slices }) {
 }
 
 // The income of every origin (its own) and work in one currency: per month, annual (monthly × 12),
-// what the monthly items actually pay in the chosen year given their start months, and one-time;
+// what the monthly items actually pay in the chosen year given their start and end months, and one-time;
 // with a pie of where the annual or the chosen year's income comes from, one slice per origin (a
 // work without an origin is its own source). Hidden works count too.
 export default function IncomeAnalysisModal({ isOpen, works, origins, onClose }) {

@@ -179,6 +179,10 @@
       "keys": "⌘c / ctrl+c",
       "desc": "复制选中任务的 id，供 tm run 使用（repository:id 或 work:id）"
     },
+    "text": {
+      "keys": "⌘x / ⌘a",
+      "desc": "编辑文本时：剪切光标所在整行（未选中文字时）/ 全选文本"
+    },
     "done": {
       "keys": "x",
       "desc": "标为完成 / 未完成"
@@ -237,17 +241,21 @@
     "monthly": "每月",
     "once": "单笔",
     "amount": "数额",
-    "amountPlaceholder": "例如：500000",
+    "amountPlaceholder": "例如：1000",
     "currency": "币种",
     "from": "开始年月（可选）",
-    "fromLabel": "开始年月",
     "fromValue": "（{{from}} 起）",
+    "to": "结束年月（含当月，可选）",
+    "toValue": "（至 {{to}}）",
+    "rangeValue": "（{{from}} ~ {{to}}）",
     "add": "添加",
     "remove": "删除",
     "perMonth": "{{value}} / 月",
     "perOnce": "{{value}}（单笔）",
     "invalidAmount": "数额必须是正数。",
     "invalidFrom": "开始年月的格式应为 2026-01。",
+    "invalidTo": "结束年月的格式应为 2026-12。",
+    "invalidRange": "结束年月不能早于开始年月。",
     "empty": "请至少添加一笔收入，或选择“没有收入”。"
   },
   "repository": {

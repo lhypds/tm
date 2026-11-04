@@ -1,0 +1,48 @@
+/* Colors only, never a weight or a style: the colored text has to sit letter for letter under the
+   textarea's. */
+.key {
+  color: var(--focus);
+}
+
+.string {
+  color: var(--ok);
+}
+
+.number {
+  color: var(--warn);
+}
+
+.literal {
+  color: var(--err);
+}
+
+.punct {
+  color: var(--muted);
+}
+
+/* The colored copy under a textarea: the textarea's box over its whole parent, still; the text in
+   it is moved instead (see useHighlight). The grid stays on the textarea, which scrolls it. */
+pre.layer.layer {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-image: none;
+}
+
+.code {
+  display: block;
+  font: inherit;
+  will-change: transform;
+}
+
+textarea.overlaid.overlaid {
+  position: relative; /* over the layer */
+  color: transparent;
+  caret-color: var(--fg);
+  background-color: transparent;
+}

@@ -5,6 +5,7 @@ Each task is a folder `<id> <title>`, the id being its creation minute (`YYYYMMD
 
 `task.txt`  
 Plain text file, just the task details. The first line is the title.  
+The folder name follows the title: change the first line (in tm or in any other editor) and the folder is renamed to `<id> <new title>` (just `<id>` when there is no title), the next time tm reads the list. Characters Windows does not allow in a name (`\ / : * ? " < > |`, control characters) are left out, and the name is trimmed.  
 A task folder without a `task.txt` is still a task, titled after the folder name.  
 Any other file in the folder is an attachment, except `prompt.txt` (optional): a prompt for an AI  
 agent working on the task, which the web UI's Task panel edits under the task's text (see [Web UI.md](Web%20UI.md))  

@@ -10,15 +10,22 @@
   color: var(--muted);
 }
 
-/* One income item: amount, currency, and a button to remove it. */
-.incomeRow {
+/* One income item on one line: a monthly item's start and end months, then amount, currency and
+   a button to remove it. */
+.item {
   display: flex;
   gap: 8px;
 }
 
-.incomeRow .input {
+.item .input {
   flex: 1;
   min-width: 0;
+}
+
+/* Just wide enough for "2026-01". */
+.item .month {
+  flex: none;
+  width: 72px;
 }
 
 /* As high as the inputs beside it. */
@@ -37,19 +44,11 @@
   width: 64px;
 }
 
-/* The year and month a monthly item starts from, after its label. */
-.fromLabel {
+/* Between a monthly item's start and end months. */
+.tilde {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  align-self: center;
   color: var(--muted);
-  white-space: nowrap;
-}
-
-.incomeRow .from {
-  flex: none;
-  width: 136px;
 }
 
 .choices {
