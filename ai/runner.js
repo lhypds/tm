@@ -3,7 +3,7 @@
 // tasks, the source code and the claude login are. On with AI_RUNNER=1 in .env (see taskmgrd.js).
 //
 // It keeps one connection open to the server, GET /api/sync/ai/commands (a text/event-stream, see
-// server/ai.js), reads the commands the server's browsers give (run, answer, stop, and forget, which
+// server/ai/ai.js), reads the commands the server's browsers give (run, answer, stop, and forget, which
 // removes a run's record from the task folder here, see ai/record.js; see ai/remote.js), carries
 // each out on this machine's session (ai/session.js) and acknowledges it (an
 // `ack` event: ok, or the error for the browser). Every event of the session goes back as it happens,
@@ -22,7 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId } = require('../utils/taskUtils');
+const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId } = require('../utils/task');
 const { resolveConfig } = require('../server/config');
 const { isDirectory, spaceOf, taskDirIn, taskDirsUnder, afterOf } = require('./task');
 const { deleteRecord } = require('./record');

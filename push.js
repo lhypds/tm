@@ -16,7 +16,7 @@
 // taskmgr.json is pushed whole; an invalid one is not pushed. A tasks folder is pushed as a snapshot
 // of its tasks: the task folders right in it and in its done, pending and aborted folders, told by
 // their name alone (a task id, 12 digits, "202610191522", with or without a title after a space; see
-// taskEntries in utils/taskUtils.js), each whole: every file in it (task.txt files as text, the
+// taskEntries in utils/task.js), each whole: every file in it (task.txt files as text, the
 // others, attachments included, by the sha1 of their content, the server asked first which of them
 // it does not have yet and those uploaded) and every empty folder. A task folder without a task.txt
 // gets one first, with the title from its name as its text (empty for a bare id), so every task
@@ -41,7 +41,7 @@ const {
   TASK_FILE, STATUS_DIRS, TASK_FOLDER_RE, ensureTaskFile,
   SYNC_MAX_FILE_BYTES: MAX_FILE_BYTES, SYNC_MAX_FOLDER_BYTES: MAX_FOLDER_BYTES,
   SYNC_MAX_FOLDER_FILES: MAX_FOLDER_FILES, isSyncSkipped
-} = require('./utils/taskUtils');
+} = require('./utils/task');
 const { appendLog } = require('./utils/logfile');
 
 const REQUEST_TIMEOUT_MS = 30 * 1000;
@@ -156,7 +156,7 @@ async function fileHash(abs, stat) {
 }
 
 // The tasks of a tasks folder, as the server mirrors them: every file of every task folder (see
-// taskEntries in utils/taskUtils.js for which folders those are), relative to the tasks folder, a
+// taskEntries in utils/task.js for which folders those are), relative to the tasks folder, a
 // task.txt as text and any other file (attachments, whatever else is there) by the sha1 of its
 // content, which the server fetches from its blob store (see pushSpace); an empty folder as a bare
 // folder. Symbolic links are followed; lock and cache files are left out. Sorted, so the same folder

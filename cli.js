@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const blessed = require('blessed');
 
-const { isCJKChar } = require('./utils/cjkUtils');
+const { isCJKChar } = require('./utils/cjk');
 const {
   createTask,
   ensureTaskFile,
@@ -13,9 +13,9 @@ const {
   openTask,
   readTasks,
   compareIdsDesc
-} = require('./utils/taskUtils');
-const { clearScreen } = require('./utils/screenUtils');
-const { getEditor, getEditorInfo, getEditorCommand } = require('./utils/editorUtils');
+} = require('./utils/task');
+const { clearScreen } = require('./utils/screen');
+const { getEditor, getEditorInfo, getEditorCommand } = require('./utils/editor');
 const { resolveConfig, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH } = require('./server/config');
 
 // load .env

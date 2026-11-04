@@ -2,7 +2,7 @@
 // pushes from taskmgrd (server/sync.js), a task of a pushed copy is run where its tasks, the source
 // code and the claude login are: on the machine that pushed it, by its taskmgrd (ai/runner.js, with
 // AI_RUNNER=1 in its .env). That runner keeps one connection open here (GET /api/sync/ai/commands in
-// server/ai.js) and gets the browsers' commands over it: run, answer, stop, forget (command). What
+// server/ai/ai.js) and gets the browsers' commands over it: run, answer, stop, forget (command). What
 // its runs do comes back as the events of its own session (ai/session.js: snapshot, run, item, delta,
 // remove; POST /api/sync/ai/events, see receive) and is kept here, run by run, so the browsers see
 // those runs as they see the runs of this machine: the same events (subscribe), the same shape

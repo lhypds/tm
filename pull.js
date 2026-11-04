@@ -2,7 +2,7 @@
 // tm pull: fetch taskmgr.json and the task folders of every tasks folder, whole (every task.txt and
 // every other file: attachments, files in folders), from the server taskmgrd pushes to (what `tm push`
 // sends, and only that: a file right in a tasks folder, or a folder there not named by a task id, is
-// not pulled either; see taskEntries in utils/taskUtils.js), and put them here. Nothing local is
+// not pulled either; see taskEntries in utils/task.js), and put them here. Nothing local is
 // deleted unless it is a task the server deleted since the last sync (see server/syncstate.js): a file or folder
 // that exists is updated when it differs, one that does not is added.
 //
@@ -28,7 +28,7 @@ const os = require('os');
 const crypto = require('crypto');
 const syncState = require('./server/syncstate');
 const { spaceKey, moveTasks } = require('./server/sync');
-const { taskEntries } = require('./utils/taskUtils');
+const { taskEntries } = require('./utils/task');
 const { loadDotenv, parseConfig, upgradeRaw, DEFAULT_CONFIG_PATH } = require('./server/config');
 
 const REQUEST_TIMEOUT_MS = 30 * 1000;
@@ -172,7 +172,7 @@ const readIf = (abs) => {
 
 // What was last synced of a space (see server/syncstate.js), the tasks only: a state written when the
 // whole folder was synced, files right in it included, must not make those files changes here, nor
-// tasks the server deleted (see taskEntries in utils/taskUtils.js). null when never synced.
+// tasks the server deleted (see taskEntries in utils/task.js). null when never synced.
 function knownOf(key) {
   const known = syncState.get(key);
   if (!known) return null;

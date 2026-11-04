@@ -2,21 +2,21 @@
 // end), as a folder named after the time the run began:
 //
 //   <task>/.claude_20261025143012/
-//     run.json         the run as the API answers it (server/ai.js), transcript included, plus `input`
+//     run.json         the run as the API answers it (server/ai/ai.js), transcript included, plus `input`
 //                      (the first prompt claude was given) and `machine` (where it ran)
 //     task.txt         the task's task.txt as it was when the run began (left out when it had none)
 //     prompt.txt       its prompt.txt as it was (left out when it had none)
 //     transcript.md    the same run, to read
 //
 // A dot folder: not an attachment in the web UI, not told to claude (ai/task.js listFiles), but synced
-// with the task as every file in a task folder is (utils/taskUtils.js taskEntries), so the tm server
+// with the task as every file in a task folder is (utils/task.js taskEntries), so the tm server
 // that receives the task shows the run after it is over, whatever restarted meanwhile, and `tm pull`
 // brings it to the other machines. The web UI's run button opens the latest record when the task has
 // no run going (GET /api/task lists them, GET /api/ai/saved/:folder reads one).
 const fs = require('fs');
 const path = require('path');
 
-const { TASK_FILE, PROMPT_FILE, formatDateTime } = require('../utils/taskUtils');
+const { TASK_FILE, PROMPT_FILE, formatDateTime } = require('../utils/task');
 
 const PREFIX = '.claude_';
 const RECORD_RE = /^\.claude_(\d{14})(?:-\d+)?$/;  // the time, and a number when two began the same second

@@ -488,7 +488,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   const seen = new Map();
 
   // The token and the machine id of a request from taskmgrd, checked and read into req.machine. Also
-  // app.auth, for the other routes taskmgrd calls (the runner's, see server/ai/index.js): the same token, and
+  // app.auth, for the other routes taskmgrd calls (the runner's, see server/ai/ai.js): the same token, and
   // the machine counts as in touch by them too.
   const auth = (req, res, next) => {
     if (!enabled) return res.status(503).json({ error: 'Sync is off on this server: set SYNC_SERVER_TOKEN in its .env.', code: 'SYNC_OFF' });

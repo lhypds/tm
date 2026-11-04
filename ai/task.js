@@ -24,7 +24,7 @@ const {
   readTasks,
   readPrompt,
   folderId
-} = require('../utils/taskUtils');
+} = require('../utils/task');
 const { resolveConfig } = require('../server/config');
 
 // Quote a path or name for a command shown to the user.

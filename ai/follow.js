@@ -12,7 +12,7 @@
 const fs = require('fs');
 const { execFileSync, spawn } = require('child_process');
 const { StringDecoder } = require('string_decoder');
-const { formatDateTime } = require('../utils/taskUtils');
+const { formatDateTime } = require('../utils/task');
 const { version } = require('../package.json');
 
 const POLL_MS = 150;        // how often the file is looked at

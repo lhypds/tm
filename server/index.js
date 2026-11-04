@@ -399,7 +399,7 @@ trimLogs(path.join(PROJECT_ROOT, 'logs'));
 const syncApp = createSyncApp({ dataDir: config.dataDir, logsDir: path.join(PROJECT_ROOT, 'logs'), token: syncToken, readConfig: config.readText, writeConfig: config.writeText });
 app.use(syncApp);
 // The runners of those machines (their taskmgrd with AI_RUNNER=1), which run Claude Code there for
-// the tasks pushed from there (see server/ai/index.js): the same token.
+// the tasks pushed from there (see server/ai/ai.js): the same token.
 app.use(createAiRunnerApp({ auth: syncApp.auth }));
 
 app.use(express.json({ limit: '10mb' }));

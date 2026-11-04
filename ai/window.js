@@ -6,7 +6,7 @@
 //
 // The window is a terminal running ai/follow.js on a file the session's events for the run are
 // appended to as they happen, one JSON line each ({ event, data }, as the web UI's event stream has
-// them, see server/ai.js), in <tmpdir>/tm-runs/<run id>.jsonl; the first line (`meta`) names the server
+// them, see server/ai/ai.js), in <tmpdir>/tm-runs/<run id>.jsonl; the first line (`meta`) names the server
 // and this machine, which terminal the window is (`terminal`, so follow.js can close it) and how many
 // seconds it stays after the run (`closeAfter`). follow.js removes the file when it is through; one it
 // never read (no terminal could be opened) is removed here a minute after the run.
