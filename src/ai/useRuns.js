@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { showToast } from "@ui";
-import * as api from "@utils/api";
+import * as api from "./api";
 
 // The runs of Claude Code (see ai/session.js), followed live over the server's event stream for as
 // long as the page is open: `runs` is every run the server has, by id, each with its transcript

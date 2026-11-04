@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { XIcon } from "@components/icons";
-import { duration, formatDateTime } from "@utils/task";
+import { formatDateTime } from "@utils/task";
+import { duration } from "../duration";
 import styles from "./runs.module.css";
 
 // The runs of Claude Code a task has had, under its prompt, listed as its files are (see Attachments):

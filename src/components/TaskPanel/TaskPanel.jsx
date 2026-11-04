@@ -2,8 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
 import Attachments from "@components/Attachments";
-import RunButton from "@components/RunButton";
-import RunList from "@components/RunList";
+import { RunButton, RunList } from "@ai";
 import { Checkbox } from "@ui";
 import styles from "./panel.module.css";
 

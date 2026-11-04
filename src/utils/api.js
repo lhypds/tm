@@ -2,7 +2,7 @@
 // the cookie expired). The auth store listens and takes the app back to the login page.
 export const UNAUTHORIZED_EVENT = "taskmgr:unauthorized";
 
-async function request(url, options) {
+export async function request(url, options) {
   const res = await fetch(url, options);
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -15,16 +15,16 @@ async function request(url, options) {
   return body;
 }
 
-const json = (method, body) => ({
+export const json = (method, body) => ({
   method,
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),
 });
 
-const q = (params) => new URLSearchParams(params).toString();
+export const q = (params) => new URLSearchParams(params).toString();
 
 // A space is one folder of tasks: { work, repository } with repository "" for the work's common tasks.
-const sp = (space) => ({ work: space.work, repository: space.repository || "" });
+export const sp = (space) => ({ work: space.work, repository: space.repository || "" });
 
 // Resolves to { username }; rejects with status 401 on a wrong username or password.
 export const login = (username, password) => request("/api/login", json("POST", { username, password }));
@@ -166,26 +166,3 @@ export const spacePath = (origin, work, repository) =>
   (origin ? `${originPath(origin)}/${encodeURIComponent(work)}` : `/w/${encodeURIComponent(work)}`) +
   (repository ? `/${encodeURIComponent(repository)}` : "");
 
-// The runs of Claude Code on tasks (server/ai.js): starting one, answering what Claude asks, stopping
-// one. The runs themselves arrive live on the event stream (see hooks/useRuns).
-
-// The event stream of every run: GET /api/ai/events.
-export const runEventsUrl = "/api/ai/events";
-
-// Start Claude Code on the task at `rel` in the space; resolves to { run } with its transcript (409
-// while the task has a run going). `after` is what Claude is told to do with its changes once the
-// work is done: "push" (commit and push), "pr" (a new branch, a commit and a pull request) or null.
-export const startRun = (space, rel, after = null) => request("/api/ai/run", json("POST", { ...sp(space), rel, ...(after ? { after } : {}) }));
-
-// Answer the run's pending question `pending`: { decision: "allow" | "deny" } for a permission,
-// { answers: { "<question>": "<answer>" } } for a question. { run }.
-export const answerRun = (id, pending, body) => request(`/api/ai/runs/${encodeURIComponent(id)}/answer`, json("POST", { pending, ...body }));
-
-export const stopRun = (id) => request(`/api/ai/runs/${encodeURIComponent(id)}/stop`, json("POST", {}));
-
-// A run's record, kept in the task folder once the run was over (its folder is named in the task's
-// `runs`, see getTask): the run with its transcript. { run }.
-export const getSavedRun = (space, rel, folder) => request(`/api/ai/saved/${encodeURIComponent(folder)}?${q({ ...sp(space), rel })}`);
-
-// Remove that record (for a copy pushed from another machine, there too). { ok: true }.
-export const deleteSavedRun = (space, rel, folder) => request(`/api/ai/saved/${encodeURIComponent(folder)}?${q({ ...sp(space), rel })}`, { method: "DELETE" });

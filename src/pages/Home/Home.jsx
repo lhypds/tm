@@ -19,7 +19,6 @@ import {
   IncomeAnalysisModal,
   LanguageSwitcher,
   UserMenu,
-  RunModal,
 } from "@components";
 import {
   PlusIcon,
@@ -40,7 +39,7 @@ import { ALL_MONTHS, inPeriod, taskMonths, monthLabel, previewKind, flattenTasks
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
-import useRuns from "@hooks/useRuns";
+import { RunModal, useRuns } from "@ai";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -506,7 +505,7 @@ export default function Home({ all = false }) {
   });
   const selectedRun = ai.runFor(selected);
   // Where the selected task would run: here, or, for a copy pushed from another machine, on that
-  // machine (see server/ai.js), which needs its taskmgrd connected as a runner (AI_RUNNER=1 there).
+  // machine (see server/ai/ai.js), which needs its taskmgrd connected as a runner (AI_RUNNER=1 there).
   // The reason it cannot now, for the run button; null when it can, or nothing is known yet.
   const noRunner = useMemo(() => {
     const sp = selected?.space;

@@ -2,7 +2,7 @@
 // taskmgr.json and the tasks of every work and repository here: each task folder of a tasks folder
 // whole, task file, attachments and every other file in it (not what is beside the tasks: a file
 // right in the tasks folder, or a folder there not named by a task id; see taskEntries in
-// utils/taskUtils.js). The config is merged into this server's own taskmgr.json,
+// utils/task.js). The config is merged into this server's own taskmgr.json,
 // each pushed work and repository pointing at its copy of the tasks, which is kept under data/, laid
 // out like the origins tree of taskmgr.json:
 //
@@ -73,7 +73,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { parseConfig, upgradeRaw } = require('./config');
 const { appendLog } = require('../utils/logfile');
-const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/taskUtils');
+const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/task');
 
 const ORIGINS_DIR = 'origins';
 const NO_ORIGIN_DIR = '_';
@@ -488,7 +488,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   const seen = new Map();
 
   // The token and the machine id of a request from taskmgrd, checked and read into req.machine. Also
-  // app.auth, for the other routes taskmgrd calls (the runner's, see server/ai.js): the same token, and
+  // app.auth, for the other routes taskmgrd calls (the runner's, see server/ai/index.js): the same token, and
   // the machine counts as in touch by them too.
   const auth = (req, res, next) => {
     if (!enabled) return res.status(503).json({ error: 'Sync is off on this server: set SYNC_SERVER_TOKEN in its .env.', code: 'SYNC_OFF' });

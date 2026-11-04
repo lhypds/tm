@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Modal } from "@ui";
 import FilePreviewModal from "@components/FilePreviewModal";
 import { PlayIcon, StopIcon } from "@components/icons";
-import * as api from "@utils/api";
-import { duration, formatDateTime } from "@utils/task";
+import { formatDateTime } from "@utils/task";
+import * as api from "../api";
+import { duration } from "../duration";
 import styles from "./run.module.css";
 
 // The run of Claude Code on a task, in a dialog sized as the task preview's: opened by the run button

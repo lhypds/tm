@@ -31,11 +31,11 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 
-const { TASK_FILE, PROMPT_FILE, readPrompt, readTaskDir } = require('../utils/taskUtils');
-const { isDirectory, spaceOf, taskDirIn, titleOf, afterOf } = require('../ai/task');
-const session = require('../ai/session');
-const remote = require('../ai/remote');
-const record = require('../ai/record');
+const { TASK_FILE, PROMPT_FILE, readPrompt, readTaskDir } = require('../../utils/task');
+const { isDirectory, spaceOf, taskDirIn, titleOf, afterOf } = require('../../ai/task');
+const session = require('../../ai/session');
+const remote = require('../../ai/remote');
+const record = require('../../ai/record');
 
 const KEEP_MS = 25 * 1000;  // a comment this often keeps an event stream open
 

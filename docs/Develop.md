@@ -29,11 +29,11 @@ the login in `~/.claude`), keeping the runs and relaying what Claude asks, and `
 the task folder (`.claude_<time>/`: run.json, task.txt, prompt.txt, transcript.md) and reads those records back. A task pushed from another machine runs on  
 that machine: `runner.js` is the runner in its taskmgrd (`AI_RUNNER=1`), which holds a connection to the server, carries  
 out the commands it gets on its own `session.js` and sends the session's events back, and `remote.js` is the server's  
-side, which keeps those runs as it gets them and hands the browsers' commands over, so `server/ai.js` serves both kinds  
+side, which keeps those runs as it gets them and hands the browsers' commands over, so `server/ai/ai.js` serves both kinds  
 of run as one. `window.js` is the runner's terminal window (`AI_RUNNER_WINDOW=1`): it appends the session's events of  
 each run to `<tmpdir>/tm-runs/<run id>.jsonl` and opens a terminal there running `follow.js`, which prints that file as  
-it grows, the way the web UI shows a run, and removes it when the run is over. Everything around it sits with its own layer: the API is `server/ai.js` (see [Server.md](Server.md)), the  
-browser's calls to it are the `*Run` functions of `src/utils/api.js`, the hook that follows the runs is  
-`src/hooks/useRuns.js`, the components that show them are `src/components/RunButton` (beside a prompt) and  
-`src/components/RunModal`, and their texts are the `ai` keys of the translations in `src/i18n`. What claude writes to  
+it grows, the way the web UI shows a run, and removes it when the run is over. Everything around it sits with its own layer: the API is `server/ai/ai.js` (see [Server.md](Server.md)), the  
+browser's calls to it are `src/ai/api.js`, the hook that follows the runs is  
+`src/ai/useRuns.js`, the components that show them are `src/ai/RunButton` (beside a prompt) and  
+`src/ai/RunModal`, and their texts are the `ai` keys of the translations in `src/i18n`. What claude writes to  
 stderr goes to `logs/ai.log`.    

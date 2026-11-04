@@ -30,7 +30,7 @@ gets one first, with the title from its name as its text (empty for a bare id). 
 is not pushed, nor looked at: a file right in the tasks folder (or in a status folder), and a folder there  
 named some other way, whatever is in it. The server brings its copy to the snapshot: a task marked done, pending or aborted (or back to todo) is moved first, then only what differs is written and what is gone removed, so after a push its copy is the tasks  
 exactly as they are here, and a renamed, moved or deleted task or attachment is mirrored too. Lock and cache files  
-(`.DS_Store`, `~$` Office locks, `Thumbs.db`, ...; see `isSyncSkipped` in `utils/taskUtils.js`) are left out. Task files go as text; every other file by the sha1 of its content: the daemon asks the  
+(`.DS_Store`, `~$` Office locks, `Thumbs.db`, ...; see `isSyncSkipped` in `utils/task.js`) are left out. Task files go as text; every other file by the sha1 of its content: the daemon asks the  
 server which of them it does not have yet and uploads only those, so an unchanged attachment, or the same  
 file under a renamed task, is never sent twice (the server keeps them in `data/.sync-blobs/`).  
 The server merges a pushed `taskmgr.json` into its own: origins, works and repositories it  

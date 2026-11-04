@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
+import { deleteSavedRun } from "@ai/api";
 import { fileRows } from "@utils/task";
 
 const attachmentsOf = (files) => files.filter((f) => !f.isSubtask);
@@ -103,7 +104,7 @@ export default function useTaskFiles(space, rel, version) {
   const forgetRun = useCallback(
     async (folder) => {
       try {
-        await api.deleteSavedRun(space, rel, folder);
+        await deleteSavedRun(space, rel, folder);
         if (shown.current === taskKey) setRuns((prev) => prev.filter((r) => r.folder !== folder));
         return true;
       } catch (e) {

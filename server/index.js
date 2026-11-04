@@ -34,8 +34,8 @@ const {
   openFolder,
   readTasks,
   compareIdsDesc
-} = require('../utils/taskUtils');
-const { getEditor } = require('../utils/editorUtils');
+} = require('../utils/task');
+const { getEditor } = require('../utils/editor');
 const { resolveConfig, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
@@ -122,7 +122,7 @@ function resolveTaskDir(root, rel) {
 // A task folder without a task file still reads as a task (see readTaskDir).
 const taskFromDir = readTaskDir;
 
-// A task's prompt, prompt.txt beside its task.txt (PROMPT_FILE and readPrompt are in taskUtils, shared
+// A task's prompt, prompt.txt beside its task.txt (PROMPT_FILE and readPrompt are in utils/task.js, shared
 // with `tm run`): edited under the task's text in the web UI's Task panel. It is not an attachment
 // (listFiles leaves it out); GET /api/task answers it and PUT /api/task/prompt writes it.
 
@@ -318,7 +318,7 @@ function spacesBody() {
 
 // The content of a folder inside a task, as `tm push` would sync it: its entries ({ name, rel,
 // isDir, size, children for a folder }), folders first, or null when the folder is not synced
-// (larger than 10 MB or with more than 10 files, see SYNC_MAX_FOLDER_BYTES in taskUtils), so the
+// (larger than 10 MB or with more than 10 files, see SYNC_MAX_FOLDER_BYTES in utils/task.js), so the
 // web UI shows it closed. Sized and counted as push does; hidden files are not listed.
 function syncedTree(root, dirAbs) {
   let size = 0;
@@ -399,7 +399,7 @@ trimLogs(path.join(PROJECT_ROOT, 'logs'));
 const syncApp = createSyncApp({ dataDir: config.dataDir, logsDir: path.join(PROJECT_ROOT, 'logs'), token: syncToken, readConfig: config.readText, writeConfig: config.writeText });
 app.use(syncApp);
 // The runners of those machines (their taskmgrd with AI_RUNNER=1), which run Claude Code there for
-// the tasks pushed from there (see server/ai.js): the same token.
+// the tasks pushed from there (see server/ai/index.js): the same token.
 app.use(createAiRunnerApp({ auth: syncApp.auth }));
 
 app.use(express.json({ limit: '10mb' }));

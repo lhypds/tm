@@ -195,7 +195,7 @@ Write one attachment as text, as the web UI's preview edits a text file (not `ta
 AI
 --
 
-Defined in `server/ai.js`: runs of Claude Code on a task, started from the Task panel and followed in the browser, through  
+Defined in `server/ai/ai.js`: runs of Claude Code on a task, started from the Task panel and followed in the browser, through  
 the Claude Agent SDK (the runs themselves live in `ai/session.js`). A task of a folder pushed from another machine by its  
 taskmgrd (see Sync below) runs on that machine instead, through the runner of its daemon (`AI_RUNNER=1` there, see  
 [taskmgrd.md](taskmgrd.md); `ai/remote.js` keeps those runs here): the routes below serve both kinds of run alike, and such  
