@@ -313,7 +313,7 @@ function listSpaces() {
 // What every change to taskmgr.json answers with: the works and the named origins ({ origin,
 // income }, an origin possibly without works yet).
 function spacesBody() {
-  return { works: listSpaces(), origins: config.getOrigins() };
+  return { works: listSpaces(), origins: config.getOrigins(), filters: config.getFilters() };
 }
 
 // The content of a folder inside a task, as `tm push` would sync it: its entries ({ name, rel,
@@ -465,6 +465,19 @@ app.put('/api/config', (req, res) => {
   if (typeof text !== 'string') throw new HttpError(400, 'Missing text.');
   try {
     config.writeText(text);
+  } catch (e) {
+    throw new HttpError(400, e.message);
+  }
+  res.json(spacesBody());
+});
+
+// Set the list bar filters of one space (its path in the web UI) in taskmgr.json; null resets them.
+app.put('/api/filters', (req, res) => {
+  const { space, filter } = req.body || {};
+  if (typeof space !== 'string' || !space) throw new HttpError(400, 'Missing space.');
+  if (filter !== null && (!filter || typeof filter !== 'object' || Array.isArray(filter))) throw new HttpError(400, '"filter" must be an object or null.');
+  try {
+    config.setFilter(space, filter);
   } catch (e) {
     throw new HttpError(400, e.message);
   }

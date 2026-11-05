@@ -78,6 +78,10 @@ export const addRepository = ({ work, name, tasksPath, sourcePath }) => request(
 // Add a work to an origin.
 export const addWork = ({ name, origin, tasksPath, income }) => request("/api/work", json("POST", { name, origin, tasksPath, income }));
 
+// Set the list bar filters ({ month, showDone, showPending, showAbort }) of one space, by its path,
+// in taskmgr.json; null resets them.
+export const saveFilter = (space, filter) => request("/api/filters", json("PUT", { space, filter }));
+
 // Set one work's name, income ({ monthly, once }, lists of { amount, currency }; null clears it),
 // tasks folder and whether it is hidden.
 export const saveWork = (work, { name, income, hidden, tasksPath }) => request("/api/work", json("PUT", { work, name, income, hidden, tasksPath }));

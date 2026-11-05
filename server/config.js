@@ -27,7 +27,10 @@
 //           }
 //         ]
 //       }
-//     ]
+//     ],
+//     "filters": {                                // optional, the web UI's list bar filters, by space path
+//       "/o/gcc3/gcc3.com": { "month": "all", "showDone": false, "showPending": true, "showAbort": false }
+//     }
 //   }
 //
 // The older form, a top-level "works" list whose works each have an optional "origin", is still
@@ -278,6 +281,27 @@ function normalizeWork(w, at, origin, seenWorks) {
   };
 }
 
+// The web UI's list bar filters, { [space path]: { month, showDone, showPending, showAbort } }: a
+// preference, not part of the works, so an entry that is not of that form is dropped rather than
+// refused.
+function normalizeFilters(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [key, v] of Object.entries(raw)) {
+    const f = normalizeFilter(v);
+    if (f) out[key] = f;
+  }
+  return out;
+}
+
+function normalizeFilter(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const f = {};
+  if (typeof v.month === 'string') f.month = v.month;
+  for (const k of ['showDone', 'showPending', 'showAbort']) if (typeof v[k] === 'boolean') f[k] = v[k];
+  return Object.keys(f).length ? f : null;
+}
+
 // Parse and validate the text of a config file.
 function parseConfig(text, configPath) {
   let raw;
@@ -288,7 +312,7 @@ function parseConfig(text, configPath) {
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${configPath} must contain a JSON object.`);
   try {
-    return normalizeOrigins(upgradeRaw(raw).origins);
+    return { ...normalizeOrigins(upgradeRaw(raw).origins), filters: normalizeFilters(raw.filters) };
   } catch (e) {
     throw new Error(`${configPath}: ${e.message}`);
   }
@@ -335,6 +359,7 @@ function resolveConfig() {
   const getWorks = () => current().works;
   // The named origins, { origin, income }, in file order.
   const getOrigins = () => current().origins;
+  const getFilters = () => current().filters;
 
   // The config file as written, for editing in the web UI.
   function readText() {
@@ -572,8 +597,20 @@ function resolveConfig() {
     return true;
   }
 
+  // Set the list bar filters of one space (its path in the web UI); null takes it out, back to the
+  // defaults. "filters" stays in the file, even empty, so that a push of it clears the server's.
+  function setFilter(space, filter) {
+    const raw = readRaw();
+    const filters = normalizeFilters(raw.filters);
+    const f = filter === null ? null : normalizeFilter(filter);
+    if (f) filters[space] = f;
+    else delete filters[space];
+    raw.filters = filters;
+    write(raw);
+  }
+
   return {
-    configPath, port, host, dataDir, usersPath, getWorks, getOrigins, readText, writeText,
+    configPath, port, host, dataDir, usersPath, getWorks, getOrigins, getFilters, setFilter, readText, writeText,
     addOrigin, addWork, addRepository, updateWork, updateOrigin, updateRepository, removeOrigin, removeWork, removeRepository,
     moveOrigin, moveWork, moveRepository
   };

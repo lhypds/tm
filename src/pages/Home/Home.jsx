@@ -76,7 +76,9 @@ function readRunAfter() {
 
 // The list bar's filters, each space (every task, an origin, a work, a repository) with its own,
 // kept by the space's path: { [path]: { month, showDone, showPending, showAbort } }. A space not
-// filtered yet shows every task but the aborted ones.
+// filtered yet shows every task but the aborted ones. They are kept in taskmgr.json ("filters"),
+// so they follow it to another browser or machine; localStorage only has a copy for the first
+// paint, before the spaces are loaded.
 const FILTER_DEFAULTS = { month: ALL_MONTHS, showDone: true, showPending: true, showAbort: false };
 
 function readFilters() {
@@ -87,6 +89,8 @@ function readFilters() {
     return {};
   }
 }
+
+const isDefaultFilter = (f) => Object.keys(FILTER_DEFAULTS).every((k) => f[k] === FILTER_DEFAULTS[k]);
 
 // The task view: "list", or "board" (the progress view).
 function readView() {
@@ -209,7 +213,18 @@ export default function Home({ all = false }) {
   // whether the list shows done, pending and aborted tasks too (the board's aborted column too).
   const [filters, setFilters] = useState(readFilters);
   const { month, showDone, showPending, showAbort } = { ...FILTER_DEFAULTS, ...filters[spaceTo] };
-  const setFilter = (patch) => setFilters((f) => ({ ...f, [spaceTo]: { ...FILTER_DEFAULTS, ...f[spaceTo], ...patch } }));
+  const setFilter = (patch) => {
+    const next = { ...FILTER_DEFAULTS, ...filters[spaceTo], ...patch };
+    setFilters((f) => ({ ...f, [spaceTo]: next }));
+    filterSaving.current += 1;
+    api
+      .saveFilter(spaceTo, isDefaultFilter(next) ? null : next)
+      .catch((e) => showToast(e.message))
+      .finally(() => {
+        filterSaving.current -= 1;
+        filterSavedAt.current = Date.now();
+      });
+  };
   const setMonth = (v) => setFilter({ month: v });
   const setShowDone = (v) => setFilter({ showDone: v });
   const setShowPending = (v) => setFilter({ showPending: v });
@@ -252,10 +267,27 @@ export default function Home({ all = false }) {
   const treeWorks = useMemo(() => (works && !showHidden ? works.filter((w) => !w.hidden) : works), [works, showHidden]);
   const hiddenCount = (works || []).filter((w) => w.hidden).length;
 
-  // The { works, origins } every change to taskmgr.json answers with.
+  const filtersMigrated = useRef(false);
+  const filterSaving = useRef(0); // filter saves under way
+  const filterSavedAt = useRef(0); // when the last one ended
+  // The { works, origins, filters } every change to taskmgr.json answers with.
   const setSpaces = useCallback((d) => {
     setWorks(d.works);
     setOrigins(d.origins || []);
+    // Not while a filter is being saved, nor just after: a reload that started before the save
+    // would put the filter back as it was.
+    if (d.filters && !filterSaving.current && Date.now() - filterSavedAt.current > 3000) {
+      // The first time, filters only this browser has (from before they were kept in taskmgr.json)
+      // are moved there.
+      const local = !filtersMigrated.current && !Object.keys(d.filters).length ? readFilters() : {};
+      filtersMigrated.current = true;
+      const moving = Object.entries(local).filter(([, f]) => f && typeof f === "object" && !isDefaultFilter({ ...FILTER_DEFAULTS, ...f }));
+      if (moving.length) {
+        moving.reduce((p, [space, f]) => p.then(() => api.saveFilter(space, { ...FILTER_DEFAULTS, ...f })), Promise.resolve()).catch(() => {});
+      } else {
+        setFilters(d.filters);
+      }
+    }
     setWorksError("");
   }, []);
 
