@@ -1984,8 +1984,8 @@ export default function Home({ all = false }) {
 
       <ConfirmModal
         isOpen={!!removingFile}
-        title={t(removingFile?.record ? "ai.forgetTitle" : "attach.deleteTitle")}
-        message={!removingFile ? "" : removingFile.record ? t("ai.forgetConfirm", { when: formatDateTime(removingFile.record.startedAt) }) : t("attach.deleteConfirm", { name: removingFile.file.name })}
+        title={t(removingFile?.record ? "ai.forgetTitle" : removingFile?.file.isDir ? "attach.deleteFolderTitle" : "attach.deleteTitle")}
+        message={!removingFile ? "" : removingFile.record ? t("ai.forgetConfirm", { when: formatDateTime(removingFile.record.startedAt) }) : t(removingFile.file.isDir ? "attach.deleteFolderConfirm" : "attach.deleteConfirm", { name: removingFile.file.name })}
         onCancel={() => setRemovingFile(null)}
         onConfirm={confirmDeleteFile}
       />

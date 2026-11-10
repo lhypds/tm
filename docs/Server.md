@@ -189,7 +189,8 @@ Upload an attachment into the task folder `rel`. The body is the raw file (up to
 becomes `name (1).ext`, `name (2).ext`, ...; a hidden name or `task.txt` is refused. 201 `{ files }`.  
 
 `DELETE /api/file?work=&repository=&rel=`  
-Delete one attachment (not `task.txt`). `{ files }`.  
+Delete one attachment (not `task.txt`): a file, or a folder with all that is in it (not a subtask's  
+folder, a `done` / `pending` / `aborted` folder or a hidden one). `{ files }`.  
 
 `PUT /api/file` `{ work, repository, rel, text }`  
 Write one attachment as text, as the web UI's preview edits a text file (not `task.txt`; line ends become `\n`). `{ files }`.  

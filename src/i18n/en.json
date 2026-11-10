@@ -114,6 +114,8 @@
     "remove": "Remove {{name}}",
     "deleteConfirm": "Delete {{name}}?",
     "deleteTitle": "Delete file",
+    "deleteFolderConfirm": "Delete the folder {{name}} and everything in it?",
+    "deleteFolderTitle": "Delete folder",
     "uploading": "Uploading...",
     "drop": "Drop files here or",
     "choose": "choose files"
@@ -363,10 +365,8 @@
   "machines": {
     "title": "Machines",
     "prompt": "What should Claude do on the machine?",
-    "run_one": "Run on {{count}} machine",
-    "run_other": "Run on {{count}} machines",
+    "run": "Run",
     "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",
-    "where": "Claude Code runs in the home folder of each machine ticked.",
     "noRunner": "runner not connected (AI_RUNNER=1 in its .env, then start taskmgrd)",
     "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env."
   }

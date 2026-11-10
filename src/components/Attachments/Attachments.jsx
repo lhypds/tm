@@ -13,7 +13,8 @@ const NONE_OPEN = new Set();
 // any other file opens in a new tab. A folder that is synced comes with its `children` (see
 // listFiles in server/index.js) and opens and closes with the + / − at its left (`open`, the rels
 // of the folders opened, and onToggle(rel), see useTaskFiles); what is in an open one is listed
-// under it, indented, as the attachments are.
+// under it, indented, as the attachments are. Each row, a folder's too, has its × (onRemove(file),
+// which asks first; a folder goes with all that is in it).
 export default function Attachments({ className, space, files, pending = [], busy, selectedRel, open = NONE_OPEN, onToggle, onAdd, onRemove, onRemovePending, onPreview }) {
   const { t } = useTranslation();
   const inputRef = useRef(null);
@@ -78,11 +79,9 @@ export default function Attachments({ className, space, files, pending = [], bus
                   </a>
                 )}
                 <span className={`muted ${styles.fileMeta}`}>{f.isDir ? t("attach.folder") : formatSize(f.size)}</span>
-                {!f.isDir && (
-                  <button type="button" className={styles.fileRemove} onClick={() => onRemove(f)} disabled={busy} aria-label={t("attach.remove", { name: f.name })}>
-                    <XIcon />
-                  </button>
-                )}
+                <button type="button" className={styles.fileRemove} onClick={() => onRemove(f)} disabled={busy} aria-label={t("attach.remove", { name: f.name })}>
+                  <XIcon />
+                </button>
               </li>
             ))}
             {pending.map((f, i) => (
