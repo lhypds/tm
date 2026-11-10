@@ -953,9 +953,14 @@ function taskDirOfAttachment(root, abs) {
 // Delete one attachment (see taskDirOfAttachment): a file, or a folder with all that is in it. Not a
 // folder that is a subtask, holds subtasks (done / pending / aborted) or is hidden (a run's record).
 app.delete('/api/file', (req, res) => {
-  const { root } = spaceFrom(req.query);
+  const space = spaceFrom(req.query);
+  const { root } = space;
   const abs = resolveInsideRoot(root, String(req.query.rel || ''));
   const taskDir = taskDirOfAttachment(root, abs);
+  // In a pushed copy, what goes is remembered: the machines it came from still have it, and are
+  // told to delete it (see deletion in server/sync.js), or their next push would bring it back.
+  const w = isMirrored(config.dataDir, root) && config.getWorks().find(x => x.work === space.work);
+  const deleted = w ? syncApp.deletion({ origin: w.origin, work: w.work, repository: space.repository || '' }, root, abs) : () => {};
   // lstat: a link is removed as the link it is, whatever it points to
   const stat = fs.lstatSync(abs, { throwIfNoEntry: false });
   if (!stat) throw new HttpError(404, 'File not found.');
@@ -967,6 +972,7 @@ app.delete('/api/file', (req, res) => {
   } else {
     fs.unlinkSync(abs);
   }
+  deleted();
   res.json({ files: listFiles(root, taskDir) });
 });
 

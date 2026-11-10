@@ -330,7 +330,10 @@ Store one file in the blob store, `data/.sync-blobs/<sha1>`. 400 when the conten
 The server's `taskmgr.json` as it is: `{ ok, text }`. Used by `tm pull`.  
 
 `GET /api/sync/pull/space?origin=&work=&repository=`  
-A space's task folders listed like a push (what is beside them in the folder, a file right in it or a folder not named by a task id, is left out as a push leaves it out): `{ ok, entries }` with `{ path, content }` for a task file, `{ path, blob: sha1, size }` for any other file and `{ path, dir: true }` for an empty folder. 404 when the server has no tasks folder for it.  
+A space's task folders listed like a push (what is beside them in the folder, a file right in it or a folder not named by a task id, is left out as a push leaves it out): `{ ok, entries }` with `{ path, content }` for a task file, `{ path, blob: sha1, size }` for any other file and `{ path, dir: true }` for an empty folder, and `deleted`, `{ path: hash }` (`''` for a folder): the attachments deleted in the server's web UI that the pulling machine still has, which `tm pull` deletes there while they are still what was deleted. 404 when the server has no tasks folder for it.  
+
+`POST /api/sync/pull/deleted` `{ origin, work, repository, paths }`  
+The pulling machine has dealt with those deleted paths (deleted them, or did not have them). Until it says so, its pushes of a path deleted in the web UI, still as it was deleted, are left out, so the path does not come back; pushed with another content, it was changed there and is written. `{ ok }`.  
 
 `GET /api/sync/pull/file?origin=&work=&repository=&path=`  
 One file of a space, raw. Nothing on the server is changed by the pull routes, but the pulling machine counts as one  

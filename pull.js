@@ -3,7 +3,8 @@
 // every other file: attachments, files in folders), from the server taskmgrd pushes to (what `tm push`
 // sends, and only that: a file right in a tasks folder, or a folder there not named by a task id, is
 // not pulled either; see taskEntries in utils/task.js), and put them here. Nothing local is
-// deleted unless it is a task the server deleted since the last sync (see server/syncstate.js): a file or folder
+// deleted unless it is a task the server deleted since the last sync (see server/syncstate.js), or an
+// attachment deleted in the server's web UI (see pullSpace): a file or folder
 // that exists is updated when it differs, one that does not is added.
 //
 // What is here wins: nothing is pulled while a change made here since the last sync is not pushed
@@ -85,6 +86,27 @@ async function get(route, query, { raw = false, timeout = REQUEST_TIMEOUT_MS } =
     throw new Error(`${SERVER} answered ${res.status}${data.error ? `: ${data.error}` : ''}`);
   }
   return raw ? Buffer.from(await res.arrayBuffer()) : res.json();
+}
+
+// One POST of JSON, answered as JSON.
+async function post(route, body) {
+  let res;
+  try {
+    res = await fetch(`${SERVER}/api/sync/pull/${route}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'X-Machine-Id': encodeURIComponent(MACHINE_ID), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    });
+  } catch (e) {
+    const why = e.name === 'TimeoutError' ? 'no answer in time' : (e.cause && e.cause.code) || e.cause?.message || e.message;
+    throw new Error(`cannot reach ${SERVER} (${why})`);
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(`${SERVER} answered ${res.status}${data.error ? `: ${data.error}` : ''}`);
+  }
+  return res.json();
 }
 
 const sha1 = (data) => crypto.createHash('sha1').update(data).digest('hex');
@@ -195,7 +217,8 @@ async function pullSpace(s, root, stats) {
   // synced was changed meanwhile.
   const known = knownOf(key) || {};
   // The tasks only, as a push sends them: a server from before that rule lists the whole folder.
-  const entries = taskEntries((await get('space', query)).entries);
+  const answer = await get('space', query);
+  const entries = taskEntries(answer.entries);
   const onServer = syncState.manifestOf(entries);
   fs.mkdirSync(root, { recursive: true });
   // A change made here while this runs: a path no longer what was synced, gone, or new. It is left as
@@ -236,6 +259,39 @@ async function pullSpace(s, root, stats) {
     } catch (err) {
       stats.failed++;
       report(`${label(s)}: ${p}: ${err.message}`);
+    }
+  }
+
+  // An attachment deleted on the server in its web UI (a file, or a folder with all in it; `deleted`,
+  // { path: hash }, '' for a folder) is deleted here too while it is still what was deleted there:
+  // the files first, then the folders left empty, the deepest first. One changed here is left (the
+  // next push puts it back on the server). The server is then told which are dealt with, and
+  // stops leaving them out of the pushes from here (see deletion in server/sync.js).
+  const deleted = answer.deleted && typeof answer.deleted === 'object' ? answer.deleted : {};
+  const dealt = [];
+  for (const p of Object.keys(deleted).sort((a, b) => (deleted[a] === '') - (deleted[b] === '') || b.length - a.length)) {
+    try {
+      const abs = safeJoin(root, p);
+      const stat = await statOf(abs);
+      if (deleted[p] === '') {
+        if (stat && stat.isDirectory() && !fs.readdirSync(abs).length) { fs.rmdirSync(abs); stats.updated++; }
+      } else if (stat && stat.isFile()) {
+        if (await fileHash(abs, stat) !== deleted[p]) continue;
+        fs.rmSync(abs);
+        stats.updated++;
+      }
+      dealt.push(p);
+    } catch (err) {
+      stats.failed++;
+      report(`${label(s)}: ${p}: ${err.message}`);
+    }
+  }
+  if (dealt.length) {
+    try {
+      await post('deleted', { ...query, paths: dealt });
+    } catch (err) {
+      stats.failed++;
+      report(`${label(s)}: ${err.message}`);
     }
   }
 

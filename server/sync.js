@@ -54,7 +54,10 @@
 //       what `tm pull` reads: this server's taskmgr.json, a space's task folders listed like a push
 //       (task files as text, the others by sha1 and size), and one file of it. Nothing is changed,
 //       but the pulling machine (X-Machine-Id) counts as one of the space's machines, and is refused
-//       (409 TOO_MANY_MACHINES) as a push would be.
+//       (409 TOO_MANY_MACHINES) as a push would be. The space's answer also has `deleted`
+//       ({ path: hash }): what was deleted here in the web UI and that machine still has.
+//   POST /api/sync/pull/deleted  { origin, work, repository, paths }  -> { ok }
+//       the pulling machine has deleted those paths too (see "what was deleted here", below).
 //
 // Attachments go through the blob store, data/.sync-blobs/<sha1>, so that a file the server already
 // has (unchanged since the last push, or the same file under a renamed task) is never sent again:
@@ -427,10 +430,11 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
         config: typeof s.config === 'string' ? s.config : null,
         spaces: s.spaces && typeof s.spaces === 'object' ? s.spaces : {},
         blobs: s.blobs && typeof s.blobs === 'object' ? s.blobs : {},  // space key -> the blobs of its snapshot
-        machines: machinesOf(s.machines)  // space key -> the MACHINE_IDs that sync it, the first to first
+        machines: machinesOf(s.machines),  // space key -> the MACHINE_IDs that sync it, the first to first
+        deleted: s.deleted && typeof s.deleted === 'object' ? s.deleted : {}  // space key -> what was deleted here (see app.deletion)
       };
     } catch (e) {
-      return { config: null, spaces: {}, blobs: {}, machines: {} };
+      return { config: null, spaces: {}, blobs: {}, machines: {}, deleted: {} };
     }
   }
 
@@ -606,6 +610,79 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     res.json({ ok: true });
   });
 
+  // ---------- what was deleted here ----------
+  //
+  // An attachment deleted here (the web UI: a file, or a folder with all in it) is still on the
+  // machines that pushed it, and their next push would bring it back. So it is remembered, in the
+  // state: deleted[space key][path] = { hash, machines }, the path relative to the space's folder, the
+  // hash as a snapshot has it (the sha1 of a file, '' for a folder), and the machines that have not
+  // deleted it yet (the space's machines when it was deleted). Until a machine has:
+  //   - its push of that path, still as it was deleted, is left out (see withoutDeleted), so the
+  //     path stays deleted here; pushed with another content it was changed there, which wins: it
+  //     is written, and no longer remembered as deleted;
+  //   - its pull is told (GET /api/sync/pull/space, `deleted`), deletes the path there when it is
+  //     still what was deleted, and says so (POST /api/sync/pull/deleted), which ends it for that machine.
+  // A path a machine pushes after that was put there anew: written, and no longer remembered.
+
+  // To be called before `abs` (a file or a folder of the space, whose folder is `root`) is deleted
+  // here: reads what goes, and returns the function to call once it is gone, which remembers it for
+  // the machines that sync the space. Nothing is remembered for a space no machine syncs.
+  app.deletion = (space, root, abs) => {
+    const going = {};
+    const rel = (a) => path.relative(root, a).split(path.sep).join('/');
+    const walk = (a) => {
+      let stat;
+      try { stat = fs.lstatSync(a); } catch (e) { return; }
+      if (stat.isDirectory()) {
+        going[rel(a)] = '';
+        for (const name of fs.readdirSync(a)) walk(path.join(a, name));
+      } else if (stat.isFile()) {
+        try { going[rel(a)] = sha1(fs.readFileSync(a)); } catch (e) { /* not read: not remembered */ }
+      }
+    };
+    walk(abs);
+    return () => {
+      const state = readState();
+      const key = spaceKey(space);
+      const machines = state.machines[key] || [];
+      if (!machines.length || !Object.keys(going).length) return;
+      const deleted = state.deleted[key] || {};
+      for (const p of Object.keys(going)) deleted[p] = { hash: going[p], machines: [...machines] };
+      state.deleted[key] = deleted;
+      writeState(state);
+    };
+  };
+
+  // A pushed snapshot (`list`, checked entries) of the space `key` without what was deleted here and
+  // `machine` has not deleted yet (see above): { list, deleted }, `deleted` being what is still
+  // remembered for the space after this push (null: nothing). A folder left with nothing in it by
+  // that is kept, empty, as it is here.
+  function withoutDeleted(key, machine, list) {
+    const gone = readState().deleted[key] || {};
+    const deleted = { ...gone };
+    if (!Object.keys(deleted).length) return { list, deleted: null };
+    const posix = (e) => e.rel.split(path.sep).join('/');
+    const left = [];
+    const kept = list.filter(e => {
+      const p = posix(e);
+      const d = deleted[p];
+      if (!d) return true;
+      const hash = e.dir ? '' : e.blob || sha1(Buffer.from(e.content, 'utf8'));
+      if (d.machines.includes(machine) && d.hash === hash) { left.push(p); return false; }
+      delete deleted[p];  // changed there, or put there anew: what is there wins
+      return true;
+    });
+    const dirs = new Set();
+    for (const e of kept) for (let d = e.dir ? posix(e) : path.posix.dirname(posix(e)); d !== '.'; d = path.posix.dirname(d)) dirs.add(d);
+    for (const p of left) {
+      const dir = path.posix.dirname(p);
+      if (dir === '.' || dirs.has(dir) || (gone[dir] && gone[dir].hash === '' && gone[dir].machines.includes(machine))) continue;  // not a folder deleted here itself
+      dirs.add(dir);
+      kept.push({ rel: path.join(...dir.split('/')), dir: true });
+    }
+    return { list: kept, deleted: Object.keys(deleted).length ? deleted : null };
+  }
+
   app.put('/api/sync/space', json, (req, res) => {
     const { origin = '', work, repository = '', machine, entries } = req.body || {};
     if (typeof origin !== 'string' || typeof repository !== 'string') throw new SyncError(400, 'origin and repository must be strings.');
@@ -614,10 +691,13 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const list = entries.map(checkEntry);
     const key = spaceKey({ origin: origin.trim(), work: work.trim(), repository: repository.trim() });
     claim(readState(), key, machineName(machine), label({ origin, work, repository }));  // refused before anything is written
-    const { files, dirs } = writeSnapshot(dataDir, target, list);
+    const kept = withoutDeleted(key, machineName(machine), list);
+    const { files, dirs } = writeSnapshot(dataDir, target, kept.list);
     const state = readState();
+    if (kept.deleted) state.deleted[key] = kept.deleted;
+    else delete state.deleted[key];
     state.spaces[key] = sha1(JSON.stringify(entries));
-    state.blobs[key] = [...new Set(list.filter(e => e.blob).map(e => e.blob))];
+    state.blobs[key] = [...new Set(kept.list.filter(e => e.blob).map(e => e.blob))];
     claim(state, key, machineName(machine), label({ origin, work, repository }));
     writeState(state);
     pruneBlobs(state);
@@ -630,6 +710,8 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   // The folder of a space as this server's taskmgr.json has it (a copy of a pushed folder, or a folder
   // of its own), or a 404 when the config does not list it or it has no tasks folder. The pulling
   // machine is counted as one of the space's machines (see claim).
+  const spaceOf = (q) => ({ origin: String(q.origin || '').trim(), work: String(q.work || '').trim(), repository: String(q.repository || '').trim() });
+
   function rootOf(req) {
     const q = req.query;
     const { works } = parseConfig(readConfig(), 'taskmgr.json');
@@ -697,7 +779,30 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const entries = taskEntries(listed);
     entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     machineLog(req, 'info', `pulled ${label(req.query)} (${entries.length} entr${entries.length === 1 ? 'y' : 'ies'})`);
-    res.json({ ok: true, entries });
+    // What was deleted here and the pulling machine has not deleted yet (see app.deletion): { path: hash }.
+    const deleted = {};
+    const remembered = readState().deleted[spaceKey(spaceOf(req.query))] || {};
+    for (const p of Object.keys(remembered)) if (remembered[p].machines.includes(req.machine)) deleted[p] = remembered[p].hash;
+    res.json({ ok: true, entries, deleted });
+  });
+
+  // The pulling machine has dealt with these paths deleted here (deleted them there, or did not have
+  // them): they are no longer left out of its pushes, nor told to its pulls (see app.deletion).
+  app.post('/api/sync/pull/deleted', json, (req, res) => {
+    const paths = Array.isArray(req.body && req.body.paths) ? req.body.paths.filter(p => typeof p === 'string') : [];
+    const key = spaceKey(spaceOf(req.body || {}));
+    const state = readState();
+    const deleted = state.deleted[key];
+    if (deleted) {
+      for (const p of paths) {
+        if (!deleted[p]) continue;
+        deleted[p].machines = deleted[p].machines.filter(m => m !== req.machine);
+        if (!deleted[p].machines.length) delete deleted[p];
+      }
+      if (!Object.keys(deleted).length) delete state.deleted[key];
+      writeState(state);
+    }
+    res.json({ ok: true });
   });
 
   // One file of a space, raw. `path` is relative to the space's folder.
