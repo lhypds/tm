@@ -3,18 +3,20 @@ import { useEffect, useState } from "react";
 import { Checkbox, Modal } from "@ui";
 import * as api from "@utils/api";
 import IncomeFields, { useIncomeFields, readIncome } from "@components/IncomeFields";
+import ColorPicker from "@components/ColorPicker";
 import styles from "./work.module.css";
 
 // Edit one work: its name, its tasks folder, whether it is hidden from the tree, and whether it has income; if it
 // does, its income as two lists, monthly and one-time, each of amount and currency. All are written
-// into taskmgr.json; "no income" removes the income. Given an `origin` ({ origin, income }) instead,
-// it edits that origin's name and income the same way. onSaved gets the new { works, origins } and
+// into taskmgr.json; "no income" removes the income. Given an `origin` ({ origin, income, color })
+// instead, it edits that origin's name, color and income the same way. onSaved gets the new { works, origins } and
 // the new name.
 export default function WorkEditModal({ work, origin, onClose, onSaved }) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [tasksPath, setTasksPath] = useState("");
   const [hidden, setHidden] = useState(false);
+  const [color, setColor] = useState("");
   const income = useIncomeFields();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -25,6 +27,7 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
     setName(origin ? origin.origin : work.work);
     setTasksPath(origin ? "" : work.shownPath || "");
     setHidden(!origin && !!work.hidden);
+    setColor(origin?.color || "");
     reset((origin || work).income);
     setError("");
   }, [work, origin, reset]);
@@ -43,7 +46,7 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
     setSaving(true);
     try {
       const spaces = origin
-        ? await api.saveOrigin(origin.origin, { name: newName, income: read.income })
+        ? await api.saveOrigin(origin.origin, { name: newName, income: read.income, color })
         : await api.saveWork(work.work, { name: newName, income: read.income, hidden, tasksPath });
       onSaved(spaces, newName);
     } catch (e) {
@@ -79,6 +82,8 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
             {t("work.hide")}
           </Checkbox>
         )}
+
+        {origin && <ColorPicker value={color} onChange={setColor} />}
 
         <IncomeFields fields={income} />
 

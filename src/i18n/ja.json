@@ -271,6 +271,8 @@
     "deleted": "repository を削除しました"
   },
   "origin": {
+    "color": "色",
+    "noColor": "色なし",
     "edit": "origin を編集",
     "saved": "origin を保存しました",
     "added": "origin を追加しました",

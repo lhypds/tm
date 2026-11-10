@@ -209,6 +209,25 @@
   white-space: nowrap;
 }
 
+/* An origin's color, a small square right after its name: the name is only as wide as its text
+   then, and the square pushes the income and the buttons to the right end. */
+.name[data-swatch="true"] {
+  flex: 0 1 auto;
+}
+
+.swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: auto;
+  box-sizing: border-box;
+  border: var(--line) solid transparent;
+}
+
+.swatch[data-color="true"] {
+  border-color: var(--border);
+}
+
 /* Works without an origin are the roots of their own trees, so they are bold like an origin. */
 .row[data-depth="0"] .name {
   font-weight: 600;

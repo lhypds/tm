@@ -61,7 +61,7 @@ export const locateFolder = ({ name, entries }) => request("/api/folder/locate",
 // Make a space's missing tasks folder; resolves to { works, origins }.
 export const createSpaceFolder = (space) => request("/api/space/create", json("POST", sp(space)));
 
-// The works and origins: { works, origins }, origins being the named ones ({ origin, income }),
+// The works and origins: { works, origins }, origins being the named ones ({ origin, income, color }),
 // some possibly without works yet. Every change to taskmgr.json below resolves to the new ones.
 
 // The raw taskmgr.json: { configPath, text }.
@@ -70,7 +70,7 @@ export const getConfig = () => request("/api/config");
 export const saveConfig = (text) => request("/api/config", json("PUT", { text }));
 
 // Add an origin, with no works yet.
-export const addOrigin = ({ name, income }) => request("/api/origin", json("POST", { name, income }));
+export const addOrigin = ({ name, income, color }) => request("/api/origin", json("POST", { name, income, color }));
 
 // Add a repository to a work; its tasks folder is created when missing.
 export const addRepository = ({ work, name, tasksPath, sourcePath }) => request("/api/repository", json("POST", { work, name, tasksPath, sourcePath }));
@@ -86,8 +86,8 @@ export const saveFilter = (space, filter) => request("/api/filters", json("PUT",
 // tasks folder and whether it is hidden.
 export const saveWork = (work, { name, income, hidden, tasksPath }) => request("/api/work", json("PUT", { work, name, income, hidden, tasksPath }));
 
-// Set one origin's name and income, as saveWork does for a work.
-export const saveOrigin = (origin, { name, income }) => request("/api/origin", json("PUT", { origin, name, income }));
+// Set one origin's name, income and color ("" for none), as saveWork does for a work.
+export const saveOrigin = (origin, { name, income, color }) => request("/api/origin", json("PUT", { origin, name, income, color }));
 
 // Set one repository's name, source folder and tasks folder (either may be "", not both).
 export const saveRepository = (work, name, { newName, sourcePath, tasksPath }) =>

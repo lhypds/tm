@@ -7,6 +7,7 @@ import { Checkbox } from "@ui";
 import * as api from "@utils/api";
 import { formatIncome, formatIncomeShort } from "@utils/income";
 import { groupWorksByOrigin } from "@utils/works";
+import { lightColor } from "@utils/colors";
 import { useWheelScroll } from "@utils/keys";
 import { TASKS_DRAG_TYPE } from "@utils/task";
 import styles from "./tree.module.css";
@@ -30,14 +31,17 @@ function RowButton({ label, onClick, children }) {
 }
 
 // The name line of a row: the name, then its income in short (in 万) at the right end, which the
-// buttons replace while the row is hovered.
-function Top({ label, income, actions }) {
+// buttons replace while the row is hovered. With a `color` (an origin's; "" for none, which is
+// transparent) a small square of its light tint, as a task's from tag has, sits right after the name.
+function Top({ label, income, actions, color }) {
   const { t } = useTranslation();
+  const swatch = color !== undefined;
   return (
     <div className={styles.top}>
-      <span className={styles.name} title={label}>
+      <span className={styles.name} data-swatch={swatch} title={label}>
         {label}
       </span>
+      {swatch && <span className={styles.swatch} data-color={!!color} style={{ background: lightColor(color) || "transparent" }} aria-hidden="true" />}
       {income && (
         <span className={styles.income} title={formatIncome(income, t)}>
           {formatIncomeShort(income)}
@@ -106,10 +110,10 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
   );
 }
 
-// An origin's name (and income) at the top of its tree; choosing it (`to`) shows every task of its
+// An origin's name (with its color's square, and income) at the top of its tree; choosing it (`to`) shows every task of its
 // works. "All origins" above the trees is one too, for every task. `rest` goes on the element, as
 // for a Row.
-function Origin({ name, to, active, focused, income, actions, onSelect, ...rest }) {
+function Origin({ name, to, active, focused, income, color, actions, onSelect, ...rest }) {
   const ref = useRef(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
@@ -127,7 +131,7 @@ function Origin({ name, to, active, focused, income, actions, onSelect, ...rest 
       {...pointerFocus}
       {...rest}
     >
-      <Top label={name} income={income} actions={actions} />
+      <Top label={name} income={income} color={color} actions={actions} />
     </div>
   );
 }
@@ -422,6 +426,7 @@ export default function SpaceTree({
                     <Origin
                       name={g.origin}
                       to={api.originPath(g.origin)}
+                      color={g.color || ""}
                       income={g.income}
                       active={activeTo === api.originPath(g.origin)}
                       focused={focused}
@@ -433,7 +438,7 @@ export default function SpaceTree({
                           </RowButton>
                           <RowButton
                             label={t("origin.edit")}
-                            onClick={() => onEditOrigin({ origin: g.origin, income: g.income })}
+                            onClick={() => onEditOrigin({ origin: g.origin, income: g.income, color: g.color })}
                           >
                             <EditIcon />
                           </RowButton>

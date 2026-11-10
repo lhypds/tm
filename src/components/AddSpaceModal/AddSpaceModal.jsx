@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "@ui";
 import * as api from "@utils/api";
 import IncomeFields, { useIncomeFields, readIncome } from "@components/IncomeFields";
+import ColorPicker from "@components/ColorPicker";
 import styles from "./add.module.css";
 
 const TYPES = ["origin", "work", "repository"];
@@ -10,7 +11,7 @@ const TYPES = ["origin", "work", "repository"];
 // Add an origin, a work or a repository to taskmgr.json, chosen at the top. `add` is what to start
 // with: { type, origin } (a work, into that origin) or { type, work } (a repository, into that
 // work), and may come with a `name`, a work with a `tasksPath`, a repository with a `sourcePath` (a
-// folder dropped on the tree). An origin has a name and income; a work an origin, name, tasks folder and income; a
+// folder dropped on the tree). An origin has a name, color and income; a work an origin, name, tasks folder and income; a
 // repository a work, name, source folder and tasks folder (one of them at least; the tasks folder
 // defaults to the source folder's "tasks"). onSaved gets the new
 // { works, origins } and what was added ({ type, name, origin, work }).
@@ -22,6 +23,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
   const [name, setName] = useState("");
   const [tasksPath, setTasksPath] = useState("");
   const [sourcePath, setSourcePath] = useState("");
+  const [color, setColor] = useState("");
   const income = useIncomeFields();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
     setName(add.name || "");
     setTasksPath(add.tasksPath || "");
     setSourcePath(add.sourcePath || "");
+    setColor("");
     reset(null);
     setError("");
     // the lists are only read when the modal opens
@@ -52,7 +55,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
     try {
       const spaces =
         type === "origin"
-          ? await api.addOrigin({ name: newName, income: read.income })
+          ? await api.addOrigin({ name: newName, income: read.income, color })
           : type === "work"
             ? await api.addWork({ name: newName, origin, tasksPath, income: read.income })
             : await api.addRepository({ work, name: newName, tasksPath, sourcePath });
@@ -140,6 +143,8 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
             </label>
           </>
         )}
+
+        {type === "origin" && <ColorPicker value={color} onChange={setColor} />}
 
         {type !== "repository" && <IncomeFields fields={income} />}
 

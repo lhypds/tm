@@ -8,6 +8,7 @@
 //       {
 //         "origin": "gcc3",                       // "" or left out for works without an origin
 //         "income": { "monthly": [...] },         // optional, what the origin pays besides its works
+//         "color": "#93c5fd",                     // optional, "#rrggbb": the origin's square in the tree and its tasks' tags
 //         "works": [
 //           {
 //             "work": "gcc3.com",
@@ -148,6 +149,13 @@ function normalizeIncome(income, reward) {
   return value.monthly.length || value.once.length ? value : null;
 }
 
+// Validate an origin's color and return it as lowercase "#rrggbb", or "" when it has none.
+function normalizeColor(color) {
+  if (color === undefined || color === null || color === '') return '';
+  if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color.trim())) throw new Error('must be a color like "#93c5fd".');
+  return color.trim().toLowerCase();
+}
+
 // The raw config in the "origins" form: an older top-level "works" list is grouped by each work's
 // "origin", in the order each origin first appears, with works without one in a last group.
 function toOrigins(raw) {
@@ -211,7 +219,13 @@ function normalizeOrigins(raw) {
       throw new Error(`origins[${i}].income${origin ? ` ("${origin}")` : ''}: ${e.message}`);
     }
     if (originIncome && !origin) throw new Error(`origins[${i}]: only an origin with a name can have an income.`);
-    if (origin) origins.push({ origin, income: originIncome });
+    let color;
+    try {
+      color = normalizeColor(g.color);
+    } catch (e) {
+      throw new Error(`origins[${i}].color${origin ? ` ("${origin}")` : ''}: ${e.message}`);
+    }
+    if (origin) origins.push({ origin, income: originIncome, color });
     const list = g.works === undefined ? [] : g.works;
     if (!Array.isArray(list)) throw new Error(`origins[${i}].works${origin ? ` ("${origin}")` : ''} must be an array.`);
     list.forEach((w, j) => works.push(normalizeWork(w, `origins[${i}].works[${j}]`, origin, seenWorks)));
@@ -357,7 +371,7 @@ function resolveConfig() {
     return cached;
   }
   const getWorks = () => current().works;
-  // The named origins, { origin, income }, in file order.
+  // The named origins, { origin, income, color }, in file order.
   const getOrigins = () => current().origins;
   const getFilters = () => current().filters;
 
@@ -447,26 +461,42 @@ function resolveConfig() {
     write(raw);
   }
 
-  // Set one origin's name and income ({ monthly, once }; null removes it), like updateWork.
-  function updateOrigin(origin, { name, income }) {
+  // The origin entry with its color set ("" or null removes it, undefined leaves it), placed after
+  // the name.
+  function withColor(g, color) {
+    if (color === undefined) return g;
+    const value = normalizeColor(color);
+    const out = {};
+    for (const [k, v] of Object.entries(g)) {
+      if (k === 'color') continue;
+      out[k] = v;
+      if (k === 'origin' && value) out.color = value;
+    }
+    if (value && !out.color) out.color = value;
+    return out;
+  }
+
+  // Set one origin's name, income ({ monthly, once }; null removes it) and, when given, its color
+  // ("#rrggbb"; "" removes it), like updateWork.
+  function updateOrigin(origin, { name, income, color }) {
     const raw = readRaw();
     const g = origin && findRawOrigin(raw, origin, false);
     if (!g) throw new Error(`No origin named "${origin}".`);
     const newName = name.trim();
     if (!newName) throw new Error('The name must not be empty.');
     g.origin = newName;
-    raw.origins[raw.origins.indexOf(g)] = withIncome(g, income, 'origin');
+    raw.origins[raw.origins.indexOf(g)] = withIncome(withColor(g, color), income, 'origin');
     write(raw);
   }
 
   // Add an origin with no works yet, after the named ones.
-  function addOrigin({ name, income }) {
+  function addOrigin({ name, income, color }) {
     const raw = readRaw();
     const origin = name.trim();
     if (!origin) throw new Error('The name must not be empty.');
     if (findRawOrigin(raw, origin, false)) throw new Error(`Duplicate origin "${origin}".`);
     const g = findRawOrigin(raw, origin, true);
-    raw.origins[raw.origins.indexOf(g)] = withIncome(g, income, 'origin');
+    raw.origins[raw.origins.indexOf(g)] = withIncome(withColor(g, color), income, 'origin');
     write(raw);
   }
 

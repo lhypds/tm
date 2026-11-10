@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import * as api from "@utils/api";
 import TreeLines from "@components/TreeLines";
 import { TASKS_DRAG_TYPE, describe, formatStamp } from "@utils/task";
+import { lightColor } from "@utils/colors";
 import styles from "./tasklist.module.css";
 
 // The status box: a tick for done, a "p" for pending, an "a" for aborted, empty for todo.
@@ -18,7 +19,8 @@ function DoneBox({ checked, pending, aborted, onChange, title }) {
   );
 }
 
-// Where a task is from: its repository (or work) name, a link to that space. A long name is cut
+// Where a task is from: its repository (or work) name, a link to that space, on a light tint of its
+// origin's color (`fromColor`; none without one). A long name is cut
 // short with an ellipsis, and the whole work / repository path shows on hover. Clicking it must not
 // select (or, doubled, preview) the row around it.
 export function FromTag({ task }) {
@@ -28,6 +30,7 @@ export function FromTag({ task }) {
   return (
     <Link
       className={`tag ${styles.from}`}
+      style={task.fromColor ? { background: lightColor(task.fromColor) } : undefined}
       to={api.spacePath(origin, work, repository)}
       title={task.from}
       onClick={stop}

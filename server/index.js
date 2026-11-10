@@ -311,7 +311,7 @@ function listSpaces() {
 }
 
 // What every change to taskmgr.json answers with: the works and the named origins ({ origin,
-// income }, an origin possibly without works yet).
+// income, color }, an origin possibly without works yet).
 function spacesBody() {
   return { works: listSpaces(), origins: config.getOrigins(), filters: config.getFilters() };
 }
@@ -511,12 +511,13 @@ app.put('/api/work', (req, res) => {
   res.json(spacesBody());
 });
 
-// Set the name and income (null clears it) of one origin in taskmgr.json.
+// Set the name, income (null clears it) and, when given, the color ("" clears it) of one origin in
+// taskmgr.json.
 app.put('/api/origin', (req, res) => {
-  const { origin, name, income } = req.body || {};
+  const { origin, name, income, color } = req.body || {};
   if (typeof origin !== 'string' || typeof name !== 'string' || income === undefined) throw new HttpError(400, 'Missing origin, name or income.');
   try {
-    config.updateOrigin(origin, { name, income });
+    config.updateOrigin(origin, { name, income, color });
   } catch (e) {
     throw new HttpError(400, e.message);
   }
@@ -573,10 +574,10 @@ app.delete('/api/repository', (req, res) => {
 
 // Add an origin (with no works yet) to taskmgr.json.
 app.post('/api/origin', (req, res) => {
-  const { name, income = null } = req.body || {};
+  const { name, income = null, color } = req.body || {};
   if (typeof name !== 'string') throw new HttpError(400, 'Missing name.');
   try {
-    config.addOrigin({ name, income });
+    config.addOrigin({ name, income, color });
   } catch (e) {
     throw new HttpError(400, e.message);
   }

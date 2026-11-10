@@ -155,7 +155,7 @@ export default function Home({ all = false }) {
   );
 
   const [works, setWorks] = useState(null);
-  const [origins, setOrigins] = useState([]); // the named origins, { origin, income }, some maybe without works
+  const [origins, setOrigins] = useState([]); // the named origins, { origin, income, color }, some maybe without works
   const [worksError, setWorksError] = useState("");
   const [treeOpen, setTreeOpen] = useState(() => !isNarrow() && readFlag("panel.tree", true));
   const [detailOpen, setDetailOpen] = useState(() => !isNarrow() && readFlag("panel.detail", true));
@@ -204,7 +204,7 @@ export default function Home({ all = false }) {
   const [configOpen, setConfigOpen] = useState(false);
   const [editingWork, setEditingWork] = useState(null); // work whose name and income are being edited
   const [adding, setAdding] = useState(null); // what the add modal starts with: { type, origin, work }
-  const [editingOrigin, setEditingOrigin] = useState(null); // { origin, income } of the origin being edited
+  const [editingOrigin, setEditingOrigin] = useState(null); // { origin, income, color } of the origin being edited
   const [editingRepository, setEditingRepository] = useState(null); // { work, name, paths } of the repository being edited
   const [removing, setRemoving] = useState(null); // { origin } or { work, repository? } to remove from taskmgr.json
   const [showHidden, setShowHidden] = useState(() => readFlag("tree.showHidden", false)); // the tree shows hidden works too
@@ -425,18 +425,20 @@ export default function Home({ all = false }) {
         const path = !scope ? [] : scope.work ? [s.repository].filter(Boolean) : [s.work, s.repository].filter(Boolean);
         const from = path.join(" / ");
         const fromParts = path.slice(-1);
+        const fromColor = origins.find((o) => o.origin === s.origin)?.color || "";
         const decorate = (task) => ({
           ...task,
           space: s,
           key: keyOf(s, task.rel),
           from,
           fromParts,
+          fromColor,
           subtaskCount: (task.subtasks || []).length, // all of them, whatever a filter keeps (the board's subtasks button)
           subtasks: (task.subtasks || []).map(decorate),
         });
         return decorate(t);
       }),
-    [data.tasks, space, scope, works],
+    [data.tasks, space, scope, works, origins],
   );
   const tasks = useMemo(() => flattenTasks(tree), [tree]);
 

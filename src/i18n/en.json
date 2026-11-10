@@ -271,6 +271,8 @@
     "deleted": "Repository deleted"
   },
   "origin": {
+    "color": "Color",
+    "noColor": "No color",
     "edit": "Edit origin",
     "saved": "Origin saved",
     "added": "Origin added",

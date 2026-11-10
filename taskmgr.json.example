@@ -2,6 +2,7 @@
   "origins": [
     {
       "origin": "gcc3",
+      "color": "#93c5fd",
       "works": [
         {
           "work": "taskmgr",
