@@ -8,7 +8,7 @@ import { duration } from "../duration";
 import styles from "./machines.module.css";
 
 const REFRESH_MS = 5000; // how often the machines are asked for while the dialog is open
-const RUNS_SHOWN = 5; // the latest runs listed of a machine
+const RUNS_SHOWN = 5; // the latest runs listed under a machine
 const PICKED_KEY = "machines.picked"; // the names of the machines ticked, kept for the next time
 
 function readPicked() {
@@ -21,11 +21,10 @@ function readPicked() {
 }
 
 // The machines Claude Code can be run on from here, opened from the header: the machines that sync
-// with this server (GET /api/ai/machines, asked again every few seconds while open), side by side,
-// each with its dot and a tick to pick it once its runner is connected (AI_RUNNER=1 in its taskmgrd;
-// said in its tooltip when not), and under them the latest runs started from here, of every machine
-// in one list: when, what was asked, where and how it goes, a click showing the run
-// (onOpenRun(run)). Above them the prompt, below the run button: it starts Claude Code
+// with this server (GET /api/ai/machines, asked again every few seconds while open), each with its
+// dot, a tick to pick it once its runner is connected (AI_RUNNER=1 in its taskmgrd; said when not),
+// and under it its latest runs started from here: when, what was asked and how it goes, a click
+// showing the run (onOpenRun(run)). Above them the prompt and the run button: it starts Claude Code
 // with that prompt on every machine ticked (onRun(machine, prompt), resolving to the run, or null
 // when refused), on no task, in the home folder there (⌘ / ctrl + enter runs too). One machine
 // started: its run is shown at once. `runs` is every run the server has, by id (see useRuns); the
@@ -78,16 +77,16 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
     }
   };
 
-  // The runs started from here, newest first: the latest few of each machine listed, in one list.
-  const latest = useMemo(() => {
+  // The runs started from here, newest first, by machine.
+  const runsOf = useMemo(() => {
     const by = {};
     for (const r of Object.values(runs || {})) {
       if (!r.task?.free || !r.machine) continue;
       (by[r.machine] ||= []).push(r);
     }
-    const shown = (machines || []).flatMap((m) => (by[m.name] || []).sort((a, b) => b.startedAt - a.startedAt).slice(0, RUNS_SHOWN));
-    return shown.sort((a, b) => b.startedAt - a.startedAt);
-  }, [runs, machines]);
+    for (const list of Object.values(by)) list.sort((a, b) => b.startedAt - a.startedAt);
+    return by;
+  }, [runs]);
 
   const stateOf = (r) =>
     r.status === "queued"
@@ -140,39 +139,37 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
         {machines?.length > 0 && (
           <ul className={styles.machines}>
             {machines.map((m) => (
-              <li key={m.name} className={styles.machine} data-ready={m.runner} title={m.runner ? undefined : t("machines.noRunner")}>
-                <Checkbox checked={isPicked(m)} disabled={!m.runner} onChange={(on) => toggle(m, on)}>
-                  <span className={styles.name}>{m.name}</span>
-                </Checkbox>
-                <MachineDot machine={m} />
+              <li key={m.name} className={styles.machine} data-ready={m.runner}>
+                <div className={styles.row}>
+                  <Checkbox checked={isPicked(m)} disabled={!m.runner} onChange={(on) => toggle(m, on)}>
+                    <span className={styles.name}>{m.name}</span>
+                  </Checkbox>
+                  <MachineDot machine={m} />
+                  {!m.runner && <span className={`muted ${styles.note}`}>{t("machines.noRunner")}</span>}
+                </div>
+                {(runsOf[m.name] || []).slice(0, RUNS_SHOWN).map((r) => (
+                  <div key={r.id} className={styles.run}>
+                    <span className={`muted ${styles.when}`}>{formatDateTime(r.startedAt)}</span>
+                    <button
+                      type="button"
+                      className={styles.runTitle}
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.currentTarget.blur();
+                        onOpenRun(r);
+                      }}
+                      title={r.task.title}
+                    >
+                      {r.task.title}
+                    </button>
+                    <span className={`muted ${styles.state}`} data-pending={!!r.pending} title={r.error || ""}>
+                      {stateOf(r)}
+                    </span>
+                  </div>
+                ))}
               </li>
             ))}
           </ul>
-        )}
-
-        {latest.length > 0 && (
-          <div className={styles.runs}>
-            {latest.map((r) => (
-              <div key={r.id} className={styles.run}>
-                <span className={`muted ${styles.when}`}>{formatDateTime(r.startedAt)}</span>
-                <button
-                  type="button"
-                  className={styles.runTitle}
-                  tabIndex={-1}
-                  onClick={(e) => {
-                    e.currentTarget.blur();
-                    onOpenRun(r);
-                  }}
-                  title={r.task.title}
-                >
-                  {r.task.title}
-                </button>
-                <span className={`muted ${styles.state}`} data-pending={!!r.pending} title={r.error || ""}>
-                  {r.status === "queued" ? stateOf(r) : `${r.machine} · ${stateOf(r)}`}
-                </span>
-              </div>
-            ))}
-          </div>
         )}
 
         <div className={styles.actions}>

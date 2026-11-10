@@ -1,5 +1,5 @@
-/* The Machines dialog (see MachinesModal): the prompt, the machines under it side by side, the
-   latest runs, and the run button at the bottom right. */
+/* The Machines dialog (see MachinesModal): the prompt, the machines under it in a faint frame, as
+   the runs under a task's prompt are (RunList), and the run button at the bottom right. */
 .modal {
   max-width: 560px;
   width: 100%;
@@ -26,18 +26,27 @@
   line-height: 1.5;
 }
 
-/* The machines, side by side (onto more lines when they do not fit): each its tick and name, then
-   its dot. One that cannot be picked is greyed, and its tooltip says why. */
 .machines {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 10px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: var(--line) solid var(--soft-line);
 }
 
 .machine {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* A machine: its tick and name, its dot, and why it cannot be picked when it cannot. */
+.row {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -54,24 +63,22 @@
   color: var(--muted);
 }
 
-/* The latest runs, in a faint frame as the runs under a task's prompt are (RunList). A run: when,
-   what was asked (a link, as a run's time is under a task's prompt) and, at the right end, where
-   and how it goes. */
-.runs {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px;
-  max-height: 40vh;
-  overflow-y: auto;
-  border: var(--line) solid var(--soft-line);
+.note {
+  margin-left: 8px;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* A run of the machine, under it, indented to the name: when, what was asked (a link, as a run's
+   time is under a task's prompt) and how it goes at the right end. */
 .run {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding-left: 18px;
 }
 
 .when {
