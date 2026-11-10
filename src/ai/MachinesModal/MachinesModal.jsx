@@ -121,6 +121,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
         <TextArea
           ref={promptRef}
           value={prompt}
+          className={styles.prompt}
           minHeight={80}
           placeholder={t("machines.prompt")}
           aria-label={t("machines.prompt")}

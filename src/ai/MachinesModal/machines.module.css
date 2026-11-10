@@ -11,6 +11,11 @@
   gap: 12px;
 }
 
+/* The prompt: tall enough for a few lines to begin with; its handle makes it taller or shorter. */
+.prompt {
+  height: 200px;
+}
+
 .error {
   color: var(--err);
   line-height: 1.5;
