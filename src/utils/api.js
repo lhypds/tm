@@ -123,6 +123,9 @@ export const getTask = (space, rel) => request(`/api/task?${q({ ...sp(space), re
 // they are after the write (prompt null when there is no file).
 export const saveTaskPrompt = (space, rel, text) => request("/api/task/prompt", json("PUT", { ...sp(space), rel, text }));
 
+// Remove the task's prompt.txt (a prompt emptied). Resolves to { prompt, files } as saveTaskPrompt does.
+export const deleteTaskPrompt = (space, rel) => request(`/api/task/prompt?${q({ ...sp(space), rel })}`, { method: "DELETE" });
+
 export const updateTask = (space, rel, fields) => request("/api/task", json("PUT", { ...sp(space), rel, ...fields }));
 
 // The raw task file, as the terminal's editor sees it.

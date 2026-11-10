@@ -25,7 +25,8 @@ const AUTOSAVE_MS = 800;
 
 // A text (task.txt, or prompt.txt) in a textarea, caret at the end. A blur saves (onSave(text), when
 // it changed) and ends the edit, and so does esc; cmd/ctrl+s saves and keeps editing. With
-// `autosave` (the prompt), it is also saved by itself once the typing rests (onSave(text, true)).
+// `autosave` (the prompt), it is also saved by itself once the typing rests (onSave(text, true)), and a blank text is not
+// saved over a blank one (nothing was typed; over a prompt that had a text, it deletes the file).
 function Editor({ value, placeholder, textRef, autosave, onSave, onEndEdit }) {
   const [draft, setDraft] = useState(value);
   const sent = useRef(null); // the text last saved, not to save it twice
@@ -41,6 +42,7 @@ function Editor({ value, placeholder, textRef, autosave, onSave, onEndEdit }) {
     clearTimeout(timer.current);
     timer.current = null;
     if (draft === (sent.current ?? value)) return;
+    if (autosave && !draft.trim() && !(sent.current ?? value).trim()) return; // a prompt, nothing typed
     sent.current = draft;
     onSave(draft, auto);
   };

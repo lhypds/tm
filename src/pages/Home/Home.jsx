@@ -657,7 +657,7 @@ export default function Home({ all = false }) {
   // the prompt there, each on its own (and kept across sessions, as the panes are); hidden, the
   // keyboard is back on the task's text (in the preview only when it was on the prompt: a file
   // chosen there, or nothing yet, stays). Opening it makes the task's prompt.txt, blank, when it has
-  // none (see makePrompt); nothing deletes it after.
+  // none (see makePrompt); emptying a prompt that had a text deletes it (see savePrompt).
   function showPrompt(open) {
     setPromptOpen(open);
     if (open) makePrompt(attachments);
@@ -689,12 +689,12 @@ export default function Home({ all = false }) {
   const detailSection = selectedFile || pickedRecord ? null : promptOpen ? section : "task";
 
   // The prompt edited under the task's text, in the panel or the preview, its prompt.txt: typing
-  // overwrites the file, a blank one too (see useTaskFiles.savePrompt). `hook` is the
+  // overwrites the file, and a text emptied (blank) deletes it (see useTaskFiles.savePrompt). `hook` is the
   // editor's useTaskFiles; the folder is re-read after, so the other one shows the new prompt too.
   // `auto`: saved by itself as the typing rested, which goes without the "Saved" toast. Resolves to
   // whether it was saved.
   async function savePrompt(hook, task, text, auto = false) {
-    if (!(await hook.savePrompt(text))) return false;
+    if (!(await hook.savePrompt(text.trim() ? text : null))) return false;
     setLoads((n) => n + 1);
     if (!auto) showToast(t("toast.saved"));
     return true;

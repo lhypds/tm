@@ -156,6 +156,9 @@ record's name) and `saved: true`.
 `PUT /api/task/prompt` `{ work, repository?, rel, text }`  
 Write the task's `prompt.txt` as typed, overwriting it; a blank `text` too. `{ prompt, files }` as they are after it.  
 
+`DELETE /api/task/prompt?work=&repository=&rel=`  
+Remove the task's `prompt.txt`; fine when it has none. `{ prompt, files }` as they are after it (`prompt` is `null`).  
+
 `PUT /api/task` `{ work, repository?, rel, details?, status? }`  
 Set a task's details and status; the folder is renamed after the first line and moved by the status. `{ task }`.  
 

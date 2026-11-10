@@ -15,7 +15,7 @@ import styles from "./panel.module.css";
 // onDelete(task) asks before deleting. The brain (onTogglePrompt) shows and hides the task's prompt, its
 // prompt.txt (`promptOpen`): the text is then split in two, the prompt under a divider that says
 // "Prompt". Opening it makes the file (blank) when the task has none; onSavePrompt(task, text)
-// overwrites it as typed, and nothing deletes it.
+// overwrites it as typed, and deletes it when its text is emptied.
 // The divider also carries the run button (RunButton), greyed out until the task has a prompt, or
 // while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
 // text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
@@ -271,9 +271,10 @@ const PROMPT_SAVE_MS = 800;
 
 // The task's prompt.txt under its text, edited the same way: saved on blur, cmd/ctrl+s and esc, and
 // by itself once the typing rests (PROMPT_SAVE_MS after the last key; onSave(task, text, true), the
-// third argument saying it is such a save, which goes without a word).
+// third argument saying it is such a save, which goes without a word). A blank text is not saved
+// over a blank prompt (nothing was typed); over one that had a text, it deletes the file.
 // `prompt` is the saved text, null for no file and undefined until the folder is read (the text is
-// empty until then, and takes what is read). A blank prompt leaves no file (see useTaskFiles).
+// empty until then, and takes what is read).
 // While the prompt is `lastPrompt`, the prompt.txt the latest run (`lastRun`, its id or its record's
 // folder) was given, going or over, it is carried out: the text is empty with the prompt as its placeholder, greyed, and
 // the file stays as it is when nothing is typed. Tab in the empty text takes the placeholder in as
@@ -313,7 +314,8 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
     clearTimeout(timer.current);
     timer.current = null;
     if (draft === saved || draft === sent.current) return;
-    const text = draft;
+    if (!draft.trim() && !saved.trim()) return; // nothing typed
+    const text = draft.trim() ? draft : ""; // emptied: the file goes (prompt null, read as "")
     sent.current = text;
     Promise.resolve(onSave(task, text, auto)).then((ok) => {
       if (ok === false && sent.current === text) sent.current = null; // not saved: to be tried again

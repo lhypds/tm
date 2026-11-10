@@ -124,7 +124,7 @@ const taskFromDir = readTaskDir;
 
 // A task's prompt, prompt.txt beside its task.txt (PROMPT_FILE and readPrompt are in utils/task.js, shared
 // with `tm run`): edited under the task's text in the web UI's Task panel. It is not an attachment
-// (listFiles leaves it out); GET /api/task answers it and PUT /api/task/prompt writes it.
+// (listFiles leaves it out); GET /api/task answers it, PUT /api/task/prompt writes it and DELETE /api/task/prompt removes it.
 
 // Write a task's prompt.txt as typed, overwriting it; a blank text too (the web UI makes the file,
 // blank, as the prompt is opened), so the file stays once made.
@@ -793,6 +793,14 @@ app.put('/api/task/prompt', (req, res) => {
   const taskDir = resolveTaskDir(root, body.rel);
   if (typeof body.text !== 'string') throw new HttpError(400, 'Missing text.');
   writePrompt(taskDir, body.text.replace(/\r\n/g, '\n'));
+  res.json({ prompt: readPrompt(taskDir), files: listFiles(root, taskDir) });
+});
+
+// Remove a task's prompt.txt (the web UI does when a prompt is emptied); fine when there is none.
+app.delete('/api/task/prompt', (req, res) => {
+  const { root } = spaceFrom(req.query);
+  const taskDir = resolveTaskDir(root, String(req.query.rel || ''));
+  fs.rmSync(path.join(taskDir, PROMPT_FILE), { force: true });
   res.json({ prompt: readPrompt(taskDir), files: listFiles(root, taskDir) });
 });
 
