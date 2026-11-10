@@ -411,35 +411,41 @@ export default function Home({ all = false }) {
   // in all of them. The whole work / repository path is kept for the hover title and search. The
   // tasks are a tree (each with its subtasks, which live in the same space); `tree` keeps that
   // shape, `tasks` is every task as a row under its parent, in the list's order.
-  const tree = useMemo(
-    () =>
-      // A task of one space has no space of its own to show on an origin's page (which can only
-      // happen with a list that is not this path's), so it is left out.
-      data.tasks.flatMap((t) => {
-        const s =
-          t.work !== undefined
-            ? { origin: (works || []).find((item) => item.work === t.work)?.origin || "", work: t.work, repository: t.repository }
-            : space;
-        if (!s) return [];
-        // On a work's page (which has the origin in its path too) a task is from its repository only.
-        const path = !scope ? [] : scope.work ? [s.repository].filter(Boolean) : [s.work, s.repository].filter(Boolean);
-        const from = path.join(" / ");
-        const fromParts = path.slice(-1);
-        const fromColor = origins.find((o) => o.origin === s.origin)?.color || "";
-        const decorate = (task) => ({
-          ...task,
-          space: s,
-          key: keyOf(s, task.rel),
-          from,
-          fromParts,
-          fromColor,
-          subtaskCount: (task.subtasks || []).length, // all of them, whatever a filter keeps (the board's subtasks button)
-          subtasks: (task.subtasks || []).map(decorate),
-        });
-        return decorate(t);
-      }),
-    [data.tasks, space, scope, works, origins],
-  );
+  const tree = useMemo(() => {
+    // A task of one space has no space of its own to show on an origin's page (which can only
+    // happen with a list that is not this path's), so it is left out.
+    const list = data.tasks.flatMap((t) => {
+      const s =
+        t.work !== undefined
+          ? { origin: (works || []).find((item) => item.work === t.work)?.origin || "", work: t.work, repository: t.repository }
+          : space;
+      if (!s) return [];
+      // On a work's page (which has the origin in its path too) a task is from its repository only.
+      const path = !scope ? [] : scope.work ? [s.repository].filter(Boolean) : [s.work, s.repository].filter(Boolean);
+      const from = path.join(" / ");
+      const fromParts = path.slice(-1);
+      const fromColor = origins.find((o) => o.origin === s.origin)?.color || "";
+      const decorate = (task) => ({
+        ...task,
+        space: s,
+        key: keyOf(s, task.rel),
+        from,
+        fromParts,
+        fromColor,
+        subtaskCount: (task.subtasks || []).length, // all of them, whatever a filter keeps (the board's subtasks button)
+        subtasks: (task.subtasks || []).map(decorate),
+      });
+      return decorate(t);
+    });
+    // In the list of every origin's tasks, those of one origin are together: the origins in the
+    // tree's order (the tasks of works without one last), each one's tasks in the list's order.
+    if (!scope?.all) return list;
+    const rank = (t) => {
+      const i = origins.findIndex((o) => o.origin === t.space.origin);
+      return i < 0 ? origins.length : i;
+    };
+    return [...list].sort((a, b) => rank(a) - rank(b));
+  }, [data.tasks, space, scope, works, origins]);
   const tasks = useMemo(() => flattenTasks(tree), [tree]);
 
   // The time filter's entries (all, last / this week, then the months, this one first); a month
