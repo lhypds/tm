@@ -266,7 +266,12 @@ function TaskText({ task, textRef, focus, onFocused, onFocus, onSave }) {
   );
 }
 
-// The task's prompt.txt under its text, edited the same way: saved on blur, cmd/ctrl+s and esc.
+// How long the typing on a prompt rests before it is saved by itself.
+const PROMPT_SAVE_MS = 800;
+
+// The task's prompt.txt under its text, edited the same way: saved on blur, cmd/ctrl+s and esc, and
+// by itself once the typing rests (PROMPT_SAVE_MS after the last key; onSave(task, text, true), the
+// third argument saying it is such a save, which goes without a word).
 // `prompt` is the saved text, null for no file and undefined until the folder is read (the text is
 // empty until then, and takes what is read). A blank prompt leaves no file (see useTaskFiles).
 // While the prompt is `lastPrompt`, the prompt.txt the latest run (`lastRun`, its id or its record's
@@ -280,6 +285,7 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
   const saved = ran ? "" : prompt ?? ""; // the file as the text shows it
   const [draft, setDraft] = useState(saved);
   const sent = useRef(null); // the text last saved, until the folder is re-read with it
+  const timer = useRef(null); // the save waiting for the typing to rest
 
   useEffect(() => {
     const el = textRef.current;
@@ -290,18 +296,49 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
   }, [focus, onFocused, textRef]);
 
   // Take the read or reloaded text unless it was typed on since saving; a new run greys it again.
+  // The answer to a save older than the last one sent is passed over: the last one's is coming.
   useEffect(() => {
     if (prompt === undefined) return;
-    setTaken(false);
-    const shown = ranOf(prompt) ? "" : prompt ?? "";
+    if (sent.current !== null && (prompt ?? "") !== sent.current) return;
+    // a save of one's own leaves the text as typed, also when it is the prompt that ran
+    if (sent.current === null) setTaken(false);
+    else if (ranOf(prompt)) setTaken(true);
+    const shown = sent.current === null && ranOf(prompt) ? "" : prompt ?? "";
     setDraft((d) => (sent.current === null || d === sent.current ? shown : d));
     sent.current = null;
   }, [prompt, lastPrompt, lastRun]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function save() {
+  // `auto`: the save is the timer's, not asked for.
+  function save(auto = false) {
+    clearTimeout(timer.current);
+    timer.current = null;
     if (draft === saved || draft === sent.current) return;
-    sent.current = draft;
-    onSave(task, draft);
+    const text = draft;
+    sent.current = text;
+    Promise.resolve(onSave(task, text, auto)).then((ok) => {
+      if (ok === false && sent.current === text) sent.current = null; // not saved: to be tried again
+    });
+  }
+
+  // The save as of the last render, for the timer and for leaving with one waiting.
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    if (timer.current === null) return; // nothing typed since the last save
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => saveRef.current(true), PROMPT_SAVE_MS);
+  }, [draft]);
+  useEffect(
+    () => () => {
+      if (timer.current !== null) saveRef.current(true);
+    },
+    [],
+  );
+
+  // Typed: the text, and a save once it rests.
+  function type(text) {
+    if (timer.current === null) timer.current = 0; // armed by the effect, once the draft is in
+    setDraft(text);
   }
 
   return (
@@ -310,9 +347,9 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
       className={styles.text}
       value={draft}
       placeholder={ran ? prompt : undefined}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => type(e.target.value)}
       onFocus={onFocus}
-      onBlur={save}
+      onBlur={() => save()}
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "s") {
           e.preventDefault();

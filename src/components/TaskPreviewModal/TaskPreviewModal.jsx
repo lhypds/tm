@@ -20,10 +20,16 @@ function previewText(details) {
     .join("\n");
 }
 
+// How long the typing on a prompt rests before it is saved by itself (as in the Task panel).
+const AUTOSAVE_MS = 800;
+
 // A text (task.txt, or prompt.txt) in a textarea, caret at the end. A blur saves (onSave(text), when
-// it changed) and ends the edit, and so does esc; cmd/ctrl+s saves and keeps editing.
-function Editor({ value, placeholder, textRef, onSave, onEndEdit }) {
+// it changed) and ends the edit, and so does esc; cmd/ctrl+s saves and keeps editing. With
+// `autosave` (the prompt), it is also saved by itself once the typing rests (onSave(text, true)).
+function Editor({ value, placeholder, textRef, autosave, onSave, onEndEdit }) {
   const [draft, setDraft] = useState(value);
+  const sent = useRef(null); // the text last saved, not to save it twice
+  const timer = useRef(null); // the save waiting for the typing to rest
 
   useEffect(() => {
     const el = textRef.current;
@@ -31,9 +37,28 @@ function Editor({ value, placeholder, textRef, onSave, onEndEdit }) {
     el.setSelectionRange(el.value.length, el.value.length);
   }, [textRef]);
 
-  const save = () => {
-    if (draft !== value) onSave(draft);
+  const save = (auto = false) => {
+    clearTimeout(timer.current);
+    timer.current = null;
+    if (draft === (sent.current ?? value)) return;
+    sent.current = draft;
+    onSave(draft, auto);
   };
+
+  // The save as of the last render, for the timer and for leaving with one waiting.
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    if (timer.current === null) return; // nothing typed since the last save
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => saveRef.current(true), AUTOSAVE_MS);
+  }, [draft]);
+  useEffect(
+    () => () => {
+      if (timer.current !== null) saveRef.current(true);
+    },
+    [],
+  );
 
   return (
     <textarea
@@ -41,7 +66,10 @@ function Editor({ value, placeholder, textRef, onSave, onEndEdit }) {
       className={styles.text}
       value={draft}
       placeholder={placeholder}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(e) => {
+        if (autosave && timer.current === null) timer.current = 0; // armed by the effect, once the draft is in
+        setDraft(e.target.value);
+      }}
       onBlur={() => {
         save();
         onEndEdit();
@@ -158,7 +186,8 @@ export default function TaskPreviewModal({
                 key={`prompt:${task.key}`}
                 value={prompt ?? ""}
                 textRef={textRef}
-                onSave={(text) => onSavePrompt(task, text)}
+                autosave
+                onSave={(text, auto) => onSavePrompt(task, text, auto)}
                 onEndEdit={onEndEdit}
               />
             ) : (

@@ -691,10 +691,13 @@ export default function Home({ all = false }) {
   // The prompt edited under the task's text, in the panel or the preview, its prompt.txt: typing
   // overwrites the file, a blank one too (see useTaskFiles.savePrompt). `hook` is the
   // editor's useTaskFiles; the folder is re-read after, so the other one shows the new prompt too.
-  async function savePrompt(hook, task, text) {
-    if (!(await hook.savePrompt(text))) return;
+  // `auto`: saved by itself as the typing rested, which goes without the "Saved" toast. Resolves to
+  // whether it was saved.
+  async function savePrompt(hook, task, text, auto = false) {
+    if (!(await hook.savePrompt(text))) return false;
     setLoads((n) => n + 1);
-    showToast(t("toast.saved"));
+    if (!auto) showToast(t("toast.saved"));
+    return true;
   }
   const openFile = (file, task = selected) => {
     if (previewKind(file.name)) setPreview({ ...file, space: task.space });
@@ -1726,7 +1729,7 @@ export default function Home({ all = false }) {
               onTogglePrompt={() => showPrompt(!promptOpen)}
               section={detailSection}
               onSection={selectSection}
-              onSavePrompt={(task, text) => savePrompt(attachments, task, text)}
+              onSavePrompt={(task, text, auto) => savePrompt(attachments, task, text, auto)}
               run={selectedRun}
               noRunner={noRunner}
               onRun={openRun}
@@ -1880,7 +1883,7 @@ export default function Home({ all = false }) {
         onEdit={setPeekEditing}
         onEndEdit={() => setPeekEditing(null)}
         onSave={saveText}
-        onSavePrompt={(task, text) => savePrompt(peekAttachments, task, text)}
+        onSavePrompt={(task, text, auto) => savePrompt(peekAttachments, task, text, auto)}
         onOpenFile={(file) => openFile(file, peek)}
         onOpenFolder={openFolder}
         onDelete={setConfirm}
