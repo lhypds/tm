@@ -1,8 +1,8 @@
 /* The Machines dialog (see MachinesModal): the prompt, the machines under it in a faint frame, as
-   the runs under a task's prompt are (RunList), and the run button at the bottom right. */
+   the runs under a task's prompt are (RunList), and the run button at the bottom right. Its width
+   is the Modal's (92% of the screen, so that on a phone it keeps clear of the edges), up to 560px. */
 .modal {
   max-width: 560px;
-  width: 100%;
 }
 
 .body {
