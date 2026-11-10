@@ -2,7 +2,7 @@
 // pushes from taskmgrd (server/sync.js), a task of a pushed copy is run where its tasks, the source
 // code and the claude login are: on the machine that pushed it, by its taskmgrd (ai/runner.js, with
 // AI_RUNNER=1 in its .env). That runner keeps one connection open here (GET /api/sync/ai/commands in
-// server/ai/ai.js) and gets the browsers' commands over it: run, answer, stop, forget (command). What
+// server/ai/ai.js) and gets the browsers' commands over it: run, prompt, answer, stop, forget (command). What
 // its runs do comes back as the events of its own session (ai/session.js: snapshot, run, item, delta,
 // remove; POST /api/sync/ai/events, see receive) and is kept here, run by run, so the browsers see
 // those runs as they see the runs of this machine: the same events (subscribe), the same shape
@@ -14,6 +14,9 @@
 // in time. Everything is in memory: a restart forgets the runs, and each runner sends them again
 // (its snapshot) when it connects.
 const crypto = require('crypto');
+
+const { PROMPT_FILE } = require('../utils/task');
+const { FREE_KEY, TITLE_MAX } = require('./session');
 
 const ACK_MS = 15 * 1000;   // how long a machine has to acknowledge a command
 
@@ -64,6 +67,9 @@ const notConnected = (machine) => httpError(409, `Claude Code runs on ${machine}
 
 // Whether the runner of `machine` is connected (and so can be given a run).
 const isConnected = (machine) => machines.has(machine);
+
+// The machines whose runner is connected now, by name: [{ name, since }], `since` when (ms) it connected.
+const connected = () => [...machines].map(([name, c]) => ({ name, since: c.since })).sort((a, b) => a.name.localeCompare(b.name));
 
 // The runner of `machine` has connected: `send(command)` writes a command to it, `close()` ends the
 // connection. Returns the way to say it is gone. A second connection of the same machine replaces
@@ -146,13 +152,29 @@ async function startRun({ machine, task, taskDir, files, after = null }) {
   for (const r of runs.values()) {
     if (r.task.key === task.key && (r.status === 'running' || r.status === 'queued')) throw httpError(409, 'Claude Code is already running on this task.');
   }
+  const id = newId();
+  return queue({ id, machine, task, taskDir, after, files }, { type: 'run', run: id, work: task.work, repository: task.repository, rel: task.rel, files, after });
+}
+
+// Ask `machine` to run Claude Code with `prompt` as it is, on no task, in its user's home folder (the
+// web UI's Machines dialog; see session.startPrompt, whose run this one is shaped as while queued).
+async function startPrompt({ machine, prompt }) {
+  if (!machines.has(machine)) throw notConnected(machine);
+  const text = String(prompt || '').trim();
+  if (!text) throw httpError(400, 'Missing prompt.');
+  const id = newId();
+  const first = text.split(/\r?\n/)[0].trim();
+  const task = { work: '', repository: '', rel: '', id: '', title: first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX)}...` : first, key: `${FREE_KEY}${id}`, free: true };
+  return queue({ id, machine, task, taskDir: null, after: null, files: { [PROMPT_FILE]: text } }, { type: 'prompt', run: id, prompt: text });
+}
+
+// A run asked of its machine with `cmd`: here as `queued` until the machine starts it, forgotten when
+// it refuses (the refusal is thrown). `init` is { id, machine, task, taskDir, after, files }.
+async function queue(init, cmd) {
+  const { machine } = init;
   const run = {
-    id: newId(),
-    machine,
-    task,
+    ...init,
     cwd: null,
-    taskDir,
-    after,
     status: 'queued',
     startedAt: Date.now(),
     endedAt: null,
@@ -162,13 +184,12 @@ async function startRun({ machine, task, taskDir, files, after = null }) {
     sessionId: null,
     cost: null,
     billed: false,
-    files,
     items: []
   };
   runs.set(run.id, run);
   emit('run', publicRun(run));
   try {
-    await command(machine, { type: 'run', run: run.id, work: task.work, repository: task.repository, rel: task.rel, files, after });
+    await command(machine, cmd);
   } catch (e) {
     if (runs.get(run.id) === run && run.status === 'queued') {
       runs.delete(run.id);
@@ -275,4 +296,4 @@ function receive(machine, events) {
   }
 }
 
-module.exports = { subscribe, listRuns, publicRun, has, isConnected, connect, receive, startRun, answerRun, stopRun, forgetRecord };
+module.exports = { subscribe, listRuns, publicRun, has, isConnected, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord };

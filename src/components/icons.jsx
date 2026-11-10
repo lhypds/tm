@@ -195,6 +195,17 @@ export function PieIcon({ className }) {
   );
 }
 
+// Machines (the computers Claude Code can be run on): a screen on its stand.
+export function MonitorIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="4" width="18" height="12" rx="1" />
+      <line x1="8" y1="20" x2="16" y2="20" />
+      <line x1="12" y1="16" x2="12" y2="20" />
+    </Icon>
+  );
+}
+
 // Run (Claude Code on a task): a play triangle.
 export function PlayIcon({ className }) {
   return (

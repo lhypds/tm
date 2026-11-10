@@ -1,0 +1,112 @@
+/* The Machines dialog (see MachinesModal): the prompt, the machines under it in a faint frame, as
+   the runs under a task's prompt are (RunList), and the run button at the bottom right. */
+.modal {
+  max-width: 560px;
+  width: 100%;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.error {
+  color: var(--err);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.hint {
+  line-height: 1.5;
+}
+
+.machines {
+  list-style: none;
+  margin: 0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: var(--line) solid var(--soft-line);
+}
+
+.machine {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* A machine: its tick and name, its dot, and why it cannot be picked when it cannot. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.machine[data-ready="false"] .name {
+  color: var(--muted);
+}
+
+.note {
+  margin-left: 8px;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A run of the machine, under it, indented to the name: when, what was asked (a link, as a run's
+   time is under a task's prompt) and how it goes at the right end. */
+.run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 18px;
+}
+
+.when {
+  flex: none;
+  font-size: 10px;
+}
+
+.runTitle {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state {
+  flex: none;
+  margin-left: auto;
+  font-size: 10px;
+}
+
+.state[data-pending="true"] {
+  color: var(--warn);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}

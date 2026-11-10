@@ -6,6 +6,9 @@
 //   POST   /api/ai/run               { work, repository?, rel, after? }: start Claude Code on that task; 201 { run }.
 //                                    `after` ("push" or "pr") is what Claude is told to do with its changes
 //                                    once done: commit and push, or a new branch and a pull request (see ai/task.js)
+//   GET    /api/ai/machines          the machines Claude Code can be run on from here: { machines }
+//   POST   /api/ai/machine/run       { machine, prompt }: start Claude Code on that machine with the prompt as
+//                                    it is, on no task, in its user's home folder; 201 { run }
 //   POST   /api/ai/runs/:id/answer   { pending, decision } or { pending, answers }: answer the run's question; { run }
 //   POST   /api/ai/runs/:id/stop     stop the run; { run }
 //   GET    /api/ai/saved/:folder     ?work&repository&rel: a run's record in the task folder (see ai/record.js); { run }
@@ -20,7 +23,8 @@
 // its taskmgrd (server/sync.js) runs on that machine, where the tasks, the source code and the claude
 // login are, through its runner (ai/runner.js; ai/remote.js keeps those runs here): the run says so
 // in `machine`, is `queued` until the machine starts it, and needs the machine's runner connected
-// (409 otherwise). A run that is over is kept in the task folder by the machine that ran it (ai/record.js;
+// (409 otherwise). A machine whose runner is connected can also be given a prompt of its own, on no
+// task (the Machines dialog): such a run has `task.free`, no task folder and so no record. A run that is over is kept in the task folder by the machine that ran it (ai/record.js;
 // GET /api/task lists a task's records), and comes here with the task when it is pushed; removing a
 // record of a pushed copy goes through that machine too. The runner's own routes, with the sync token
 // rather than a login (createAiRunnerApp):
@@ -66,8 +70,9 @@ function eventStream(req, res, onClose) {
 // `locate(space)` says where a space's tasks are: { remote, machine }, `remote` whether the folder is
 // a copy pushed from another machine and `machine` that machine as the web UI shows it ({ name,
 // online, runner }, see index.js), null when unknown. `machine` is this machine's name, for the records
-// of its runs (MACHINE_ID; the hostname when not given).
-function createAiApp({ config, logFile, machine, locate = () => ({ remote: false, machine: null }) }) {
+// of its runs (MACHINE_ID; the hostname when not given). `machines()` lists the machines that sync with
+// this server, [{ name, seenAt, online }] (server/sync.js allMachines), for GET /api/ai/machines.
+function createAiApp({ config, logFile, machine, locate = () => ({ remote: false, machine: null }), machines = () => [] }) {
   session.configure({ logFile, machine });
   const app = express.Router();
 
@@ -117,6 +122,26 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     try { text = fs.readFileSync(path.join(taskDir, TASK_FILE), 'utf8'); } catch (e) { /* a bare folder: the title stands */ }
     const files = { [TASK_FILE]: text, [PROMPT_FILE]: readPrompt(taskDir) };
     const run = await remote.startRun({ machine: where.machine.name, task, taskDir, files, after });
+    res.status(201).json({ run: remote.publicRun(run, true) });
+  });
+
+  // The machines Claude Code can be run on from here: those that sync with this server and those whose
+  // runner is connected, by name, each { name, seenAt, online, runner } as GET /api/spaces says a
+  // machine (`runner`: connected, so it can be given a prompt; in touch then).
+  app.get('/api/ai/machines', (req, res) => {
+    const byName = new Map(machines().map(m => [m.name, { ...m, runner: false }]));
+    for (const c of remote.connected()) {
+      byName.set(c.name, { name: c.name, seenAt: null, ...byName.get(c.name), online: true, runner: true });
+    }
+    res.json({ machines: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)) });
+  });
+
+  app.post('/api/ai/machine/run', async (req, res) => {
+    const body = req.body || {};
+    const name = String(body.machine || '');
+    if (!name) throw httpError(400, 'Missing machine.');
+    if (typeof body.prompt !== 'string' || !body.prompt.trim()) throw httpError(400, 'Missing prompt.');
+    const run = await remote.startPrompt({ machine: name, prompt: body.prompt });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 

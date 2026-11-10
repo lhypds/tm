@@ -15,6 +15,10 @@
 // into the task folder, as .claude_<time>/ (see ai/record.js), which goes with the task wherever it is
 // synced and is what the web UI shows of it from then on. What claude writes to stderr goes to logs/ai.log.
 //
+// A run need not be on a task: startPrompt runs a prompt typed in the web UI's Machines dialog as it
+// is, in the home folder of this machine's user, to work on the machine itself. Such a run has no
+// task folder, so it leaves no record: it is in memory only, with the others.
+//
 // AI_PERMISSION_MODE in .env picks the permission mode of a run: acceptEdits unless set; `default`
 // asks for edits too, `plan` has Claude plan first (the plan is asked about in the browser, as a
 // permission for ExitPlanMode), `auto` lets a classifier decide, `bypassPermissions` asks nothing
@@ -33,6 +37,8 @@ const record = require('./record');
 const RUNS_KEPT = 20;          // finished runs kept, oldest dropped first
 const RESULT_MAX = 4000;       // characters of a tool result kept in the transcript
 const SUMMARY_MAX = 4000;      // characters of a tool call's summary (a command, a plan, ...)
+const TITLE_MAX = 80;          // characters of a prompt's first line kept as the title of its run
+const FREE_KEY = '~prompt/';   // what the key of a run on no task begins with, then its id: no task's key does
 
 // Tools that are a question to the user rather than a call: shown as what they ask (see ask).
 const ASKED_TOOLS = ['AskUserQuestion', 'ExitPlanMode'];
@@ -176,13 +182,45 @@ function startRun({ space, taskDir, taskRef, id = null, after = null }) {
   } catch (e) {
     throw httpError(400, e.message);
   }
-  const run = {
+  return begin({
     id: id || newId(),
     key,
     task: { ...taskRef, id: d.task.id, title: d.title, key },
     cwd: d.cwd,
     taskDir,
     after: d.after,    // "push", "pr" or null: what Claude was told to do with its changes after
+    files: { [TASK_FILE]: readText(path.join(taskDir, TASK_FILE)), [PROMPT_FILE]: d.prompt },  // the task's own files as they are, for the record
+    input: d.text      // the first prompt claude was given, for the record
+  });
+}
+
+// Start Claude Code on this machine with `prompt` as it is, on no task (the web UI's Machines dialog):
+// in `cwd`, the user's home folder unless given. The run is shaped as a task's, for the browser to
+// follow alike: its `task` is { free: true, title (the prompt's first line), key }, with no work, no
+// rel and no id, its `taskDir` null, and its `files` the prompt, as a prompt.txt. `id` as in startRun.
+function startPrompt({ prompt, id = null, cwd = os.homedir() }) {
+  const text = String(prompt || '').trim();
+  if (!text) throw httpError(400, 'Missing prompt.');
+  if (id && runs.has(id)) throw httpError(409, `There is a run ${id} already.`);
+  id = id || newId();
+  const key = `${FREE_KEY}${id}`;
+  return begin({
+    id,
+    key,
+    task: { work: '', repository: '', rel: '', id: '', title: clip(text.split(/\r?\n/)[0].trim(), TITLE_MAX), key, free: true },
+    cwd,
+    taskDir: null,
+    after: null,
+    files: { [PROMPT_FILE]: text },
+    input: text
+  });
+}
+
+// The run begins: `init` is what tells one run from another (see startRun, startPrompt), `input` in
+// it the first prompt for claude.
+function begin(init) {
+  const run = {
+    ...init,
     status: 'running',
     startedAt: Date.now(),
     endedAt: null,
@@ -195,21 +233,19 @@ function startRun({ space, taskDir, taskRef, id = null, after = null }) {
     billed: false,     // whether that is paid: Claude Code used with an API key, not a claude.ai login
     abort: new AbortController(),
     text: null,        // the index of the text item being streamed, while one is
-    done: null,        // resolves the input stream, which ends the session, when the run is over
-    files: { [TASK_FILE]: readText(path.join(taskDir, TASK_FILE)), [PROMPT_FILE]: d.prompt },  // the task's own files as they are, for the record
-    input: d.text      // the first prompt claude was given, for the record
+    done: null         // resolves the input stream, which ends the session, when the run is over
   };
   runs.set(run.id, run);
   prune();
   emit('run', publicRun(run));
-  log(run, `start: ${run.task.id} ${run.task.title} in ${run.cwd} (${permissionMode()}${run.after ? `, after: ${run.after}` : ''})`);
-  loop(run, d.text).catch(e => log(run, `loop: ${e.stack || e.message}`));
+  log(run, `start: ${run.task.free ? 'prompt' : run.task.id} ${run.task.title} in ${run.cwd} (${permissionMode()}${run.after ? `, after: ${run.after}` : ''})`);
+  loop(run, run.input).catch(e => log(run, `loop: ${e.stack || e.message}`));
   return run;
 }
 
 // The run is over: its pending question (if any) refused, its status and end set, the run written
-// into the task folder (see ai/record.js) and then everyone told, so a browser that re-reads the
-// folder on the news finds the record there.
+// into the task folder (see ai/record.js; a run on no task has none, and no record) and then everyone
+// told, so a browser that re-reads the folder on the news finds the record there.
 function end(run, status, error = null) {
   if (run.status !== 'running') return;
   if (run.pending) run.pending.settle({ cancelled: true }, { behavior: 'deny', message: 'The run was stopped.' });
@@ -217,12 +253,14 @@ function end(run, status, error = null) {
   run.endedAt = Date.now();
   run.error = error;
   log(run, `end: ${status}${error ? ` (${error})` : ''}`);
-  try {
-    const { files, ...pub } = publicRun(run, true);  // the files go beside run.json, not in it
-    const folder = record.saveRun(run.taskDir, { ...pub, input: run.input, machine }, files);
-    log(run, `recorded in ${folder}`);
-  } catch (e) {
-    log(run, `cannot record the run: ${e.message}`);
+  if (run.taskDir) {
+    try {
+      const { files, ...pub } = publicRun(run, true);  // the files go beside run.json, not in it
+      const folder = record.saveRun(run.taskDir, { ...pub, input: run.input, machine }, files);
+      log(run, `recorded in ${folder}`);
+    } catch (e) {
+      log(run, `cannot record the run: ${e.message}`);
+    }
   }
   emit('run', publicRun(run));
   if (run.done) run.done();
@@ -253,14 +291,14 @@ async function loop(run, prompt) {
     prompt: input(),
     options: {
       cwd: run.cwd,
-      additionalDirectories: samePath(run.cwd, run.taskDir) ? [] : [run.taskDir],
+      additionalDirectories: !run.taskDir || samePath(run.cwd, run.taskDir) ? [] : [run.taskDir],
       permissionMode: mode,
       ...(mode === 'bypassPermissions' ? { allowDangerouslySkipPermissions: true } : {}),
       canUseTool: (name, toolInput, opts) => ask(run, name, toolInput, opts),
       abortController: run.abort,
       includePartialMessages: true,
       systemPrompt: { type: 'preset', preset: 'claude_code' },
-      title: `tm ${run.task.id} ${run.task.title}`,
+      title: `tm ${[run.task.id, run.task.title].filter(Boolean).join(' ')}`,
       stderr: (data) => log(run, `claude: ${data}`)
     }
   });
@@ -422,4 +460,4 @@ function stopRun(id) {
   return run;
 }
 
-module.exports = { configure, subscribe, listRuns, publicRun, startRun, answerRun, stopRun, summarizeTool };
+module.exports = { configure, subscribe, listRuns, publicRun, startRun, startPrompt, answerRun, stopRun, summarizeTool, FREE_KEY, TITLE_MAX };

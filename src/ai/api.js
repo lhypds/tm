@@ -11,6 +11,15 @@ export const runEventsUrl = "/api/ai/events";
 // work is done: "push" (commit and push), "pr" (a new branch, a commit and a pull request) or null.
 export const startRun = (space, rel, after = null) => request("/api/ai/run", json("POST", { ...sp(space), rel, ...(after ? { after } : {}) }));
 
+// The machines Claude Code can be run on from here (those that sync with this server): { machines:
+// [{ name, seenAt, online, runner }] }, `runner` whether the machine's runner is connected, so it can
+// be given a prompt.
+export const getMachines = () => request("/api/ai/machines");
+
+// Start Claude Code on `machine` with `prompt` as it is, on no task, in the home folder there;
+// resolves to { run } with its transcript (409 when the machine's runner is not connected).
+export const startMachineRun = (machine, prompt) => request("/api/ai/machine/run", json("POST", { machine, prompt }));
+
 // Answer the run's pending question `pending`: { decision: "allow" | "deny" } for a permission,
 // { answers: { "<question>": "<answer>" } } for a question. { run }.
 export const answerRun = (id, pending, body) => request(`/api/ai/runs/${encodeURIComponent(id)}/answer`, json("POST", { pending, ...body }));

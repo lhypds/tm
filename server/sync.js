@@ -736,6 +736,16 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     return { name, seenAt, online: !!seenAt && Date.now() - seenAt < ONLINE_MS };
   });
 
+  // Every machine that syncs a space here, or made a request since the server started, by name, as
+  // machinesInfo says one: [{ name, seenAt, online }].
+  app.allMachines = () => {
+    const names = new Set([...Object.values(readState().machines).flat(), ...seen.keys()]);
+    return [...names].sort((x, y) => x.localeCompare(y)).map(name => {
+      const seenAt = seen.get(name) || null;
+      return { name, seenAt, online: !!seenAt && Date.now() - seenAt < ONLINE_MS };
+    });
+  };
+
   // Forget the hashes of the pushed snapshots, so the next push sends every space whole: to be called
   // when the tasks are changed here (the web UI), which leaves the copies no longer what was pushed.
   // The blobs each space refers to are kept, so none is uploaded again.

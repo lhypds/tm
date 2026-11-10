@@ -359,5 +359,15 @@
     "forget": "删除 {{when}} 的运行记录",
     "forgetConfirm": "删除 {{when}} 的运行记录？",
     "forgetTitle": "删除运行记录"
+  },
+  "machines": {
+    "title": "机器",
+    "prompt": "让 Claude 在这台机器上做什么？",
+    "run_one": "在 {{count}} 台机器上运行",
+    "run_other": "在 {{count}} 台机器上运行",
+    "runHint": "用这个 prompt 在勾选的机器上运行 Claude Code（⌘ / ctrl + enter）",
+    "where": "Claude Code 在每台勾选机器的 home 目录下运行。",
+    "noRunner": "runner 未连接（在它的 .env 里设 AI_RUNNER=1 并启动 taskmgrd）",
+    "none": "还没有机器与这台服务器同步：在一台机器上启动 taskmgrd，并在 .env 里设 AI_RUNNER=1。"
   }
 }

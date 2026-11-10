@@ -43,6 +43,15 @@
   background: var(--bg-hover);
 }
 
+.check[data-disabled="true"] {
+  cursor: default;
+}
+
+.check[data-disabled="true"] .box {
+  background: var(--bg);
+  opacity: 0.4;
+}
+
 
 .input:checked + .box::before {
   opacity: 1;

@@ -238,6 +238,18 @@ that machine's runner, with the task's `task.txt` and `prompt.txt` as they are h
 they differ), and answered once the machine has started it (201) or refused (its error and status); 409 when the machine's  
 runner is not connected, or the folder was pushed without a machine id; 504 when the machine does not answer in 15 seconds.  
 
+`GET /api/ai/machines`  
+The machines Claude Code can be run on from here: `{ machines: [{ name, seenAt, online, runner }] }`, as `GET /api/spaces`  
+says a machine, for every machine that syncs a space with this server, made a request since it started, or has its  
+runner connected (`runner`), sorted by name.  
+
+`POST /api/ai/machine/run` `{ machine, prompt }`  
+Start Claude Code on that machine with the prompt as it is, on no task, in the home folder of its user (the web UI's  
+Machines dialog). 201 `{ run }`, with its transcript: a run as above whose `task` is `{ work: "", repository: "", rel: "",  
+id: "", title, key, free: true }` (`title` the prompt's first line, `key` `~prompt/<run id>`), `taskDir` `null` and `files`  
+`{ "prompt.txt": <the prompt> }`. It is followed, answered and stopped as any run; having no task folder, it leaves no  
+record. 400 without a prompt, 409 when the machine's runner is not connected, 504 when it does not answer in 15 seconds.  
+
 `POST /api/ai/runs/:id/answer` `{ pending, decision }` or `{ pending, answers }`  
 Answer the run's pending question `pending` (its id): `decision` `allow` or `deny` for a permission, `answers` for a  
 question, an object from each question's text to the answer (the label picked, several joined by `, `, or a text of one's  
@@ -267,7 +279,7 @@ one), so a runner connected counts as its machine being in touch:
 `GET /api/sync/ai/commands`  
 The commands for that machine, live: a `text/event-stream` of `command` events, each `{ id, type, ... }`: `run` `{ run, work,  
 repository, rel, files }` (start Claude Code on that task as run `run`, `files` being `{ "task.txt": text, "prompt.txt": text | null }`  
-as the server has them), `answer` `{ run, pending, body }`, `stop` `{ run }` and `forget` `{ work, repository, rel, folder }`  
+as the server has them), `prompt` `{ run, prompt }` (start Claude Code with that prompt on no task, as run `run`), `answer` `{ run, pending, body }`, `stop` `{ run }` and `forget` `{ work, repository, rel, folder }`  
 (remove that run record from the task folder there), with a comment every 25 seconds to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
 
 `POST /api/sync/ai/events` `{ events }`  

@@ -979,7 +979,8 @@ app.use(createAiApp({
   config,
   logFile: path.join(PROJECT_ROOT, 'logs', 'ai.log'),
   machine: String(process.env.MACHINE_ID || '').trim() || undefined,
-  locate: (space) => ({ remote: isMirrored(config.dataDir, space.root), machine: machineOf(space) })
+  locate: (space) => ({ remote: isMirrored(config.dataDir, space.root), machine: machineOf(space) }),
+  machines: () => syncApp.allMachines()
 }));
 
 app.use('/api', (req, res) => { throw new HttpError(404, 'Unknown API route.'); });

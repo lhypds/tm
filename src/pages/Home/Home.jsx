@@ -30,6 +30,7 @@ import {
   PieIcon,
   ListIcon,
   BoardIcon,
+  MonitorIcon,
 } from "@components/icons";
 import { BOARD_STATUSES, boardStatus } from "@components/TaskBoard";
 import { showToast, Checkbox } from "@ui";
@@ -39,7 +40,7 @@ import { ALL_MONTHS, inPeriod, taskMonths, monthLabel, previewKind, flattenTasks
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
-import { RunModal, useRuns } from "@ai";
+import { RunModal, MachinesModal, useRuns } from "@ai";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -585,6 +586,22 @@ export default function Home({ all = false }) {
     setRunPromptRel(null);
     setLoads((n) => n + 1); // whatever the run left in the task folder (its record, its files) shows now
   };
+  // The Machines dialog, opened from the header: a prompt run on the machines that sync with this
+  // server, on no task (see MachinesModal). A run picked there, or just started, shows in a run
+  // dialog of its own, in front of it (`machineRunId`), under a stand-in for the task it has not.
+  const [machinesOpen, setMachinesOpen] = useState(false);
+  const [machineRunId, setMachineRunId] = useState(null);
+  const [machineRunFile, setMachineRunFile] = useState(null); // its prompt, previewed from that dialog
+  const machineRun = machineRunId ? ai.runs[machineRunId] || null : null;
+  const machineRunTask = useMemo(
+    () => (machineRun ? { key: machineRun.task.key, title: machineRun.task.title, rel: "", space: null } : null),
+    [machineRun?.task.key, machineRun?.task.title], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const machinesBusy = Object.values(ai.runs).some((r) => r.task?.free && isGoing(r)); // a dot on the header's button meanwhile
+  const closeMachineRun = () => {
+    setMachineRunId(null);
+    setMachineRunFile(null);
+  };
   const [fileRel, setFileRel] = useState(null);
   // the panel's file list as shown, folders and what is in the open ones included (see fileRows)
   const fileList = attachments.rows;
@@ -1094,7 +1111,7 @@ export default function Home({ all = false }) {
       if (e.defaultPrevented || e.repeat || (e.code !== "KeyC" && e.key.toLowerCase() !== "c")) return;
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || isTyping(e)) return;
       if (!selected || window.getSelection?.()?.toString()) return;
-      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || analysisOpen || runKey !== null || command !== null) return;
+      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || analysisOpen || machinesOpen || runKey !== null || command !== null) return;
       e.preventDefault();
       const id = runId(selected);
       copyText(id).then((ok) => {
@@ -1136,6 +1153,7 @@ export default function Home({ all = false }) {
       adding ||
       editingRepository ||
       analysisOpen ||
+      machinesOpen ||
       command !== null
     )
       return false;
@@ -1573,6 +1591,19 @@ export default function Home({ all = false }) {
           >
             <PieIcon />
           </button>
+          <button
+            type="button"
+            className="btn"
+            data-dot={machinesBusy}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              setMachinesOpen(true);
+            }}
+            title={t("machines.title")}
+            aria-label={t("machines.title")}
+          >
+            <MonitorIcon />
+          </button>
           <div className={styles.account}>
             <LanguageSwitcher />
             <UserMenu />
@@ -1910,6 +1941,31 @@ export default function Home({ all = false }) {
           if (f) setRunPromptRel(f.rel);
         }}
         onClose={closeRun}
+        onStop={ai.stop}
+        onAnswer={ai.answer}
+      />
+
+      {/* the machines, and a prompt to run on them; a run of theirs in its own dialog, in front */}
+      <MachinesModal
+        isOpen={machinesOpen}
+        runs={ai.runs}
+        onRun={ai.startOn}
+        onOpenRun={(r) => setMachineRunId(r.id)}
+        onClose={() => {
+          setMachinesOpen(false);
+          closeMachineRun();
+        }}
+      />
+      <RunModal
+        task={machineRunTask}
+        run={machineRun}
+        saved={[]}
+        folder={null}
+        file={machineRunFile}
+        selectedPrompt={null}
+        onPrompts={() => {}}
+        onPreview={setMachineRunFile}
+        onClose={closeMachineRun}
         onStop={ai.stop}
         onAnswer={ai.answer}
       />

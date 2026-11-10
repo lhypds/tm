@@ -3,7 +3,8 @@
 // tasks, the source code and the claude login are. On with AI_RUNNER=1 in .env (see taskmgrd.js).
 //
 // It keeps one connection open to the server, GET /api/sync/ai/commands (a text/event-stream, see
-// server/ai/ai.js), reads the commands the server's browsers give (run, answer, stop, and forget, which
+// server/ai/ai.js), reads the commands the server's browsers give (run, prompt, which runs a prompt on
+// no task, in the home folder here, answer, stop, and forget, which
 // removes a run's record from the task folder here, see ai/record.js; see ai/remote.js), carries
 // each out on this machine's session (ai/session.js) and acknowledges it (an
 // `ack` event: ok, or the error for the browser). Every event of the session goes back as it happens,
@@ -183,6 +184,11 @@ function startRunner({ server, token, machineId, log, warn, logFile, window = fa
           const written = writeFiles(taskDir, cmd.files);
           const run = session.startRun({ id: String(cmd.run || '') || null, space, taskDir, taskRef: { work: space.work, repository: space.repository, rel: String(cmd.rel || '') }, after: afterOf(cmd.after) });
           log(`runner: run ${run.id}: ${run.task.id} ${run.task.title} in ${run.cwd}${made ? ' (task made here)' : ''}${written.length ? ` (${written.join(', ')} written)` : ''}`);
+          break;
+        }
+        case 'prompt': {
+          const run = session.startPrompt({ id: String(cmd.run || '') || null, prompt: cmd.prompt });
+          log(`runner: run ${run.id}: prompt "${run.task.title}" in ${run.cwd}`);
           break;
         }
         case 'answer':

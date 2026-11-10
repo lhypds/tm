@@ -7,6 +7,7 @@ import * as api from "./api";
 // (`items`) and its `pending` question. runFor(task) is the latest run of a task of the list (by
 // its space and rel), start / answer / stop act on one (an error shows as a toast); start(task, after)
 // takes what Claude should do with its changes once done ("push", "pr" or null, see api.startRun).
+// startOn(machine, prompt) starts a run on no task, on a machine (the Machines dialog).
 // onAsk(run) is called when a run gets a question for the user, whatever task is shown; onEnd(run)
 // when a run seen going here is over (done, failed or stopped; not for one found over already).
 export default function useRuns({ onAsk, onEnd } = {}) {
@@ -98,6 +99,19 @@ export default function useRuns({ onAsk, onEnd } = {}) {
     }
   }, []);
 
+  // Start Claude Code on a machine with a prompt, on no task (see MachinesModal): the run, or null
+  // when refused.
+  const startOn = useCallback(async (machine, prompt) => {
+    try {
+      const { run } = await api.startMachineRun(machine, prompt);
+      put(run);
+      return run;
+    } catch (e) {
+      failed(e);
+      return null;
+    }
+  }, []);
+
   const answer = useCallback(async (run, body) => {
     if (!run.pending) return false;
     try {
@@ -117,5 +131,5 @@ export default function useRuns({ onAsk, onEnd } = {}) {
     }
   }, []);
 
-  return { runs, runFor, start, answer, stop };
+  return { runs, runFor, start, startOn, answer, stop };
 }

@@ -359,5 +359,15 @@
     "forget": "{{when}} の実行を削除",
     "forgetConfirm": "{{when}} の実行を削除しますか？",
     "forgetTitle": "実行履歴を削除"
+  },
+  "machines": {
+    "title": "マシン",
+    "prompt": "このマシンで Claude に何をさせますか？",
+    "run_one": "{{count}} 台で実行",
+    "run_other": "{{count}} 台で実行",
+    "runHint": "チェックしたマシンでこのプロンプトの Claude Code を実行（⌘ / ctrl + enter）",
+    "where": "Claude Code はチェックした各マシンのホームフォルダで実行されます。",
+    "noRunner": "runner 未接続（そのマシンの .env で AI_RUNNER=1 にして taskmgrd を起動）",
+    "none": "このサーバーと同期しているマシンはまだありません：マシンで .env を AI_RUNNER=1 にして taskmgrd を起動してください。"
   }
 }

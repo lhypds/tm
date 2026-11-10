@@ -359,5 +359,15 @@
     "forget": "Remove the run of {{when}}",
     "forgetConfirm": "Remove the run of {{when}}?",
     "forgetTitle": "Remove run"
+  },
+  "machines": {
+    "title": "Machines",
+    "prompt": "What should Claude do on the machine?",
+    "run_one": "Run on {{count}} machine",
+    "run_other": "Run on {{count}} machines",
+    "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",
+    "where": "Claude Code runs in the home folder of each machine ticked.",
+    "noRunner": "runner not connected (AI_RUNNER=1 in its .env, then start taskmgrd)",
+    "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env."
   }
 }

@@ -53,7 +53,7 @@ function watchRuns(session, { server, machine, log, warn, terminal = 'terminal',
       warn(`runner: window of run ${run.id}: cannot write ${file}: ${e.message}`);
       return null;
     }
-    openTerminal(`tm ${run.task.id} ${run.task.title}`, file, terminal, (error) => warn(`runner: window of run ${run.id}: ${error}`));
+    openTerminal(`tm ${[run.task.id, run.task.title].filter(Boolean).join(' ')}`, file, terminal, (error) => warn(`runner: window of run ${run.id}: ${error}`));
     log(`runner: run ${run.id}: window opened (${file})`);
     return { file, stream };
   }

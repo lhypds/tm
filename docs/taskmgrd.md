@@ -86,7 +86,9 @@ asked for shows as "waiting for <machine>" until this machine starts it. The run
 (the server shows them again after its own restart, from here): the web UI on this machine, another process, does  
 not list them. A run that is over is written into the task folder as `.claude_<time>/` (see [Task file.md](Task%20file.md))  
 and pushed with the task like any file in it, so the server shows it after it is over for as long as the folder is  
-there; clearing it in the server's web UI removes it here, through the same connection. What claude writes to stderr goes to `logs/ai.log`, as for the web UI's own runs. Anyone logged in to  
+there; clearing it in the server's web UI removes it here, through the same connection. What claude writes to stderr goes to `logs/ai.log`, as for the web UI's own runs. The server's web UI can also give this machine a prompt of its own, on no task (the Machines button in its header): Claude  
+Code then runs it in the home folder of the daemon's user, to work on the machine itself, and the run, having no task  
+folder, leaves no record. Anyone logged in to  
 the server's web UI can so run code on this machine, with the permissions above: turn the runner on only for a server  
 you trust.  
 

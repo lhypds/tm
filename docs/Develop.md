@@ -34,6 +34,7 @@ of run as one. `window.js` is the runner's terminal window (`AI_RUNNER_WINDOW=1`
 each run to `<tmpdir>/tm-runs/<run id>.jsonl` and opens a terminal there running `follow.js`, which prints that file as  
 it grows, the way the web UI shows a run, and removes it when the run is over. Everything around it sits with its own layer: the API is `server/ai/ai.js` (see [Server.md](Server.md)), the  
 browser's calls to it are `src/ai/api.js`, the hook that follows the runs is  
-`src/ai/useRuns.js`, the components that show them are `src/ai/RunButton` (beside a prompt) and  
-`src/ai/RunModal`, and their texts are the `ai` keys of the translations in `src/i18n`. What claude writes to  
+`src/ai/useRuns.js`, the components that show them are `src/ai/RunButton` (beside a prompt),  
+`src/ai/RunModal` and `src/ai/MachinesModal` (the header's Machines dialog: a prompt run on a machine itself, on no task,  
+`startPrompt` in `session.js` and `remote.js`), and their texts are the `ai` keys of the translations in `src/i18n`. What claude writes to  
 stderr goes to `logs/ai.log`.    
