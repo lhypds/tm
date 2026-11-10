@@ -303,6 +303,7 @@
     "sourcePath": "ソースフォルダ",
     "optional": "任意",
     "tasksPathDefault": "既定：ソースフォルダ内の \"tasks\"",
+    "tasksPathData": "既定：tm の data フォルダ内",
     "pathEmpty": "タスクフォルダかソースフォルダを入力してください。",
     "submit": "追加",
     "workEmpty": "work を選んでください。"

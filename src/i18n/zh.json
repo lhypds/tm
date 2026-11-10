@@ -303,6 +303,7 @@
     "sourcePath": "源代码文件夹",
     "optional": "可选",
     "tasksPathDefault": "默认：源代码文件夹下的 \"tasks\"",
+    "tasksPathData": "默认：tm 的 data 文件夹下",
     "pathEmpty": "请填写任务文件夹或源代码文件夹。",
     "submit": "添加",
     "workEmpty": "请选择一个 work。"

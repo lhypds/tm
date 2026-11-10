@@ -470,33 +470,42 @@ function resolveConfig() {
     write(raw);
   }
 
+  // Where the tasks of a work or repository added without a folder are kept, until another one is
+  // given (the edit dialogs, or taskmgr.json): in this tm's data folder, by name,
+  //   data/works/<work>/tasks                      a work's common tasks
+  //   data/works/<work>/repositories/<repository>  a repository's tasks
+  // (not under data/origins/, which holds the copies taskmgrd pushes, see server/sync.js). It is
+  // written to taskmgr.json as the tasks_path, so a rename of the work or repository keeps the folder.
+  const defaultTasksPath = (work, repository) =>
+    path.join(dataDir, 'works', work, ...(repository ? ['repositories', repository] : ['tasks']));
+
   // Add a work at the end of its origin (which must be named; it is added when it does not exist),
-  // with no repositories. The tasks folder, when given, is created when it does not exist yet, so
-  // the work can be opened right away.
+  // with no repositories. Its tasks folder (the one given, or else one in the data folder, see
+  // defaultTasksPath) is created when it does not exist yet, so the work can be opened right away.
   function addWork({ name, origin, tasksPath, income }) {
     const raw = readRaw();
     const work = name.trim();
     if (!work) throw new Error('The name must not be empty.');
     const originName = origin.trim();
     if (!originName) throw new Error('The origin must not be empty.');
-    const tasks = (tasksPath || '').trim();
+    const tasks = (tasksPath || '').trim() || defaultTasksPath(work);
     const g = findRawOrigin(raw, originName, true);
     if (!Array.isArray(g.works)) g.works = [];
-    g.works.push(withIncome({ work, ...(tasks ? { tasks_path: tasks } : {}), repositories: [] }, income));
+    g.works.push(withIncome({ work, tasks_path: tasks, repositories: [] }, income));
     write(raw);
-    if (tasks) fs.mkdirSync(path.resolve(expandHome(tasks)), { recursive: true });
+    fs.mkdirSync(path.resolve(expandHome(tasks)), { recursive: true });
   }
 
-  // Add a repository at the end of a work; its tasks folder is created like a new work's. With no
-  // tasks folder, tasks_path is left out and the "tasks" folder in the source folder is used.
+  // Add a repository at the end of a work; its tasks folder is created like a new work's. With a
+  // source folder and no tasks folder, tasks_path is left out and the "tasks" folder in the source
+  // folder is used; with neither, the tasks are kept in the data folder (see defaultTasksPath).
   function addRepository({ work, name, tasksPath, sourcePath }) {
     const raw = readRaw();
     const { w } = findRawWork(raw, work);
     const repository = name.trim();
     if (!repository) throw new Error('The name must not be empty.');
-    const tasks = (tasksPath || '').trim();
     const source = (sourcePath || '').trim();
-    if (!tasks && !source) throw new Error('Give a tasks folder or a source folder.');
+    const tasks = (tasksPath || '').trim() || (source ? '' : defaultTasksPath(String(w.work).trim(), repository));
     if (!Array.isArray(w.repositories)) w.repositories = [];
     w.repositories.push({ repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}) });
     write(raw);

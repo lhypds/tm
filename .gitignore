@@ -11,6 +11,9 @@ dist/
 # web UI login accounts
 /data/users.json
 
+# the tasks of the works and repositories added without a folder of their own
+/data/works/
+
 # what taskmgrd pushes to this server (see README, "Sync daemon")
 /data/origins/
 /data/.sync-tmp/

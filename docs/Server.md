@@ -96,7 +96,7 @@ Rename an origin and set its income (`null` clears it).
 Remove an origin with its works.  
 
 `POST /api/work` `{ name, origin?, tasksPath?, income? }`  
-Add a work. 201.  
+Add a work. Without a `tasksPath`, its tasks are kept in tm's own data folder, `data/works/<work>/tasks`, which is written to `taskmgr.json` as its `tasks_path`. 201.  
 
 `PUT /api/work` `{ work, name, income, hidden?, tasksPath? }`  
 Rename a work, set its income (`null` clears it), and, when given, whether it is hidden and its tasks folder.  
@@ -105,7 +105,7 @@ Rename a work, set its income (`null` clears it), and, when given, whether it is
 Remove a work.  
 
 `POST /api/repository` `{ work, name, tasksPath?, sourcePath? }`  
-Add a repository to a work. 201.  
+Add a repository to a work. With neither a `tasksPath` nor a `sourcePath`, its tasks are kept in `data/works/<work>/repositories/<repository>`, written as its `tasks_path`. 201.  
 
 `PUT /api/repository` `{ work, name, newName, tasksPath?, sourcePath? }`  
 Rename a repository and set its folders.  

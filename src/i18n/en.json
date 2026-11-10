@@ -303,6 +303,7 @@
     "sourcePath": "Source folder",
     "optional": "Optional",
     "tasksPathDefault": "Default: the source folder's \"tasks\"",
+    "tasksPathData": "Default: a folder in tm's data folder",
     "pathEmpty": "Give a tasks folder or a source folder.",
     "submit": "Add",
     "workEmpty": "Choose a work."

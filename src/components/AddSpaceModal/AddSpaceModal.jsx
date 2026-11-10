@@ -46,7 +46,6 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
     if (!newName) return setError(t("work.nameEmpty"));
     if (type === "work" && !origin) return setError(t("work.originEmpty"));
     if (type === "repository" && !work) return setError(t("add.workEmpty"));
-    if (type === "repository" && !tasksPath.trim() && !sourcePath.trim()) return setError(t("add.pathEmpty"));
     const read = type === "repository" ? { income: null } : readIncome(income);
     if (read.error) return setError(t(read.error));
     setSaving(true);
@@ -125,7 +124,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
         {type === "work" && (
           <label className={styles.field}>
             <span className={styles.label}>{t("work.tasksPath")}</span>
-            <input className="input mono" value={tasksPath} placeholder={t("add.optional")} onChange={(e) => setTasksPath(e.target.value)} />
+            <input className="input mono" value={tasksPath} placeholder={t("add.tasksPathData")} onChange={(e) => setTasksPath(e.target.value)} />
           </label>
         )}
 
@@ -137,7 +136,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
             </label>
             <label className={styles.field}>
               <span className={styles.label}>{t("work.tasksPath")}</span>
-              <input className="input mono" value={tasksPath} placeholder={t("add.tasksPathDefault")} onChange={(e) => setTasksPath(e.target.value)} />
+              <input className="input mono" value={tasksPath} placeholder={t(sourcePath.trim() ? "add.tasksPathDefault" : "add.tasksPathData")} onChange={(e) => setTasksPath(e.target.value)} />
             </label>
           </>
         )}
