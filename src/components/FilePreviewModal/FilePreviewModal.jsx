@@ -31,6 +31,7 @@ function Editor({ value, highlight, textRef, onSave, onEndEdit }) {
       <textarea
         ref={textRef}
         className={`${styles.text} ${colors.className}`}
+        data-wrap={!highlight}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onScroll={colors.onScroll}
@@ -77,7 +78,7 @@ function TextView({ url, highlight, editing, onEdit, onEndEdit, onSave, textRef 
     );
   }
   return (
-    <pre className={styles.text} onMouseDown={noDoubleClickSelect} onDoubleClick={onEdit}>
+    <pre className={styles.text} data-wrap={!highlight} onMouseDown={noDoubleClickSelect} onDoubleClick={onEdit}>
       {highlight ? <Highlighted text={text} highlight={highlight} /> : text}
     </pre>
   );

@@ -24,7 +24,8 @@
 /* A text file (txt, md, ...) as the file has it, line for line, in the font and over the faint
    grid the task's text and its prompt have (a cell is two characters wide and one line tall; it
    starts inside the padding and scrolls with the text), not the grey of the pdf and image frames;
-   long lines scroll sideways rather than wrap. Edited, it is a textarea that looks the same. */
+   long lines wrap, read or edited, but for a colored file (code: JSON), whose lines scroll sideways.
+   Edited, it is a textarea that looks the same. */
 .text {
   flex: 1;
   min-width: 0;
@@ -43,6 +44,11 @@
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
+}
+
+.text[data-wrap="true"] {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* The textarea's place, holding a colored copy under it for a JSON file (see useHighlight). */

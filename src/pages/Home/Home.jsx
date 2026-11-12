@@ -140,6 +140,8 @@ function pollingTitle(polling, t) {
   return polling.fresh ? t("status.pollingOk", { when }) : t("status.pollingStale", { when });
 }
 
+const MAX_SPACE_HITS = 8; // works and repositories listed under the search box
+
 export default function Home({ all = false }) {
   const { t } = useTranslation();
   const { logout } = useAuth();
@@ -180,6 +182,8 @@ export default function Home({ all = false }) {
   // folder with `parent`, the task it is a subtask of) and the board column it belongs to.
   const [creating, setCreating] = useState(null);
   const searchRef = useRef(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [hitIndex, setHitIndex] = useState(-1); // the work / repository chosen under the search box, -1: none
   const [focusing, setFocusing] = useState(null); // { key, area }: the task whose text ("task") or prompt ("prompt") the panel should focus
   const [promptOpen, setPromptOpen] = useState(() => readFlag("panel.prompt", false)); // the panel shows the task's prompt.txt under its text
   const [peekPromptOpen, setPeekPromptOpen] = useState(() => readFlag("preview.prompt", false)); // and the preview, on its own
@@ -483,6 +487,43 @@ export default function Home({ all = false }) {
   // folder, a filter, a deleted task); j (or a wheel notch down) then starts from the first row.
   const selectedIndex = visible.findIndex((t) => t.key === selectedKey);
   const selected = visible[selectedIndex] || null;
+
+  // The works and repositories the search box's text names, listed under the box: those of the
+  // tree (so a hidden work only while those are shown), a work by its name, a repository by its
+  // own, each with the path it is under. Up / down choose one and enter (or a click) goes to it.
+  const spaceHits = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const hits = [];
+    for (const w of treeWorks || []) {
+      const origin = w.origin || "";
+      if (w.work.toLowerCase().includes(q)) hits.push({ to: api.spacePath(origin, w.work), name: w.work, under: [origin].filter(Boolean) });
+      for (const r of w.repositories || []) {
+        if (r.name.toLowerCase().includes(q))
+          hits.push({ to: api.spacePath(origin, w.work, r.name), name: r.name, under: [origin, w.work].filter(Boolean) });
+      }
+    }
+    return hits.slice(0, MAX_SPACE_HITS);
+  }, [query, treeWorks]);
+  const hitsOpen = searchFocused && spaceHits.length > 0;
+
+  // Out of the search box and onto the tasks (the board's column of the selected task): enter
+  // there, with nothing chosen under it. A selection the search left out moves to the first task.
+  function focusTasks() {
+    searchRef.current?.blur();
+    const task = selected || visible[0] || null;
+    if (task && !selected) setSelectedKey(task.key);
+    setPane(view === "board" ? (task ? boardStatus(task) : boardPaneOf(pane)) : "tasks");
+  }
+  const boardPaneOf = (p) => (boardStatuses.includes(p) ? p : boardStatuses[0]);
+
+  function openHit(hit) {
+    setQuery("");
+    setHitIndex(-1);
+    searchRef.current?.blur();
+    setPane(view === "board" ? boardPaneOf(pane) : "tasks");
+    selectSpace(hit.to);
+  }
 
   // The tasks chosen, in the order shown: the group, or the selected task alone. Selecting a task
   // outside the group (the keys, a new folder) ends it.
@@ -1622,8 +1663,30 @@ export default function Home({ all = false }) {
             ref={searchRef}
             className={`input ${styles.searchInput}`}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHitIndex(-1);
+            }}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => {
+              setSearchFocused(false);
+              setHitIndex(-1);
+            }}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return; // an input method's own enter / arrows
+              if (hitsOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                e.preventDefault();
+                // Past either end is the box itself again (nothing chosen: enter goes to the tasks).
+                const n = spaceHits.length + 1;
+                setHitIndex((i) => ((i + 1 + (e.key === "ArrowDown" ? 1 : n - 1)) % n) - 1);
+                return;
+              }
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (hitsOpen && spaceHits[hitIndex]) openHit(spaceHits[hitIndex]);
+                else focusTasks();
+                return;
+              }
               if (e.key !== "Escape") return;
               e.currentTarget.blur();
               if (pane !== "tree") {
@@ -1648,6 +1711,25 @@ export default function Home({ all = false }) {
             >
               <XIcon />
             </button>
+          )}
+          {hitsOpen && (
+            <ul className={styles.searchHits} role="listbox">
+              {spaceHits.map((hit, i) => (
+                <li
+                  key={hit.to}
+                  role="option"
+                  aria-selected={i === hitIndex}
+                  data-selected={i === hitIndex}
+                  title={[...hit.under, hit.name].join(" / ")}
+                  onMouseDown={(e) => e.preventDefault()} // the box keeps the focus until the click
+                  onMouseEnter={() => setHitIndex(i)}
+                  onClick={() => openHit(hit)}
+                >
+                  {hit.under.length > 0 && <span className={styles.searchHitUnder}>{hit.under.join(" / ")} / </span>}
+                  {hit.name}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 

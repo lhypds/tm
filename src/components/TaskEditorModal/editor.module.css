@@ -9,13 +9,13 @@
 }
 
 /* The whole task file: front matter and details, monospaced like the terminal editor (the grid
-   comes with the TextArea). */
+   comes with the TextArea). A long line wraps, as it does in the panel's text. */
 .text {
   min-height: 320px;
   font-family: var(--font);
   line-height: 1.5;
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .actions {

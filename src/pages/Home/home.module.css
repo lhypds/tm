@@ -119,6 +119,45 @@
   color: var(--muted);
 }
 
+/* The works and repositories the text names, under the box as the profile's menu is under its
+   button: a row each, the path it is under greyed before its name, the one chosen inverted. */
+.searchHits {
+  position: absolute;
+  top: calc(100% - var(--line));
+  left: 0;
+  right: 0;
+  z-index: 999;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+}
+
+.searchHits li {
+  height: 22px;
+  padding: 4px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.searchHitUnder {
+  color: var(--muted);
+}
+
+.searchHits li[data-selected="true"] {
+  background: var(--border);
+  color: var(--bg);
+}
+
+.searchHits li[data-selected="true"] .searchHitUnder {
+  color: inherit;
+}
+
 .searchClear:hover {
   color: var(--fg);
 }
