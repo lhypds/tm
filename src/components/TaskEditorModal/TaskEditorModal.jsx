@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Modal, TextArea } from "@ui";
 import Attachments from "@components/Attachments";
 import { BrainIcon } from "@components/icons";
-import { isTyping } from "@utils/keys";
+import { isTyping, keyName } from "@utils/keys";
 import styles from "./editor.module.css";
 
 // A new task in one text area, the way the terminal opens it in $EDITOR; the first line becomes
@@ -15,8 +15,9 @@ import styles from "./editor.module.css";
 // save button is then "Save & Execute", which creates the task and runs Claude Code on it (`prompt`
 // is that text, blank or not; null with the prompt hidden, when the task is only saved). As big as
 // the task preview. Esc in a text takes the caret out of it rather than closing the editor (a second
-// esc closes it), and the page's keys work then: g shows the prompt and puts the caret in it, e / i
-// put it back in the task's text.
+// esc closes it), and the page's keys work then: the text the caret left stays chosen, shaded as the
+// text chosen in the task preview is; j / k move between the task's text and the prompt (when
+// shown), e / i put the caret back in the one chosen, and g shows the prompt and puts the caret in it.
 export default function TaskEditorModal({ isOpen, space, parent, saving, onCancel, onSave, onPreview }) {
   const { t } = useTranslation();
   const title = parent ? t("editor.newSubtask", { name: parent.title || parent.id }) : t("editor.newTask");
@@ -24,6 +25,7 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
   const [prompt, setPrompt] = useState("");
   const [promptOpen, setPromptOpen] = useState(false);
   const [pending, setPending] = useState([]); // File objects
+  const [section, setSection] = useState("task"); // the text the caret is in, or was last: "task" or "prompt"
   const textRef = useRef(null);
   const promptRef = useRef(null);
 
@@ -33,6 +35,7 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
     setText("");
     setPrompt("");
     setPromptOpen(false);
+    setSection("task");
     textRef.current?.focus();
   }, [isOpen]);
 
@@ -50,22 +53,25 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
     else onCancel();
   }
 
-  // With the caret in no text: g edits the prompt (shown first when hidden), e / i the task's text.
+  // With the caret in no text: j / k choose the task's text or the prompt (when shown), e / i edit
+  // the one chosen, g the prompt (shown first when hidden).
+  const chosen = promptOpen ? section : "task";
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e)) return;
-      const key = e.key.toLowerCase();
-      if (key !== "g" && key !== "e" && key !== "i") return;
+      const key = keyName(e).toLowerCase();
+      if (!["g", "e", "i", "j", "k", "up", "down"].includes(key)) return;
       e.preventDefault(); // the key is not typed into the text it brings the caret to
       if (key === "g") {
         setPromptOpen(true);
         setTimeout(() => promptRef.current?.focus());
-      } else textRef.current?.focus();
+      } else if (key === "e" || key === "i") (chosen === "prompt" ? promptRef : textRef).current?.focus();
+      else if (promptOpen) setSection(key === "j" || key === "down" ? "prompt" : "task");
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [isOpen]);
+  }, [isOpen, chosen, promptOpen]);
 
   function submit(e) {
     e?.preventDefault();
@@ -91,7 +97,7 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
     <Modal isOpen={isOpen} onClose={onCancel} onEscape={onEscape} title={title} titleActions={brain} closeOnOverlay={false} className={styles.modal}>
       <form className={styles.form} onSubmit={submit} onKeyDown={onKeyDown}>
         <div className={styles.area}>
-          <TextArea ref={textRef} className={styles.text} value={text} onChange={(e) => setText(e.target.value)} aria-label={title} />
+          <TextArea ref={textRef} className={styles.text} value={text} data-selected={chosen === "task"} onFocus={() => setSection("task")} onChange={(e) => setText(e.target.value)} aria-label={title} />
         </div>
 
         {promptOpen && (
@@ -99,7 +105,7 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
             {/* the prompt's head, as the preview's: its name */}
             <div className={styles.promptHead}>{t("panel.prompt")}</div>
             <div className={styles.area}>
-              <TextArea ref={promptRef} className={styles.text} value={prompt} onChange={(e) => setPrompt(e.target.value)} aria-label={t("panel.prompt")} />
+              <TextArea ref={promptRef} className={styles.text} value={prompt} data-selected={chosen === "prompt"} onFocus={() => setSection("prompt")} onChange={(e) => setPrompt(e.target.value)} aria-label={t("panel.prompt")} />
             </div>
           </>
         )}

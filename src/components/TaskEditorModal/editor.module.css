@@ -36,6 +36,12 @@
   word-break: break-word;
 }
 
+/* The text the caret left (esc), or the one j / k chose since: shaded, as the text chosen in the
+   task preview is. Not while the caret is in it. */
+.text[data-selected="true"]:not(:focus) {
+  background-color: var(--bg-hover);
+}
+
 /* Above the prompt: its name, closer to the prompt under it than to the task's text above. */
 .promptHead {
   flex: none;
