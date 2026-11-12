@@ -996,7 +996,10 @@ app.use(createAiApp({
   config,
   logFile: path.join(PROJECT_ROOT, 'logs', 'ai.log'),
   machine: String(process.env.MACHINE_ID || '').trim() || undefined,
-  locate: (space) => ({ remote: !!machineOf(space), machine: machineOf(space) }),
+  locate: (space) => {
+    const machines = machinesOf(space);
+    return { remote: machines.length > 0, machine: runMachine(machines), machines };
+  },
   machines: () => syncApp.allMachines()
 }));
 

@@ -547,15 +547,20 @@ export default function Home({ all = false }) {
   const selectedRun = ai.runFor(selected);
   // Where the selected task would run: here, or, for a copy pushed from another machine, on that
   // machine (see server/ai/ai.js), which needs its taskmgrd connected as a runner (AI_RUNNER=1 there).
+  // A folder two machines sync runs on the one picked in the dropdown beside the run button
+  // (`runOn`, by folder; kept while the page is open), or, until one is picked, on the one the
+  // server would take (one whose runner is connected, or else the first).
   // The reason it cannot now, for the run button; null when it can, or nothing is known yet.
-  const noRunner = useMemo(() => {
+  const [runOn, setRunOn] = useState({}); // "work/repository" -> the name of the machine picked
+  const runSpace = useMemo(() => {
     const sp = selected?.space;
     const w = sp && works?.find((x) => x.work === sp.work);
-    const s = w && (sp.repository ? w.repositories.find((p) => p.name === sp.repository) : w);
-    if (!s?.remote) return null;
-    if (!s.machine) return t("ai.noMachine");
-    return s.machine.runner ? null : t("ai.noRunner", { machine: s.machine.name });
-  }, [selected, works, t]);
+    return (w && (sp.repository ? w.repositories.find((p) => p.name === sp.repository) : w)) || null;
+  }, [selected, works]);
+  const runOnKey = selected?.space ? `${selected.space.work}/${selected.space.repository || ""}` : "";
+  const runMachines = runSpace?.remote ? runSpace.machines || [] : [];
+  const runMachine = runMachines.find((m) => m.name === runOn[runOnKey]) || runSpace?.machine || null;
+  const noRunner = !runSpace?.remote ? null : !runMachine ? t("ai.noMachine") : runMachine.runner ? null : t("ai.noRunner", { machine: runMachine.name });
   // The selected task's attachments; on the Task panel j / k walk them and space opens one. Also the
   // records of its runs of Claude Code (attachments.runs), which the run button shows when the task
   // has no run going.
@@ -583,7 +588,7 @@ export default function Home({ all = false }) {
     // else a run starts, with what to do after the work as the checkboxes under the prompt say;
     // refused (the machine not connected, say), the dialog closes again
     setStarting(true);
-    const ok = await ai.start(task, runAfter);
+    const ok = await ai.start(task, runAfter, runMachines.length > 1 && task.key === selected?.key ? runMachine?.name || null : null);
     setStarting(false);
     if (!ok) closeRun();
   };
@@ -1771,6 +1776,9 @@ export default function Home({ all = false }) {
               onSavePrompt={(task, text, auto) => savePrompt(attachments, task, text, auto)}
               run={selectedRun}
               noRunner={noRunner}
+              machines={runMachines}
+              machine={runMachine?.name || ""}
+              onMachine={(name) => setRunOn((prev) => ({ ...prev, [runOnKey]: name }))}
               onRun={openRun}
               after={runAfter}
               onAfter={setRunAfter}

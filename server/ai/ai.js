@@ -67,7 +67,7 @@ function eventStream(req, res, onClose) {
   return (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-// `locate(space)` says where a space's tasks are: { remote, machine }, `remote` whether the folder is
+// `locate(space)` says where a space's tasks are: { remote, machine, machines }, `remote` whether the folder is
 // a copy pushed from another machine and `machine` that machine as the web UI shows it ({ name,
 // online, runner }, see index.js), null when unknown. `machine` is this machine's name, for the records
 // of its runs (MACHINE_ID; the hostname when not given). `machines()` lists the machines that sync with
@@ -121,7 +121,11 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     let text = null;
     try { text = fs.readFileSync(path.join(taskDir, TASK_FILE), 'utf8'); } catch (e) { /* a bare folder: the title stands */ }
     const files = { [TASK_FILE]: text, [PROMPT_FILE]: readPrompt(taskDir) };
-    const run = await remote.startRun({ machine: where.machine.name, task, taskDir, files, after });
+    // Synced by two machines, the one asked for (`machine`, picked beside the run button) runs it.
+    const asked = typeof body.machine === 'string' ? body.machine.trim() : '';
+    const target = asked ? (where.machines || []).find(m => m.name === asked) : where.machine;
+    if (!target) throw httpError(400, `"${asked}" does not sync this folder.`);
+    const run = await remote.startRun({ machine: target.name, task, taskDir, files, after });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 
