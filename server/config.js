@@ -82,6 +82,27 @@ function expandHome(p) {
   return p;
 }
 
+// A path of taskmgr.json, absolute: "~" is the home folder, and "./data" (or any other relative
+// path) is inside the taskmgr folder, wherever tm is started from.
+function resolvePath(p) {
+  return path.resolve(PROJECT_ROOT, expandHome(p));
+}
+
+// A path as it is shown and written to taskmgr.json: "./data/works/a/tasks" for a folder inside the
+// taskmgr folder, "~/code/a" for one inside the home folder, else the absolute path as it is.
+function shortPath(p) {
+  if (!p) return p;
+  // A Windows path written for WSL stays as written.
+  if (process.platform !== 'win32' && /^[A-Za-z]:[\\/]/.test(p)) return p;
+  const abs = resolvePath(p);
+  const under = (base, mark) => {
+    const rel = path.relative(base, abs);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
+    return rel ? `${mark}/${rel.split(path.sep).join('/')}` : mark;
+  };
+  return under(PROJECT_ROOT, '.') || under(os.homedir(), '~') || abs;
+}
+
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim() !== '';
 }
@@ -236,7 +257,7 @@ function normalizeOrigins(raw) {
 // A repository's tasks folder, absolute: its tasks_path, or the "tasks" folder in its source code
 // folder when it has none.
 function repositoryTasksRoot(tasks, source) {
-  return tasks ? path.resolve(expandHome(tasks)) : path.join(path.resolve(expandHome(source)), 'tasks');
+  return tasks ? resolvePath(tasks) : path.join(resolvePath(source), 'tasks');
 }
 
 // Validate and normalize one work entry; `at` is where it is in the file, for error messages.
@@ -267,9 +288,9 @@ function normalizeWork(w, at, origin, seenWorks) {
     income,
     hidden: w.hidden === true,
     // "" when the work has no common tasks folder, only its repositories'.
-    root: tasksPath ? path.resolve(expandHome(tasksPath)) : '',
-    // The path as written in taskmgr.json (with "~" kept), for the UI to show.
-    shownPath: tasksPath,
+    root: tasksPath ? resolvePath(tasksPath) : '',
+    // The path for the UI to show, in its short form (see shortPath).
+    shownPath: shortPath(tasksPath),
     repositories: repositories.map((p, j) => {
       if (!p || typeof p !== 'object') throw new Error(`${at}.repositories[${j}] ("${work}") must be an object.`);
       if (!isNonEmptyString(p.repository)) throw new Error(`${at}.repositories[${j}].repository ("${work}") must be a non-empty string.`);
@@ -285,11 +306,11 @@ function normalizeWork(w, at, origin, seenWorks) {
       return {
         name,
         root: repositoryTasksRoot(tasks, source),
-        sourcePath: source ? path.resolve(expandHome(source)) : '',
-        // Its source code folder as written in taskmgr.json, or its tasks folder when it has none.
-        shownPath: source || tasks,
-        // Both folders as written ("" when left out), for editing.
-        paths: { source, tasks }
+        sourcePath: source ? resolvePath(source) : '',
+        // Its source code folder, or its tasks folder when it has none, in its short form.
+        shownPath: shortPath(source || tasks),
+        // Both folders in their short form ("" when left out), for editing.
+        paths: { source: shortPath(source), tasks: shortPath(tasks) }
       };
     })
   };
@@ -507,7 +528,7 @@ function resolveConfig() {
   // (not under data/origins/, which holds the copies taskmgrd pushes, see server/sync.js). It is
   // written to taskmgr.json as the tasks_path, so a rename of the work or repository keeps the folder.
   const defaultTasksPath = (work, repository) =>
-    path.join(dataDir, 'works', work, ...(repository ? ['repositories', repository] : ['tasks']));
+    shortPath(path.join(dataDir, 'works', work, ...(repository ? ['repositories', repository] : ['tasks'])));
 
   // Add a work at the end of its origin (which must be named; it is added when it does not exist),
   // with no repositories. Its tasks folder (the one given, or else one in the data folder, see
@@ -523,7 +544,7 @@ function resolveConfig() {
     if (!Array.isArray(g.works)) g.works = [];
     g.works.push(withIncome({ work, tasks_path: tasks, repositories: [] }, income));
     write(raw);
-    fs.mkdirSync(path.resolve(expandHome(tasks)), { recursive: true });
+    fs.mkdirSync(resolvePath(tasks), { recursive: true });
   }
 
   // Add a repository at the end of a work; its tasks folder is created like a new work's. With a
@@ -655,4 +676,4 @@ function resolveConfig() {
   };
 }
 
-module.exports = { resolveConfig, loadDotenv, parseConfig, upgradeRaw, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, DEFAULT_DATA_DIR, POLL_STATE_PATH };
+module.exports = { resolveConfig, loadDotenv, parseConfig, upgradeRaw, shortPath, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, DEFAULT_DATA_DIR, POLL_STATE_PATH };

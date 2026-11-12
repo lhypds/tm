@@ -74,7 +74,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
-const { parseConfig, upgradeRaw } = require('./config');
+const { parseConfig, upgradeRaw, shortPath } = require('./config');
 const { appendLog } = require('../utils/logfile');
 const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/task');
 
@@ -333,11 +333,11 @@ function toMirror(dataDir, pushed) {
     const origin = name(g, 'origin');
     for (const w of g.works || []) {
       const work = name(w, 'work');
-      if (name(w, 'tasks_path')) w.tasks_path = spaceDir(dataDir, { origin, work, repository: '' });
+      if (name(w, 'tasks_path')) w.tasks_path = shortPath(spaceDir(dataDir, { origin, work, repository: '' }));
       else delete w.tasks_path;
       for (const p of w.repositories || []) {
         delete p.source_path;
-        p.tasks_path = spaceDir(dataDir, { origin, work, repository: name(p, 'repository') });
+        p.tasks_path = shortPath(spaceDir(dataDir, { origin, work, repository: name(p, 'repository') }));
       }
     }
   }

@@ -56,7 +56,7 @@ Settings
 --------
 
 `GET /api/settings`  
-`{ configPath, editor, syncServer }`: the path of `taskmgr.json`, the default text editor, and the host of the server  
+`{ configPath, editor, syncServer }`: the path of `taskmgr.json` (in its short form, `./taskmgr.json`), the default text editor, and the host of the server  
 this machine syncs with (`SYNC_SERVER` in `.env`, as `tm.example.com`, no scheme; `""` when it is not set).  
 
 `GET /api/polling`  
@@ -96,7 +96,7 @@ Rename an origin and set its income (`null` clears it).
 Remove an origin with its works.  
 
 `POST /api/work` `{ name, origin?, tasksPath?, income? }`  
-Add a work. Without a `tasksPath`, its tasks are kept in tm's own data folder, `data/works/<work>/tasks`, which is written to `taskmgr.json` as its `tasks_path`. 201.  
+Add a work. Without a `tasksPath`, its tasks are kept in tm's own data folder, `./data/works/<work>/tasks`, which is written to `taskmgr.json` as its `tasks_path`. 201.  
 
 `PUT /api/work` `{ work, name, income, hidden?, tasksPath? }`  
 Rename a work, set its income (`null` clears it), and, when given, whether it is hidden and its tasks folder.  
@@ -105,7 +105,7 @@ Rename a work, set its income (`null` clears it), and, when given, whether it is
 Remove a work.  
 
 `POST /api/repository` `{ work, name, tasksPath?, sourcePath? }`  
-Add a repository to a work. With neither a `tasksPath` nor a `sourcePath`, its tasks are kept in `data/works/<work>/repositories/<repository>`, written as its `tasks_path`. 201.  
+Add a repository to a work. With neither a `tasksPath` nor a `sourcePath`, its tasks are kept in `./data/works/<work>/repositories/<repository>`, written as its `tasks_path`. 201.  
 
 `PUT /api/repository` `{ work, name, newName, tasksPath?, sourcePath? }`  
 Rename a repository and set its folders.  
@@ -133,7 +133,7 @@ Tasks
 
 `GET /api/tasks?work=&repository=&dir=`  
 The tasks in a folder, sorted todo, done, pending, aborted, each with its subtasks:  
-`{ work, repository, dir, absDir, remote, machine, machines, isRoot, parent, crumbs, tasks, counts }`; `counts` counts the subtasks too;  
+`{ work, repository, dir, absDir, shownDir, remote, machine, machines, isRoot, parent, crumbs, tasks, counts }`; `counts` counts the subtasks too;  
 `remote` says whether the folder is a copy pushed by taskmgrd and `machines` / `machine` which machines sync it, as in `GET /api/spaces`.  
 
 `GET /api/tasks/all?all=1` / `?origin=` / `?work=`  
@@ -311,7 +311,7 @@ and of each space's last snapshot, keyed `origin/work/repository` (`""` for no o
 
 `PUT /api/sync/config` `{ text }`  
 Merge the pushed config into the server's `taskmgr.json` and prune `data/origins/` to what is in it. `{ ok, pruned }`.  
-The pushed works and repositories get their copies under `data/origins/` as `tasks_path`; `source_path` is left out.  
+The pushed works and repositories get their copies under `./data/origins/` as `tasks_path`; `source_path` is left out.  
 Origins, works and repositories only on the server are kept, those only pushed are added; a work in both  
 (same origin, same name) takes the pushed fields, its repositories merged the same way (the pushed one wins  
 for a repository in both). A work pushed without `tasks_path` loses the one it has on the server, and the copy  

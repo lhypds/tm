@@ -36,7 +36,7 @@ const {
   compareIdsDesc
 } = require('../utils/task');
 const { getEditor } = require('../utils/editor');
-const { resolveConfig, POLL_STATE_PATH } = require('./config');
+const { resolveConfig, shortPath, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
 const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
@@ -244,6 +244,7 @@ function listDir(space, rel) {
     repository: space.repository,
     dir: toRel(root, abs),
     absDir: abs,
+    shownDir: shortPath(abs),
     remote: isMirrored(config.dataDir, root),
     machine: machineOf(space),
     machines: machinesOf(space),
@@ -268,7 +269,7 @@ function listSpacesTasks(spaces, absDir) {
   const remote = isMirrored(config.dataDir, absDir);
   // absDir, when given, is the root of the first space (a work's common tasks).
   const machines = remote && spaces[0] && spaces[0].root === absDir ? machinesOf(spaces[0]) : [];
-  return { dir: '', absDir, remote, machine: runMachine(machines), machines, isRoot: true, parent: null, crumbs: [], tasks, counts: countTasks(tasks) };
+  return { dir: '', absDir, shownDir: shortPath(absDir), remote, machine: runMachine(machines), machines, isRoot: true, parent: null, crumbs: [], tasks, counts: countTasks(tasks) };
 }
 
 // A work's common tasks and those of all its repositories.
@@ -428,7 +429,7 @@ function syncServerHost() {
 }
 
 app.get('/api/settings', (req, res) => {
-  res.json({ configPath: config.configPath, editor: getEditor(), syncServer: syncServerHost() });
+  res.json({ configPath: shortPath(config.configPath), editor: getEditor(), syncServer: syncServerHost() });
 });
 
 // For the dot beside the sync server in the status bar: whether taskmgrd polls that server (POLLING=1
@@ -457,7 +458,7 @@ app.get('/api/polling', (req, res) => {
 
 // The raw taskmgr.json, to edit the works and repositories from the web UI.
 app.get('/api/config', (req, res) => {
-  res.json({ configPath: config.configPath, text: config.readText() });
+  res.json({ configPath: shortPath(config.configPath), text: config.readText() });
 });
 
 app.put('/api/config', (req, res) => {
@@ -720,18 +721,15 @@ function locateFolder(name, entries) {
   return search(os.homedir(), 4);
 }
 
-// The path of a folder dropped on the web UI, from its name and the names in it: { path }, with
-// the home folder written "~" as in taskmgr.json.
+// The path of a folder dropped on the web UI, from its name and the names in it: { path }, in its
+// short form ("./" for the taskmgr folder, "~/" for the home folder) as in taskmgr.json.
 app.post('/api/folder/locate', (req, res) => {
   const name = String(req.body?.name || '');
   const entries = Array.isArray(req.body?.entries) ? req.body.entries.map(String).slice(0, 50) : [];
   if (!name || name.includes('/') || name.includes('\\')) throw new HttpError(400, 'Missing name.');
   const found = locateFolder(name, entries);
   if (!found) throw new HttpError(404, `Folder "${name}" not found.`);
-  const home = os.homedir();
-  const rel = path.relative(home, found);
-  const shown = path.sep === '/' && !rel.startsWith('..') && !path.isAbsolute(rel) ? `~/${rel}` : found;
-  res.json({ path: shown });
+  res.json({ path: shortPath(found) });
 });
 
 // Create the missing tasks folder of a work or a repository.

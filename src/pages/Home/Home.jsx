@@ -1807,7 +1807,7 @@ export default function Home({ all = false }) {
               {t("status.aborted")} {c.aborted ?? 0}
             </span>
             <span className={`mono ${styles.path}`} title={data.absDir}>
-              {data.absDir}
+              {data.shownDir || data.absDir}
             </span>
             {syncServer && (
               <span className={`mono ${styles.server}`} title={pollingTitle(polling, t) || syncServer}>
