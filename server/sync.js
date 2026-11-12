@@ -692,14 +692,14 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   }
 
   app.put('/api/sync/space', json, (req, res) => {
-    const { origin = '', work, repository = '', machine, entries, force } = req.body || {};
+    const { origin = '', work, repository = '', machine, entries, merged } = req.body || {};
     if (typeof origin !== 'string' || typeof repository !== 'string') throw new SyncError(400, 'origin and repository must be strings.');
     const target = spaceDir(dataDir, { origin, work, repository });
     if (!Array.isArray(entries)) throw new SyncError(400, '"entries" must be an array.');
     const list = entries.map(checkEntry);
     const key = spaceKey({ origin: origin.trim(), work: work.trim(), repository: repository.trim() });
     claim(readState(), key, machineName(machine), label({ origin, work, repository }));  // refused before anything is written
-    if (force !== true) pullFirst(key, machineName(machine), target, list, label({ origin, work, repository }));
+    if (merged !== true) pullFirst(key, machineName(machine), target, list, label({ origin, work, repository }));
     const kept = withoutDeleted(key, machineName(machine), list);
     const { files, dirs } = writeSnapshot(dataDir, target, kept.list);
     const state = readState();
@@ -715,13 +715,16 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   });
 
   // A push writes the folder as the pushing machine has it, so a task only here would go. That is
-  // right for a copy of what machines push, but not for a folder no machine syncs yet (a work or
-  // repository added here in the web UI, with tasks made here): the first push into it is refused
-  // while it holds a task the snapshot does not have. A `tm pull` there brings those tasks over, and
-  // counts the machine as one of the space's, after which its pushes go through as ever; `force`
-  // (`tm push --force`) pushes anyway, for when the pull is refused too (tasks never pushed there).
+  // right once the machine syncs the space, but not for its first push into a folder that has tasks
+  // already (a work or repository of the same name added here in the web UI, with tasks made here,
+  // or pushed by another machine): that push is refused, PULL_FIRST, while the folder holds a task
+  // the snapshot does not have. The machine then merges the two by task id (mergeSpace in push.js:
+  // it fetches the tasks here whose id it does not have, with merge=1, see rootOf; a task whose id it
+  // has is its own to keep) and pushes again, with `merged: true`, which goes through: the tasks
+  // only here are in that snapshot now, and those of an id both had are replaced by the machine's.
+  // A `tm pull` there (into an empty folder, say) makes the machine one of the space's as well.
   function pullFirst(key, machine, target, list, what) {
-    if (!machine || (readState().machines[key] || []).length) return;
+    if (!machine || (readState().machines[key] || []).includes(machine)) return;
     const pushed = new Set(list.map(e => e.rel.split(path.sep).join('/')));
     const walk = (dir, rel) => {
       let entries;
@@ -733,7 +736,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       }
       return false;
     };
-    if (walk(target, '')) throw new SyncError(409, `${what} has tasks on the server that this machine does not have: run "tm pull" first, or "tm push --force" to overwrite them.`, { code: 'PULL_FIRST' });
+    if (walk(target, '')) throw new SyncError(409, `${what} has tasks on the server that this machine does not have: a newer tm merges them when it pushes; or run "tm pull" first.`, { code: 'PULL_FIRST' });
   }
 
   // ---------- pull: what `tm pull` reads ----------
@@ -753,7 +756,9 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const root = w && (repository ? (w.repositories.find(p => p.name === repository) || {}).root : w.root);
     if (!root) throw new SyncError(404, `No tasks folder for "${[origin, work, repository].filter(Boolean).join(' / ')}" here.`);
     const state = readState();
-    if (claim(state, spaceKey({ origin, work, repository }), req.machine, label({ origin, work, repository }))) writeState(state);
+    // merge=1: a machine reading the folder to merge it with its own before its first push (see
+    // pullFirst); it is counted once that push went through.
+    if (q.merge !== '1' && claim(state, spaceKey({ origin, work, repository }), req.machine, label({ origin, work, repository }))) writeState(state);
     return root;
   }
 
