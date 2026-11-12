@@ -233,8 +233,8 @@ changed), `delta` `{ run, i, text }` (text appended to item `i`) and `remove` `{
 `GET /api/ai/runs`  
 Every run the server has, with its transcript: `{ runs }`.  
 
-`POST /api/ai/run` `{ work, repository?, rel }`  
-Start Claude Code on that task: in the repository's source folder (`source_path`) for a repository's task, else in the task  
+`POST /api/ai/run` `{ work, repository?, rel, machine? }`  
+`machine` (optional) names the one of the folder's machines to run on, for a folder two machines sync (400 when it does not sync the folder; without it, one whose runner is connected, or else the first). Start Claude Code on that task: in the repository's source folder (`source_path`) for a repository's task, else in the task  
 folder, with the task folder readable either way, and the same first prompt as `tm run`. 201 `{ run }`, with its transcript;  
 409 while the task has a run going, 400 when the source folder is missing. For a task of a pushed folder, the run is asked of  
 that machine's runner, with the task's `task.txt` and `prompt.txt` as they are here (written there before the run when  

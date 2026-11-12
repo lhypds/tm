@@ -328,6 +328,7 @@
   },
   "ai": {
     "run": "Claude Code で実行",
+    "runOn": "実行するマシン",
     "afterPush": "Commit & push",
     "afterPr": "Create PR",
     "show": "実行を表示",
