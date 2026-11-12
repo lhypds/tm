@@ -41,6 +41,7 @@ import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/wo
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
+import { getMachines } from "@ai/api";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -588,10 +589,41 @@ export default function Home({ all = false }) {
     if (!ok) closeRun();
   };
   // Pressed on a task whose folder two machines sync, the run button opens the run's dialog and, in
-  // front of it, asks which one runs the task (`pickRun`: the task, and the machine of the list the
-  // keyboard is on, to begin with one whose runner is connected; see RunOnModal): enter or a click
-  // runs it there, esc lets go, closing the run's dialog with it.
-  const [pickRun, setPickRun] = useState(null); // { task, index } while the machines are listed
+  // front of it, asks which one runs the task (`pickRun`: the task, the machines, and the one of them
+  // the keyboard is on; see RunOnModal): enter or a click runs it there, esc lets go, closing the
+  // run's dialog with it. Only a machine whose runner is connected can be picked: the keys, the
+  // wheel and the pointer pass the others over (index -1 while none can). Whether a runner is
+  // connected is asked again while the list is open, as the tree's answer may be minutes old.
+  const [pickRun, setPickRun] = useState(null); // { task, machines, index } while the machines are listed
+  const firstReady = (machines) => machines.findIndex((m) => m.runner);
+  // The next machine that can be picked from `index` on, `dir` 1 down or -1 up; `index` when none.
+  const stepReady = (machines, index, dir) => {
+    for (let i = index + dir; i >= 0 && i < machines.length; i += dir) if (machines[i].runner) return i;
+    return index;
+  };
+  const picking = !!pickRun;
+  useEffect(() => {
+    if (!picking) return undefined;
+    let stale = false;
+    const load = () =>
+      getMachines().then(
+        (d) => {
+          if (stale) return;
+          setPickRun((p) => {
+            if (!p) return p;
+            const machines = p.machines.map((m) => ({ ...m, ...(d.machines || []).find((x) => x.name === m.name) }));
+            return { ...p, machines, index: machines[p.index]?.runner ? p.index : firstReady(machines) };
+          });
+        },
+        () => {}, // not answered: the list stays as it is
+      );
+    load();
+    const id = setInterval(load, 3000);
+    return () => {
+      stale = true;
+      clearInterval(id);
+    };
+  }, [picking]);
   const openRun = async (task, folder = null) => {
     if (folder) {
       showRun(task, folder);
@@ -601,20 +633,15 @@ export default function Home({ all = false }) {
     if (isGoing(ai.runFor(task))) return showRun(task, null); // the run going opens
     if (runMachines.length > 1 && task.key === selected?.key) {
       showRun(task, null);
-      setPickRun({ task, index: Math.max(0, runMachines.findIndex((m) => m.runner)) });
+      setPickRun({ task, machines: runMachines, index: firstReady(runMachines) });
       return;
     }
     await startRun(task);
   };
+  const movePick = (dir) => setPickRun((p) => p && { ...p, index: p.index < 0 ? firstReady(p.machines) : stepReady(p.machines, p.index, dir) });
   const confirmPick = (index) => {
-    if (!pickRun) return;
-    const m = runMachines[index];
-    if (!m) return;
-    if (!m.runner) {
-      setPickRun({ ...pickRun, index });
-      showToast(t("ai.noRunner", { machine: m.name }), 4000, "bottom", "error");
-      return;
-    }
+    const m = pickRun?.machines[index];
+    if (!m?.runner) return; // not one that can be picked
     const { task } = pickRun;
     setPickRun(null);
     startRun(task, m.name);
@@ -1203,9 +1230,9 @@ export default function Home({ all = false }) {
       return false;
     if (pickRun) {
       // The machines a task can run on: j / k walk them, enter runs the task on the one they are on.
-      const move = moveIndex(name, pickRun.index, runMachines.length);
+      const move = moveIndex(name, 1, 3); // 0: up, 2: down, null: another key
       if (move !== null) {
-        if (move >= 0) setPickRun({ ...pickRun, index: move });
+        movePick(move - 1);
         return true;
       }
       if (name === "enter") {
@@ -2003,7 +2030,7 @@ export default function Home({ all = false }) {
       />
 
       {/* which machine a task runs on, asked by the run button when two sync its folder */}
-      <RunOnModal machines={pickRun ? runMachines : null} index={pickRun?.index} onIndex={(index) => setPickRun((p) => p && { ...p, index })} onPick={confirmPick} onClose={cancelPick} />
+      <RunOnModal machines={pickRun ? pickRun.machines : null} index={pickRun?.index} onIndex={(index) => setPickRun((p) => p && { ...p, index })} onMove={movePick} onPick={confirmPick} onClose={cancelPick} />
 
       {/* the machines, and a prompt to run on them; a run of theirs in its own dialog, in front */}
       <MachinesModal

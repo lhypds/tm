@@ -31,8 +31,17 @@
   background: var(--bg-hover);
 }
 
+/* One whose runner is not connected cannot be picked: greyed out, and not a thing to click. */
+.machines li[data-ready="false"] {
+  cursor: default;
+}
+
 .machines li[data-ready="false"] .name {
   color: var(--muted);
+}
+
+.machines li[data-ready="true"] .name {
+  color: var(--fg);
 }
 
 .name {
