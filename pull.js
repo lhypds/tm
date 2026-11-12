@@ -235,8 +235,18 @@ async function pullSpace(s, root, stats) {
       return true;  // an invalid path: told below
     }
   }));
+  // What was synced of a moved task is known under its new folder from then on: without that, a task
+  // renamed on the server (another title, so another folder name) would look changed here, its files
+  // being under a path never synced, and the old title would be pushed back.
   moveTasks(root, tasks.filter((e, i) => !here[i]), {
-    onMove: () => { stats.updated++; },
+    onMove: (from, to) => {
+      stats.updated++;
+      for (const p of Object.keys(known)) {
+        if (!p.startsWith(`${from}/`)) continue;
+        known[to + p.slice(from.length)] = known[p];
+        delete known[p];
+      }
+    },
     onError: (p, err) => { stats.failed++; report(`${label(s)}: ${p}: ${err.message}`); }
   });
 
