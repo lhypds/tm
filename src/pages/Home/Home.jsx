@@ -2003,7 +2003,7 @@ export default function Home({ all = false }) {
       />
 
       {/* which machine a task runs on, asked by the run button when two sync its folder */}
-      <RunOnModal machines={pickRun ? runMachines : null} index={pickRun?.index} onPick={confirmPick} onClose={cancelPick} />
+      <RunOnModal machines={pickRun ? runMachines : null} index={pickRun?.index} onIndex={(index) => setPickRun((p) => p && { ...p, index })} onPick={confirmPick} onClose={cancelPick} />
 
       {/* the machines, and a prompt to run on them; a run of theirs in its own dialog, in front */}
       <MachinesModal

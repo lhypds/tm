@@ -10,7 +10,6 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
 .machines li {
@@ -23,7 +22,11 @@
   cursor: pointer;
 }
 
-.machines li:hover,
+/* No gap between them: one line between two machines, not two. */
+.machines li + li {
+  border-top: 0;
+}
+
 .machines li[data-selected="true"] {
   background: var(--bg-hover);
 }

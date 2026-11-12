@@ -90,18 +90,23 @@
 
 /* What Claude is at, under the transcript (see Working): the glyph turns in a box of its own, so the
    line never shifts as the glyphs differ in width; the dots pulse one after the other; the time
-   runs at the end. */
+   runs at the end. The glyphs are not in the text's font (dingbats, each from whatever font has
+   it), so their baselines are not the text's: the box is as tall as a letter and the glyph is
+   centred in it, and the line is centred on the text, rather than set on a baseline. */
 .working {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
 .glyph {
   flex: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.25em;
-  text-align: center;
+  height: 1em;
+  line-height: 1;
   color: var(--fg);
 }
 
