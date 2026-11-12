@@ -369,7 +369,6 @@
     "prompt": "让 Claude 在这台机器上做什么？",
     "run": "执行",
     "runHint": "用这个 prompt 在勾选的机器上运行 Claude Code（⌘ / ctrl + enter）",
-    "noRunner": "runner 未连接（在它的 .env 里设 AI_RUNNER=1 并启动 taskmgrd）",
     "none": "还没有机器与这台服务器同步：在一台机器上启动 taskmgrd，并在 .env 里设 AI_RUNNER=1。"
   }
 }

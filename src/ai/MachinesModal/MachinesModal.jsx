@@ -22,7 +22,7 @@ function readPicked() {
 
 // The machines Claude Code can be run on from here, opened from the header: the machines that sync
 // with this server (GET /api/ai/machines, asked again every few seconds while open), each with its
-// dot, a tick to pick it once its runner is connected (AI_RUNNER=1 in its taskmgrd; said when not),
+// dot, a tick to pick it once its runner is connected (AI_RUNNER=1 in its taskmgrd),
 // and under it its latest runs started from here: when, what was asked and how it goes, a click
 // showing the run (onOpenRun(run)). Above them the prompt and the run button: it starts Claude Code
 // with that prompt on every machine ticked (onRun(machine, prompt), resolving to the run, or null
@@ -145,7 +145,6 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
                     <span className={styles.name}>{m.name}</span>
                   </Checkbox>
                   <MachineDot machine={m} />
-                  {!m.runner && <span className={`muted ${styles.note}`}>{t("machines.noRunner")}</span>}
                 </div>
                 {(runsOf[m.name] || []).slice(0, RUNS_SHOWN).map((r) => (
                   <div key={r.id} className={styles.run}>

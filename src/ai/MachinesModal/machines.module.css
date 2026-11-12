@@ -63,14 +63,6 @@
   color: var(--muted);
 }
 
-.note {
-  margin-left: 8px;
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* A run of the machine, under it, indented to the name: when, what was asked (a link, as a run's
    time is under a task's prompt) and how it goes at the right end. */
 .run {
