@@ -10,9 +10,9 @@
 //
 //   node ai/follow.js <file>       <tmpdir>/tm-runs/<run id>.jsonl: one JSON line per event (see ai/window.js)
 const fs = require('fs');
-const { execFileSync, spawn } = require('child_process');
 const { StringDecoder } = require('string_decoder');
 const { formatDateTime } = require('../utils/task');
+const { waitToClose } = require('../utils/terminal');
 const { version } = require('../package.json');
 
 const POLL_MS = 150;        // how often the file is looked at
@@ -258,87 +258,10 @@ function finish(r) {
   else line(red(`Run ${r.status || 'failed'}${r.error ? `: ${r.error}` : '.'}`));
   cleanup();
   if (!process.stdin.isTTY) process.exit(0);
-  waitToClose();
-}
-
-// After the run, the window closes by itself `closeAfter` seconds later, counted down on its last
-// line, or on Enter before that; space stops the countdown, and the window then stays until Enter,
-// as it does from the start with closeAfter 0. The keys are read one by one (raw mode), so ctrl-c
-// closes too.
-function waitToClose() {
-  const stdin = process.stdin;
-  let countdown = null;
-  const stayOpen = () => {
-    if (!countdown) return;
-    clearInterval(countdown);
-    countdown = null;
-    process.stdout.write(`\r\x1b[2K${dim('Press Enter to close.')}`);
-  };
-  const close = () => {
-    if (countdown) clearInterval(countdown);
-    if (stdin.setRawMode) stdin.setRawMode(false);
-    closeWindow();
-    process.exit(0);
-  };
-  if (stdin.setRawMode) stdin.setRawMode(true);
-  stdin.setEncoding('utf8');
-  stdin.resume();
-  stdin.on('data', (key) => {
-    if (key === '\r' || key === '\n' || key === '\x03' || key === '\x04') close();  // enter, ctrl-c, ctrl-d
-    else if (key === ' ') stayOpen();
-  });
-  if (!(closeAfter > 0)) {
-    line(dim('Press Enter to close.'));
-    return;
-  }
-  let left = Math.ceil(closeAfter);
-  const show = () => process.stdout.write(`\r\x1b[2K${dim(`Closing in ${left}s ${M.dot} Enter closes now, space keeps it open.`)}`);
+  // The window then closes by itself `closeAfter` seconds later, or on Enter (see utils/terminal.js).
   nl();
-  show();
-  countdown = setInterval(() => {
-    if (--left > 0) { show(); return; }
-    process.stdout.write('\n');
-    close();
-  }, 1000);
-}
-
-// On macOS the window is Terminal.app's or iTerm2's (`terminal`). Terminal keeps a window whose
-// process ended ("[Process completed]", by default) rather than closing it, and iTerm2 may be set to
-// (its profile's "after a session ends"): it is closed from here, once this process is gone (so the app
-// does not ask about a process still running), by its tty. Elsewhere the terminal closes with the process.
-function closeWindow() {
-  if (process.platform !== 'darwin') return;
-  let tty;
-  try {
-    tty = execFileSync('tty', { stdio: ['inherit', 'pipe', 'ignore'] }).toString().trim();
-  } catch (e) {
-    return;
-  }
-  if (!/^\/dev\/[\w/]+$/.test(tty)) return;
-  const script = terminal === 'iterm' ? [
-    'delay 0.3',
-    'tell application "iTerm"',
-    'repeat with w in windows',
-    'repeat with t in tabs of w',
-    'repeat with s in sessions of t',
-    `if tty of s is "${tty}" then close s`,
-    'end repeat',
-    'end repeat',
-    'end repeat',
-    'end tell'
-  ] : [
-    'delay 0.3',
-    'tell application "Terminal"',
-    'repeat with w in windows',
-    'repeat with t in tabs of w',
-    `if tty of t is "${tty}" then close t`,
-    'end repeat',
-    'end repeat',
-    'end tell'
-  ];
-  try {
-    spawn('osascript', script.flatMap(l => ['-e', l]), { detached: true, stdio: 'ignore' }).unref();
-  } catch (e) { /* the window stays */ }
+  if (closeAfter > 0) write('\n');
+  waitToClose({ closeAfter, terminal, dim, dot: M.dot });
 }
 
 function fail(message) {
