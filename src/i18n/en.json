@@ -192,7 +192,7 @@
     },
     "preview": {
       "keys": "space",
-      "desc": "preview task.txt"
+      "desc": "open the task dialog: edit task.txt and its prompt, saved with Save (⌘S)"
     },
     "files": {
       "keys": "j / k, space on Task",
@@ -204,10 +204,10 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "edit the task's prompt (in the panel, the preview, or a new task after esc)"
+      "desc": "edit the task's prompt (in the panel, or in the task dialog once esc left the text)"
     },
     "run": {
-      "keys": "shift+r; r in the preview",
+      "keys": "shift+r; r in the task dialog",
       "desc": "run the task's prompt with Claude Code"
     },
     "pending": {
@@ -365,7 +365,6 @@
     "turns_other": "{{count}} turns",
     "queued": "waiting for {{machine}}",
     "noRunner": "Runs on {{machine}}, which is not connected: start taskmgrd there with AI_RUNNER=1 in its .env",
-    "noPrompt": "No prompt to run: g writes one",
     "noMachine": "This copy was pushed without a machine id: Claude Code cannot run on it",
     "thinking": "Thinking",
     "using": "Using {{tool}}",

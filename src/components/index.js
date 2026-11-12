@@ -7,7 +7,6 @@ export { default as TreeLines } from "./TreeLines";
 export { default as MachineDot } from "./MachineDot";
 export { default as Attachments, useTaskFiles } from "./Attachments";
 export { default as FilePreviewModal } from "./FilePreviewModal";
-export { default as TaskPreviewModal } from "./TaskPreviewModal";
 export { default as TaskPanel } from "./TaskPanel";
 export { default as ConfigEditorModal } from "./ConfigEditorModal";
 export { default as LanguageSwitcher } from "./LanguageSwitcher";

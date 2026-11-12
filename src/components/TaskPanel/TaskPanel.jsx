@@ -178,7 +178,7 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  <RunButton run={run} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
+                  <RunButton run={run} disabled={!attachments.prompt?.trim()} reason={noRunner} onClick={() => onRun(task)} />
                 </div>
               </div>
               {/* The prompt's part: its text, with the task's runs under it when it has had any. */}

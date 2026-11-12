@@ -192,7 +192,7 @@
     },
     "preview": {
       "keys": "space",
-      "desc": "task.txt をプレビュー"
+      "desc": "タスクダイアログを開く：task.txt とプロンプトを編集し、保存（⌘S）で書き込み"
     },
     "files": {
       "keys": "Task で j / k, space",
@@ -204,10 +204,10 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "タスクのプロンプトを編集（パネル、プレビュー、または新規タスクで esc の後）"
+      "desc": "タスクのプロンプトを編集（パネル、またはタスクダイアログで esc の後）"
     },
     "run": {
-      "keys": "shift+r、プレビューでは r",
+      "keys": "shift+r、タスクダイアログでは r",
       "desc": "タスクのプロンプトを Claude Code で実行"
     },
     "pending": {
@@ -365,7 +365,6 @@
     "turns_other": "{{count}} ターン",
     "queued": "{{machine}} を待っています",
     "noRunner": "{{machine}} で実行しますが、接続されていません：そのマシンの .env で AI_RUNNER=1 にして taskmgrd を起動してください",
-    "noPrompt": "実行するプロンプトがありません：g で書けます",
     "noMachine": "このコピーはマシン名なしで送られたため、Claude Code を実行できません",
     "thinking": "考え中",
     "using": "{{tool}} を使用中",

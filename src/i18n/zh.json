@@ -192,7 +192,7 @@
     },
     "preview": {
       "keys": "space",
-      "desc": "预览 task.txt"
+      "desc": "打开任务窗口：编辑 task.txt 和 prompt，按保存（⌘S）写入"
     },
     "files": {
       "keys": "在 Task 中 j / k, space",
@@ -204,10 +204,10 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "编辑任务的 prompt（在面板、预览中，或新建任务窗口按 esc 之后）"
+      "desc": "编辑任务的 prompt（在面板中，或在任务窗口按 esc 离开输入框之后）"
     },
     "run": {
-      "keys": "shift+r；预览中 r",
+      "keys": "shift+r；任务窗口中 r",
       "desc": "用 Claude Code 执行任务的 prompt"
     },
     "pending": {
@@ -365,7 +365,6 @@
     "turns_other": "{{count}} 轮",
     "queued": "等待 {{machine}}",
     "noRunner": "需在 {{machine}} 上运行，但它未连接：在那台机器的 .env 里设 AI_RUNNER=1 并启动 taskmgrd",
-    "noPrompt": "没有可执行的 prompt：按 g 编写",
     "noMachine": "这个副本推送时没有机器名，无法运行 Claude Code",
     "thinking": "思考中",
     "using": "正在使用 {{tool}}",

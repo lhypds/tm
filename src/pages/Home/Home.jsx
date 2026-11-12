@@ -11,7 +11,6 @@ import {
   ConfirmModal,
   HelpModal,
   FilePreviewModal,
-  TaskPreviewModal,
   ConfigEditorModal,
   WorkEditModal,
   AddSpaceModal,
@@ -690,14 +689,11 @@ export default function Home({ all = false }) {
     await startRun(task);
   };
   // r on a task (the selected one, or the preview's), as its run button: its run going is shown,
-  // else Claude Code starts on it; a toast says why not, where the button would be greyed out
-  // (no prompt.txt, or its machine not connected). `hook` is the task's useTaskFiles.
+  // else Claude Code starts on it; nothing happens where the button would be greyed out (no
+  // prompt, or a blank one, or its machine not connected). `hook` is the task's useTaskFiles.
   const runPrompt = (task, hook) => {
     if (!task) return;
-    if (!isGoing(ai.runFor(task))) {
-      const reason = hook.prompt == null ? t("ai.noPrompt") : noRunnerOf(task.space);
-      if (reason) return showToast(reason, 4000);
-    }
+    if (!isGoing(ai.runFor(task)) && (!hook.prompt?.trim() || noRunnerOf(task.space))) return;
     openRun(task);
   };
   const movePick = (dir) => setPickRun((p) => p && { ...p, index: p.index < 0 ? firstReady(p.machines) : stepReady(p.machines, p.index, dir) });
@@ -761,8 +757,7 @@ export default function Home({ all = false }) {
   // The same for the task preview opened with space: j / k pick a file, enter opens it.
   // peek holds the key; the task itself is read fresh, so a saved edit shows at once
   const peekTask = tasks.find((task) => task.key === peek?.key) || peek;
-  const [peekEditing, setPeekEditing] = useState(null); // the preview's text being edited: "task", "prompt" or null
-  const [peekSection, setPeekSection] = useState(null); // the text the keyboard is on in the preview: "task" or "prompt", null until j / k chose one
+  const editorKeys = useRef(null); // the task dialog's keys while it is open (see TaskEditorModal)
   const peekAttachments = useTaskFiles(peekTask?.space, peekTask?.rel, loads);
   const peekFiles = peekAttachments.files.filter((f) => !f.isDir);
   const [peekFileRel, setPeekFileRel] = useState(null);
@@ -770,8 +765,6 @@ export default function Home({ all = false }) {
   const closePeek = () => {
     setPeek(null);
     setPeekFileRel(null);
-    setPeekEditing(null);
-    setPeekSection(null);
   };
   // d on a file asks in a popup; confirming (d again, or the button) deletes it and moves the highlight to its neighbour.
   // The same popup asks before a run's record is removed (`record`, see forgetRecord).
@@ -794,7 +787,7 @@ export default function Home({ all = false }) {
   // d, or the preview's delete button, deletes it as d on a file chosen in that list does (asking
   // first); the preview closes once it is gone and the highlight moves to its neighbour. Null for
   // a file from elsewhere (the task editor's), which the preview cannot delete.
-  const previewList = peek ? peekFiles : fileList;
+  const previewList = creating ? [] : peek ? peekFiles : fileList;
   const previewEntry = preview ? previewList.find((f) => f.rel === preview.rel) : null;
   const deletePreviewFile = previewEntry
     ? () =>
@@ -816,11 +809,6 @@ export default function Home({ all = false }) {
       setSection("task");
       setPickedRun(null); // the runs under the prompt go with it
     }
-  }
-  function showPeekPrompt(open) {
-    setPeekPromptOpen(open);
-    if (open) makePrompt(peekAttachments);
-    else setPeekSection((s) => (s === "prompt" ? "task" : s));
   }
   // A blank prompt.txt for the task of `hook` (a useTaskFiles) when it has none (null: read, and no
   // file); the folder is re-read after, so the other reader of it (panel or preview) shows it too.
@@ -1019,8 +1007,40 @@ export default function Home({ all = false }) {
     }
   }
 
+  // The task dialog saved on an existing task: its text when it changed (the first line names the
+  // folder, so the task may move), and, with the Prompt area shown (`prompt` not null), its
+  // prompt.txt: written when it changed, removed when emptied. The dialog closes; with `execute`
+  // Claude Code then runs on the task, as its run button would.
+  async function saveEdited(task, { text, prompt, execute }) {
+    setSaving(true);
+    try {
+      let rel = task.rel;
+      if (text !== (task.details ?? "")) rel = (await api.saveTaskText(task.space, task.rel, text)).task.rel;
+      if (prompt !== null) {
+        const had = peekAttachments.prompt;
+        if (!prompt.trim()) {
+          if (had != null) await api.deleteTaskPrompt(task.space, rel);
+        } else if (prompt !== had) await api.saveTaskPrompt(task.space, rel, prompt);
+      }
+      const key = keyOf(task.space, rel);
+      setSelectedKey((k) => (k === task.key ? key : k));
+      closePeek();
+      await reload();
+      showToast(t("toast.saved"));
+      if (execute) {
+        const reason = noRunnerOf(task.space);
+        if (reason) showToast(reason, 5000);
+        else openRun({ ...task, rel, key, details: text });
+      }
+    } catch (e) {
+      showToast(e.message, 4000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // `prompt`: the text of the editor's Prompt area when it is shown ("Save & Execute"), which
-  // becomes the task's prompt.txt, blank or not; Claude Code then runs on the task, as its run
+  // becomes the task's prompt.txt (never blank: the editor only saves then); Claude Code then runs on the task, as its run
   // button would (asking which machine first, when two sync its folder). Null: saved only.
   async function saveEditor(text, files = [], prompt = null) {
     setSaving(true);
@@ -1295,7 +1315,6 @@ export default function Home({ all = false }) {
   // The terminal's key bindings (see cli.js); :h lists them.
   useShortcuts((name) => {
     if (
-      creating ||
       confirm ||
       removingFile ||
       configOpen ||
@@ -1357,7 +1376,7 @@ export default function Home({ all = false }) {
     }
     if (preview) {
       // j / k step to the next / previous file of the task the preview came from
-      const list = (peek ? peekFiles : fileList).filter((f) => !f.isDir && previewKind(f.name));
+      const list = (creating ? [] : peek ? peekFiles : fileList).filter((f) => !f.isDir && previewKind(f.name));
       const move = moveIndex(name, list.findIndex((f) => f.rel === preview.rel), list.length);
       if (move !== null) {
         if (move >= 0 && list[move].rel !== preview.rel) {
@@ -1380,60 +1399,8 @@ export default function Home({ all = false }) {
       closePreview();
       return true;
     }
-    if (peek) {
-      // j / k walk the task's text, its prompt (when shown) and then the attachments; the preview
-      // opens with nothing chosen, so the first j lands on the task's text. e / i edit the text
-      // chosen (the task's, with none or an attachment chosen); enter opens the attachment chosen,
-      // and otherwise closes the preview, as q and space do.
-      const rows = ["task", ...(peekPromptOpen ? ["prompt"] : []), ...peekFiles.map((f) => f.rel)];
-      const at = peekFile ? rows.indexOf(peekFile.rel) : rows.indexOf(peekSection); // -1 with nothing chosen
-      const move = moveIndex(name, at, rows.length);
-      if (move !== null) {
-        if (move >= 0) {
-          const row = rows[move];
-          if (row === "task" || row === "prompt") {
-            setPeekSection(row);
-            setPeekFileRel(null);
-          } else setPeekFileRel(row);
-        }
-        return true;
-      }
-      const text = peekFile ? null : peekSection; // the text chosen, when not an attachment (null before j / k chose one)
-      if (["e", "i"].includes(name)) {
-        setPeekEditing(text || "task");
-        return true;
-      }
-      if (name === "d") {
-        // the chosen attachment, else the task itself (not on the prompt, which is not deleted);
-        // each asks first
-        if (peekFile) deleteFile(peekAttachments, peekFiles, peekFile, setPeekFileRel);
-        else if (text !== "prompt") setConfirm(peekTask);
-        return true;
-      }
-      if (["enter", "space"].includes(name) && peekFile) {
-        openFile(peekFile, peek);
-        return true;
-      }
-      if (name === "o") {
-        openFolder(peekTask);
-        return true;
-      }
-      // g edits the prompt, shown first when hidden; r runs it, as the run button beside it
-      if (name === "g" || name === "G") {
-        if (!peekPromptOpen) showPeekPrompt(true);
-        setPeekSection("prompt");
-        setPeekFileRel(null);
-        setPeekEditing("prompt");
-        return true;
-      }
-      if (name === "r" || name === "R") {
-        runPrompt(peekTask, peekAttachments);
-        return true;
-      }
-      if (!["q", "enter", "space"].includes(name)) return false;
-      closePeek();
-      return true;
-    }
+    // The task dialog, new task or existing: its own keys (see TaskEditorModal).
+    if (creating || peek) return editorKeys.current?.(name) ?? false;
     // the help closes with the keys that close it in the terminal
     if (help) {
       if (!["q", "enter", "space"].includes(name)) return false;
@@ -2128,37 +2095,30 @@ export default function Home({ all = false }) {
 
       <HelpModal isOpen={help} onClose={() => setHelp(false)} />
 
+      {/* the task dialog: a new task, or the one opened with space or a double click */}
       <TaskEditorModal
-        isOpen={!!creating}
+        isOpen={!!creating || !!peekTask}
+        task={creating ? null : peekTask}
         space={creating?.space}
         parent={creating?.parent}
         saving={saving}
-        onCancel={() => setCreating(null)}
-        onSave={saveEditor}
-        onPreview={(file) => setPreview({ ...file, space: creating.space })}
-      />
-
-      {/* its brain shows the prompt here on its own, apart from the panel's */}
-      <TaskPreviewModal
-        task={peekTask}
-        editing={peekEditing}
-        onEdit={setPeekEditing}
-        onEndEdit={() => setPeekEditing(null)}
-        onSave={saveText}
-        onSavePrompt={(task, text, auto) => savePrompt(peekAttachments, task, text, auto)}
-        onOpenFile={(file) => openFile(file, peek)}
-        onOpenFolder={openFolder}
-        onDelete={setConfirm}
-        files={peekFiles}
-        selectedRel={peekFile?.rel}
-        onClose={closePeek}
+        keysRef={editorKeys}
         prompt={peekAttachments.prompt}
-        promptOpen={peekPromptOpen}
-        onTogglePrompt={() => showPeekPrompt(!peekPromptOpen)}
-        section={peekFile ? null : peekSection}
+        promptDefault={peekPromptOpen}
+        onPromptOpen={setPeekPromptOpen}
+        files={creating ? [] : peekFiles}
+        selectedRel={peekFile?.rel}
+        onSelectRel={setPeekFileRel}
         run={ai.runFor(peekTask)}
         noRunner={noRunnerOf(peekTask?.space)}
         onRun={openRun}
+        onCancel={() => (creating ? setCreating(null) : closePeek())}
+        onSave={(v) => (creating ? saveEditor(v.text, v.files, v.execute ? v.prompt : null) : saveEdited(peekTask, v))}
+        onPreview={(file) => setPreview({ ...file, space: creating.space })}
+        onOpenFile={(file) => openFile(file, peek)}
+        onOpenFolder={openFolder}
+        onDelete={setConfirm}
+        onDeleteFile={(file) => deleteFile(peekAttachments, peekFiles, file, setPeekFileRel)}
       />
 
       {/* the run of Claude Code on a task, opened by the run button beside its prompt */}

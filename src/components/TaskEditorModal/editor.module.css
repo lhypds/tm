@@ -1,4 +1,4 @@
-/* As big as the task preview (see taskPreview.module.css). */
+/* The task dialog, new task or existing: most of the screen. */
 .modal.modal {
   max-width: 900px;
   width: 80vw;
@@ -8,45 +8,88 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
 }
 
-/* A text's part of the height: the task's, and with the prompt shown the prompt's too, the two
-   sharing it equally (the TextArea's wrapper fills it, and the textarea its wrapper). */
-.area {
-  flex: 1;
-  min-height: 80px;
+/* The folder, brain and delete buttons beside the title, framed as the Task panel's are (global .btn). */
+.headerButtons {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-.area > div {
-  flex: 1;
-  min-height: 0;
-}
-
-/* The whole task file: front matter and details, monospaced like the terminal editor (the grid
-   comes with the TextArea). A long line wraps, as it does in the panel's text. */
+/* The task's text; with the prompt shown, the prompt's too, the two sharing the height equally.
+   Monospaced over the panel's grid, like the terminal editor; a long line wraps. */
 .text {
-  height: 100%;
+  flex: 1;
+  min-height: 60px;
+  width: 100%;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  resize: none;
+  outline: none;
+  color: inherit;
+  border: var(--line) solid var(--border);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 2ch 18px;
+  background-repeat: repeat; /* ress turns it off everywhere */
+  background-origin: content-box;
+  background-attachment: local;
   font-family: var(--font);
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 18px;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* The text the caret left (esc), or the one j / k chose since: shaded, as the text chosen in the
-   task preview is. Not while the caret is in it. */
+/* The text the keyboard is on (j / k, or the one the caret left with esc): shaded, as a chosen
+   attachment's row. Not while the caret is in it. */
 .text[data-selected="true"]:not(:focus) {
   background-color: var(--bg-hover);
 }
 
-/* Above the prompt: its name, closer to the prompt under it than to the task's text above. */
+/* Above the prompt: its name, with the run button right beside it. Closer to the prompt under it
+   (half the column's gap) than to the task's text above, so it reads as the prompt's head. */
 .promptHead {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -4px;
+}
+
+.promptHead > span {
   font-size: 14px;
-  margin-bottom: -6px;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+  max-height: 25%;
+  overflow: auto;
+}
+
+.files ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.files a {
+  text-decoration: underline;
+}
+
+.files li[data-selected="true"] {
+  background: var(--bg-hover);
 }
 
 .actions {
