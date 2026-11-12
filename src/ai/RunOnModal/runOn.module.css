@@ -1,5 +1,5 @@
-/* The machines a task can run on (see RunOnModal): a short list, the one the keyboard is on shaded
-   as a chosen file is. */
+/* The machines a task can run on (see RunOnModal): a short list of framed rows, the one the keyboard
+   is on shaded as a chosen file is. */
 .modal {
   max-width: 320px;
 }
@@ -10,6 +10,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
 .machines li {
@@ -18,6 +19,7 @@
   gap: 2px;
   min-width: 0;
   padding: 6px 8px;
+  border: var(--line) solid var(--border);
   cursor: pointer;
 }
 

@@ -587,9 +587,10 @@ export default function Home({ all = false }) {
     setStarting(false);
     if (!ok) closeRun();
   };
-  // Pressed on a task whose folder two machines sync, the run button first asks which one runs it
-  // (`pickRun`: the task, and the machine of the list the keyboard is on, to begin with one whose
-  // runner is connected; see RunOnModal): enter or a click runs it there, esc lets go.
+  // Pressed on a task whose folder two machines sync, the run button opens the run's dialog and, in
+  // front of it, asks which one runs the task (`pickRun`: the task, and the machine of the list the
+  // keyboard is on, to begin with one whose runner is connected; see RunOnModal): enter or a click
+  // runs it there, esc lets go, closing the run's dialog with it.
   const [pickRun, setPickRun] = useState(null); // { task, index } while the machines are listed
   const openRun = async (task, folder = null) => {
     if (folder) {
@@ -599,6 +600,7 @@ export default function Home({ all = false }) {
     }
     if (isGoing(ai.runFor(task))) return showRun(task, null); // the run going opens
     if (runMachines.length > 1 && task.key === selected?.key) {
+      showRun(task, null);
       setPickRun({ task, index: Math.max(0, runMachines.findIndex((m) => m.runner)) });
       return;
     }
@@ -616,6 +618,10 @@ export default function Home({ all = false }) {
     const { task } = pickRun;
     setPickRun(null);
     startRun(task, m.name);
+  };
+  const cancelPick = () => {
+    setPickRun(null);
+    closeRun();
   };
   const closeRun = () => {
     setRunKey(null);
@@ -1981,7 +1987,7 @@ export default function Home({ all = false }) {
       {/* the run of Claude Code on a task, opened by the run button beside its prompt */}
       <RunModal
         task={runTask}
-        run={starting ? null : ai.runFor(runTask)}
+        run={starting || pickRun ? null : ai.runFor(runTask)}
         saved={savedRuns}
         folder={runFolder}
         file={runFile}
@@ -1997,7 +2003,7 @@ export default function Home({ all = false }) {
       />
 
       {/* which machine a task runs on, asked by the run button when two sync its folder */}
-      <RunOnModal machines={pickRun ? runMachines : null} index={pickRun?.index} onPick={confirmPick} onClose={() => setPickRun(null)} />
+      <RunOnModal machines={pickRun ? runMachines : null} index={pickRun?.index} onPick={confirmPick} onClose={cancelPick} />
 
       {/* the machines, and a prompt to run on them; a run of theirs in its own dialog, in front */}
       <MachinesModal

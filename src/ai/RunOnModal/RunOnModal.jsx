@@ -3,7 +3,7 @@ import MachineDot from "@components/MachineDot";
 import styles from "./runOn.module.css";
 
 // Where a task runs, asked once the run button is pressed on a task whose folder two machines sync
-// (see openRun in Home), before anything starts: the machines (`machines`, as GET /api/spaces says
+// (see openRun in Home), before anything starts, in front of the run's dialog: the machines (`machines`, as GET /api/spaces says
 // them), and nothing else, no title. `index` is the one the keyboard is on, shaded; the page's keys
 // move it (j / k or the arrows) and enter runs the task there, as a click on a machine does
 // (onPick(index)). Esc, × or a click outside closes it without running (onClose). A machine whose
