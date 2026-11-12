@@ -1195,11 +1195,10 @@ function editConfig() {
 }
 
 // `tm push`: what the sync daemon does, once and in the foreground: push what differs from the
-// server, report it, and exit (non-zero when the push failed). `tm push --force` also overwrites
-// a folder the server has tasks of its own in (see PULL_FIRST in server/sync.js).
-function pushNow(force) {
+// server, report it, and exit (non-zero when the push failed).
+function pushNow() {
   const { spawnSync } = require('child_process');
-  const result = spawnSync(process.execPath, [path.join(__dirname, 'push.js'), ...(force ? ['--force'] : [])], { stdio: 'inherit' });
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'push.js')], { stdio: 'inherit' });
   process.exit(result.status === null ? 1 : result.status);
 }
 
@@ -1326,7 +1325,7 @@ function main() {
     return;
   }
   if (command === 'push') {
-    pushNow(args.slice(1).includes('--force'));
+    pushNow();
     return;
   }
   if (command === 'pull') {

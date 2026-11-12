@@ -38,7 +38,7 @@ const { loadDotenv, parseConfig, DEFAULT_CONFIG_PATH } = require('./server/confi
 const { spaceKey } = require('./server/sync');
 const syncState = require('./server/syncstate');
 const {
-  TASK_FILE, STATUS_DIRS, TASK_FOLDER_RE, ensureTaskFile,
+  TASK_FILE, STATUS_DIRS, TASK_FOLDER_RE, ensureTaskFile, taskEntries,
   SYNC_MAX_FILE_BYTES: MAX_FILE_BYTES, SYNC_MAX_FOLDER_BYTES: MAX_FOLDER_BYTES,
   SYNC_MAX_FOLDER_FILES: MAX_FOLDER_FILES, isSyncSkipped
 } = require('./utils/task');
@@ -52,9 +52,6 @@ const SERVER = String(process.env.SYNC_SERVER || '').trim().replace(/\/+$/, '');
 const TOKEN = String(process.env.SYNC_SERVER_TOKEN || '').trim();
 // What the server shows a folder pushed from here as coming from: MACHINE_ID, or the hostname.
 const MACHINE_ID = String(process.env.MACHINE_ID || '').trim() || os.hostname();
-// `tm push --force`: also overwrite a folder the server has tasks of its own in (see PULL_FIRST in
-// server/sync.js). Never set for the daemon, which requires this file.
-const FORCE = require.main === module && process.argv.includes('--force');
 const CONFIG_PATH = DEFAULT_CONFIG_PATH;
 
 const sha1 = (text) => crypto.createHash('sha1').update(text).digest('hex');
@@ -314,7 +311,7 @@ function isDir(p) {
 
 // One request to the server: `body` is sent as JSON, or as it is when it is a Buffer (a file). A
 // refused request throws an error carrying the server's `code` and `missing` (see server/sync.js).
-async function request(method, route, body, { timeout = REQUEST_TIMEOUT_MS } = {}) {
+async function request(method, route, body, { timeout = REQUEST_TIMEOUT_MS, raw: rawAnswer = false } = {}) {
   const raw = Buffer.isBuffer(body);
   let res;
   try {
@@ -328,6 +325,7 @@ async function request(method, route, body, { timeout = REQUEST_TIMEOUT_MS } = {
     const why = e.name === 'TimeoutError' ? 'no answer in time' : (e.cause && e.cause.code) || e.cause?.message || e.message;
     throw new Error(`cannot reach ${SERVER} (${why})`);
   }
+  if (res.ok && rawAnswer) return Buffer.from(await res.arrayBuffer());  // a file, as it is
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(`${SERVER} answered ${res.status}${data.error ? `: ${data.error}` : ''}`);
@@ -350,8 +348,64 @@ async function pushConfig(text) {
   return `pushed taskmgr.json${pruned.length ? ` (removed on the server: ${pruned.join(', ')})` : ''}`;
 }
 
-// Push one space's snapshot (see snapshot); resolves to the line to log about it.
-async function pushSpace(space, { entries, blobs }) {
+// The id of the task a path of a tasks folder is in ("/"-separated, relative to it): the 12 digits
+// its folder name starts with, the folder being right in the tasks folder or in its done, pending
+// or aborted folder. '' for a path that is in no task.
+function taskIdOf(rel) {
+  const p = String(rel).split('/');
+  const name = p[STATUS_DIRS.includes(p[0]) ? 1 : 0] || '';
+  return TASK_FOLDER_RE.test(name) ? name.slice(0, 12) : '';
+}
+
+// The first sync of a folder the server has tasks in too (a work or repository of the same name
+// there, with tasks this machine does not have; the server says so, PULL_FIRST): the two are merged,
+// by task id. A task of the server whose id no task has here is brought over whole (its task.txt,
+// subtasks, attachments and other files), into the same place; a task whose id is here too is left
+// as it is here: what is here wins, and the push that follows removes the server's. Resolves to how
+// many tasks were brought over. Nothing here is changed or deleted. The server does not count this
+// machine as one of the space's yet (merge=1): it does once the push went through, so a merge that
+// fails is done again by the next push.
+async function mergeSpace(space, entries) {
+  const query = new URLSearchParams({ origin: space.origin || '', work: space.work, repository: space.repository || '', merge: '1' });
+  const answer = await request('GET', `/api/sync/pull/space?${query}`);
+  const here = new Set(entries.map(e => taskIdOf(e.path)).filter(Boolean));
+  const root = path.resolve(space.root);
+  const tasks = new Set();
+  for (const e of taskEntries(Array.isArray(answer.entries) ? answer.entries : [])) {
+    const id = taskIdOf(e.path);
+    if (!id || here.has(id)) continue;
+    const parts = String(e.path).split('/');
+    if (parts.some(s => !s || s === '.' || s === '..' || /[\\\0]/.test(s))) throw new Error(`${label(space)}: invalid path "${e.path}" on the server`);
+    const abs = path.resolve(root, ...parts);
+    if (!abs.startsWith(root + path.sep)) throw new Error(`${label(space)}: path "${e.path}" leaves the folder`);
+    if (e.dir === true) {
+      await fsp.mkdir(abs, { recursive: true });
+    } else {
+      let data;
+      if (typeof e.content === 'string') {
+        data = e.content;
+      } else {
+        const q = new URLSearchParams({ origin: space.origin || '', work: space.work, repository: space.repository || '', path: e.path, merge: '1' });
+        data = await request('GET', `/api/sync/pull/file?${q}`, null, { timeout: UPLOAD_TIMEOUT_MS, raw: true });
+      }
+      await fsp.mkdir(path.dirname(abs), { recursive: true });
+      const tmp = `${abs}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+      try {
+        await fsp.writeFile(tmp, data);
+        await fsp.rename(tmp, abs);
+      } finally {
+        await fsp.rm(tmp, { force: true });
+      }
+    }
+    tasks.add(`${STATUS_DIRS.includes(parts[0]) ? `${parts[0]}/` : ''}${id}`);
+  }
+  return tasks.size;
+}
+
+// Push one space's snapshot (see snapshot); resolves to the line to log about it. A folder the
+// server has tasks of its own in is merged with them first (see mergeSpace), then pushed as it is
+// after that (`merged`: how many tasks the merge brought, when this is that push).
+async function pushSpace(space, { entries, blobs }, merged = null) {
   // The attachments the server does not have yet go first, one by one; then the snapshot. Should
   // the server lose one meanwhile, it says which (MISSING_BLOBS) and those are sent once more.
   let uploaded = 0;
@@ -373,11 +427,15 @@ async function pushSpace(space, { entries, blobs }) {
     const { missing } = await request('POST', '/api/sync/blobs', { blobs: [...blobs.keys()] });
     await upload(missing);
   }
-  const body = { origin: space.origin, work: space.work, repository: space.repository, machine: MACHINE_ID, entries, ...(FORCE ? { force: true } : {}) };
+  const body = { origin: space.origin, work: space.work, repository: space.repository, machine: MACHINE_ID, entries, ...(merged === null ? {} : { merged: true }) };
   let result;
   try {
     result = await request('PUT', '/api/sync/space', body);
   } catch (e) {
+    if (e.code === 'PULL_FIRST' && merged === null && space.root) {
+      const brought = await mergeSpace(space, entries);
+      return pushSpace(space, await snapshot(space.root), brought);
+    }
     if (e.code !== 'MISSING_BLOBS' || !Array.isArray(e.missing)) throw e;
     await upload(e.missing);
     result = await request('PUT', '/api/sync/space', body);
@@ -385,7 +443,7 @@ async function pushSpace(space, { entries, blobs }) {
   const { files, dirs } = result;
   try { syncState.set(spaceKey(space), syncState.manifestOf(entries)); } catch (e) { warn(`could not record the sync state: ${e.message}`); }
   const n = (count, what) => `${count} ${what}${count === 1 ? '' : 's'}`;
-  return `pushed ${label(space)} (${n(files, 'file')}${dirs ? `, ${n(dirs, 'empty folder')}` : ''}${uploaded ? `, ${n(uploaded, 'attachment')} uploaded` : ''})`;
+  return `${merged === null ? '' : `merged ${label(space)} with the server's (${n(merged, 'task')} brought here); `}pushed ${label(space)} (${n(files, 'file')}${dirs ? `, ${n(dirs, 'empty folder')}` : ''}${uploaded ? `, ${n(uploaded, 'attachment')} uploaded` : ''})`;
 }
 
 module.exports = { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace, fileHash, saveHashCache };
@@ -413,7 +471,7 @@ async function main() {
       log(done);
       syncLog(true, done);
     } catch (e) {
-      if (e.code !== 'TOO_MANY_MACHINES' && e.code !== 'PULL_FIRST') fail(`${what}: ${e.message}`);
+      if (e.code !== 'TOO_MANY_MACHINES') fail(`${what}: ${e.message}`);
       warn(`${what}: ${e.message}`);
       syncLog(false, `${what}: ${e.message}`);
       refused.push(what);
