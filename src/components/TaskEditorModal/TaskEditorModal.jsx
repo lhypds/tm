@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { Modal } from "@ui";
 import Attachments from "@components/Attachments";
 import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
-import { RunButton } from "@ai";
 import { fileUrl } from "@utils/api";
 import { moveIndex } from "@utils/keys";
 import { formatSize, previewKind } from "@utils/task";
@@ -45,15 +44,15 @@ function HeaderButton({ label, dot, pressed, onClick, children }) {
 // prompt starts hidden; for an existing one as it was last left (`promptDefault`, onPromptOpen(open)
 // keeps it).
 // An existing task also has, beside the title, its folder (onOpenFolder) and delete (onDelete, which
-// asks first); beside "Prompt" the run button (RunButton: `run` the task's run, shown by
-// onRun(task) while it goes, `noRunner` why it cannot run; otherwise it saves and executes, as the
-// button at the bottom); and under the texts its attachments (`files`, the one at `selectedRel`
+// asks first), and under the texts its attachments (`files`, the one at `selectedRel`
 // marked), a click on one opening it through onOpenFile.
 // Keys: esc in a text takes the caret out of it (a second esc closes the dialog, as Cancel does:
 // what was typed is dropped), and the page's keys then work, handed over by Home through `keysRef`
 // (keysRef.current(name) says whether it used the key): j / k walk the task's text, the prompt
 // (when shown) and the attachments (onSelectRel(rel)), the one chosen shaded; e / i put the caret
-// in the text chosen; g shows the prompt and puts the caret in it; r runs (as the run button). On
+// in the text chosen; g shows the prompt and puts the caret in it, and hides it again; r saves and executes, as the
+// button does (or shows the task's run, `run`, through onRun(task) while one is going; not while
+// `noRunner` says the task cannot run). On
 // an existing task also: enter / space open the attachment chosen, d deletes it (onDeleteFile), or
 // the task with none chosen, o opens the folder, and q, space or enter close the dialog while
 // nothing was typed. A new task opens with the caret in its text, an existing one with nothing chosen.
@@ -191,8 +190,7 @@ export default function TaskEditorModal({
       return true;
     }
     if (name === "g") {
-      if (!promptOpen) showPrompt(true);
-      else focusText("prompt");
+      showPrompt(!promptOpen); // shown, with the caret in it; again (once esc left it), hidden
       return true;
     }
     if (name === "r") {
@@ -255,10 +253,9 @@ export default function TaskEditorModal({
 
         {promptOpen && (
           <>
-            {/* the prompt's head, as the panel's divider: its name, and the run button */}
+            {/* the prompt's head, as the panel's divider: its name */}
             <div className={styles.promptHead}>
               <span>{t("panel.prompt")}</span>
-              {task && <RunButton run={run} disabled={!execute || blocked} reason={noRunner} onClick={runNow} />}
             </div>
             <textarea
               ref={promptRef}

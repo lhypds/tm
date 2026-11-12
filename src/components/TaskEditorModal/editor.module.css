@@ -52,7 +52,7 @@
   background-color: var(--bg-hover);
 }
 
-/* Above the prompt: its name, with the run button right beside it. Closer to the prompt under it
+/* Above the prompt: its name. Closer to the prompt under it
    (half the column's gap) than to the task's text above, so it reads as the prompt's head. */
 .promptHead {
   flex: none;

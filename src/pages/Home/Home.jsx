@@ -1433,11 +1433,12 @@ export default function Home({ all = false }) {
       reload();
       return true;
     }
-    // g edits the selected task's prompt in the panel (shown first, when hidden); shift+r runs it,
+    // g shows the selected task's prompt in the panel and puts the caret in it, and hides it again; shift+r runs it,
     // as the run button beside it (r alone refreshes here)
     if (name === "g" || name === "G") {
-      if (selected) {
-        if (!promptOpen) showPrompt(true);
+      if (promptOpen) showPrompt(false); // again (once esc left the prompt): hidden
+      else if (selected) {
+        showPrompt(true);
         selectSection("prompt");
         openEditor(selected, "prompt");
       }
