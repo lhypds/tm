@@ -328,7 +328,6 @@
   },
   "ai": {
     "run": "用 Claude Code 执行",
-    "runOn": "在哪台机器上运行",
     "afterPush": "Commit & push",
     "afterPr": "Create PR",
     "show": "查看运行",

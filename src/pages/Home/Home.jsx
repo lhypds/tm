@@ -40,7 +40,7 @@ import { ALL_MONTHS, inPeriod, taskMonths, monthLabel, previewKind, flattenTasks
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
-import { RunModal, MachinesModal, useRuns } from "@ai";
+import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -547,20 +547,16 @@ export default function Home({ all = false }) {
   const selectedRun = ai.runFor(selected);
   // Where the selected task would run: here, or, for a copy pushed from another machine, on that
   // machine (see server/ai/ai.js), which needs its taskmgrd connected as a runner (AI_RUNNER=1 there).
-  // A folder two machines sync runs on the one picked in the dropdown beside the run button
-  // (`runOn`, by folder; kept while the page is open), or, until one is picked, on the one the
-  // server would take (one whose runner is connected, or else the first).
-  // The reason it cannot now, for the run button; null when it can, or nothing is known yet.
-  const [runOn, setRunOn] = useState({}); // "work/repository" -> the name of the machine picked
+  // The reason it cannot now, for the run button; null when it can, or nothing is known yet. A
+  // folder two machines sync can run while either's runner is connected: which one is asked once
+  // the button is pressed (see openRun).
   const runSpace = useMemo(() => {
     const sp = selected?.space;
     const w = sp && works?.find((x) => x.work === sp.work);
     return (w && (sp.repository ? w.repositories.find((p) => p.name === sp.repository) : w)) || null;
   }, [selected, works]);
-  const runOnKey = selected?.space ? `${selected.space.work}/${selected.space.repository || ""}` : "";
   const runMachines = runSpace?.remote ? runSpace.machines || [] : [];
-  const runMachine = runMachines.find((m) => m.name === runOn[runOnKey]) || runSpace?.machine || null;
-  const noRunner = !runSpace?.remote ? null : !runMachine ? t("ai.noMachine") : runMachine.runner ? null : t("ai.noRunner", { machine: runMachine.name });
+  const noRunner = !runSpace?.remote ? null : !runSpace.machine ? t("ai.noMachine") : runSpace.machine.runner ? null : t("ai.noRunner", { machine: runSpace.machine.name });
   // The selected task's attachments; on the Task panel j / k walk them and space opens one. Also the
   // records of its runs of Claude Code (attachments.runs), which the run button shows when the task
   // has no run going.
@@ -575,22 +571,51 @@ export default function Home({ all = false }) {
   const savedRuns = runTask && runTask.key === selected?.key ? attachments.runs : [];
   const [starting, setStarting] = useState(false); // a run asked for and not answered yet: the dialog says so, rather than showing the task's last run
   const isGoing = (run) => !!run && (run.status === "running" || run.status === "queued");
-  const openRun = async (task, folder = null) => {
+  const showRun = (task, folder) => {
     setRunKey(task.key);
     setRunFolder(folder);
     setRunFile(null);
     setRunPromptRel(null);
+  };
+  // A run starts, with what to do after the work as the checkboxes under the prompt say, on
+  // `machine` when the task's folder is synced by two; refused (the machine not connected, say),
+  // the dialog closes again.
+  const startRun = async (task, machine = null) => {
+    showRun(task, null);
+    setStarting(true);
+    const ok = await ai.start(task, runAfter, machine);
+    setStarting(false);
+    if (!ok) closeRun();
+  };
+  // Pressed on a task whose folder two machines sync, the run button first asks which one runs it
+  // (`pickRun`: the task, and the machine of the list the keyboard is on, to begin with one whose
+  // runner is connected; see RunOnModal): enter or a click runs it there, esc lets go.
+  const [pickRun, setPickRun] = useState(null); // { task, index } while the machines are listed
+  const openRun = async (task, folder = null) => {
     if (folder) {
+      showRun(task, folder);
       selectRun(folder); // the keyboard is on the record opened, so space closes and opens it again
       return;
     }
-    if (isGoing(ai.runFor(task))) return; // the run going opens
-    // else a run starts, with what to do after the work as the checkboxes under the prompt say;
-    // refused (the machine not connected, say), the dialog closes again
-    setStarting(true);
-    const ok = await ai.start(task, runAfter, runMachines.length > 1 && task.key === selected?.key ? runMachine?.name || null : null);
-    setStarting(false);
-    if (!ok) closeRun();
+    if (isGoing(ai.runFor(task))) return showRun(task, null); // the run going opens
+    if (runMachines.length > 1 && task.key === selected?.key) {
+      setPickRun({ task, index: Math.max(0, runMachines.findIndex((m) => m.runner)) });
+      return;
+    }
+    await startRun(task);
+  };
+  const confirmPick = (index) => {
+    if (!pickRun) return;
+    const m = runMachines[index];
+    if (!m) return;
+    if (!m.runner) {
+      setPickRun({ ...pickRun, index });
+      showToast(t("ai.noRunner", { machine: m.name }), 4000, "bottom", "error");
+      return;
+    }
+    const { task } = pickRun;
+    setPickRun(null);
+    startRun(task, m.name);
   };
   const closeRun = () => {
     setRunKey(null);
@@ -1124,7 +1149,7 @@ export default function Home({ all = false }) {
       if (e.defaultPrevented || e.repeat || (e.code !== "KeyC" && e.key.toLowerCase() !== "c")) return;
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || isTyping(e)) return;
       if (!selected || window.getSelection?.()?.toString()) return;
-      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || analysisOpen || machinesOpen || runKey !== null || command !== null) return;
+      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || analysisOpen || machinesOpen || pickRun || runKey !== null || command !== null) return;
       e.preventDefault();
       const id = runId(selected);
       copyText(id).then((ok) => {
@@ -1170,6 +1195,19 @@ export default function Home({ all = false }) {
       command !== null
     )
       return false;
+    if (pickRun) {
+      // The machines a task can run on: j / k walk them, enter runs the task on the one they are on.
+      const move = moveIndex(name, pickRun.index, runMachines.length);
+      if (move !== null) {
+        if (move >= 0) setPickRun({ ...pickRun, index: move });
+        return true;
+      }
+      if (name === "enter") {
+        confirmPick(pickRun.index);
+        return true;
+      }
+      return false;
+    }
     if (runKey !== null && runFile) {
       // A file previewed from the run dialog: j / k step to the next / previous of the run's
       // prompts, as they step through a task's files; q, enter and space close it, as they close
@@ -1776,9 +1814,6 @@ export default function Home({ all = false }) {
               onSavePrompt={(task, text, auto) => savePrompt(attachments, task, text, auto)}
               run={selectedRun}
               noRunner={noRunner}
-              machines={runMachines}
-              machine={runMachine?.name || ""}
-              onMachine={(name) => setRunOn((prev) => ({ ...prev, [runOnKey]: name }))}
               onRun={openRun}
               after={runAfter}
               onAfter={setRunAfter}
@@ -1960,6 +1995,9 @@ export default function Home({ all = false }) {
         onStop={ai.stop}
         onAnswer={ai.answer}
       />
+
+      {/* which machine a task runs on, asked by the run button when two sync its folder */}
+      <RunOnModal machines={pickRun ? runMachines : null} index={pickRun?.index} onPick={confirmPick} onClose={() => setPickRun(null)} />
 
       {/* the machines, and a prompt to run on them; a run of theirs in its own dialog, in front */}
       <MachinesModal

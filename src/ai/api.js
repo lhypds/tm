@@ -9,7 +9,7 @@ export const runEventsUrl = "/api/ai/events";
 // Start Claude Code on the task at `rel` in the space; resolves to { run } with its transcript (409
 // while the task has a run going). `after` is what Claude is told to do with its changes once the
 // work is done: "push" (commit and push), "pr" (a new branch, a commit and a pull request) or null.
-// `machine` names the one of the folder's machines to run on, when it is synced by two (null: the
+// `machine` names the one of the folder's machines to run on, when it is synced by two (asked of the user then, see RunOnModal; null: the
 // server picks, one whose runner is connected).
 export const startRun = (space, rel, after = null, machine = null) =>
   request("/api/ai/run", json("POST", { ...sp(space), rel, ...(after ? { after } : {}), ...(machine ? { machine } : {}) }));

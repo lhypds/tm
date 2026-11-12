@@ -84,13 +84,6 @@
   gap: 4px;
 }
 
-/* The machine a task runs on, at the left of the run button, as tall as it and as wide as its name. */
-.barActions .runOn {
-  width: auto;
-  max-width: 160px;
-  height: 22px;
-}
-
 /* Between the task's text and its prompt: "Prompt", with the prompt's run and delete at its right,
    highlighted as the head is while the keyboard is on the prompt. */
 .divider {

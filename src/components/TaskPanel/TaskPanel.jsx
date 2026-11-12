@@ -18,8 +18,7 @@ import styles from "./panel.module.css";
 // overwrites it as typed, and deletes it when its text is emptied.
 // The divider also carries the run button (RunButton), greyed out until the task has a prompt, or
 // while `noRunner` says why the task cannot run now (a copy from a machine that is not connected; the
-// text is the button's tooltip); at its left, when two machines sync the task's folder (`machines`),
-// a dropdown picks the one it runs on (`machine`, its name; onMachine(name)): onRun(task) starts Claude Code on the task and opens the run's dialog,
+// text is the button's tooltip): onRun(task) starts Claude Code on the task and opens the run's dialog,
 // or opens the dialog of the run the task has going (`run`, see useRuns), which the button shows with
 // a dot. Under the prompt's text, two checkboxes say what Claude does with its changes once the
 // work is done (`after`: "push" commits and pushes, "pr" makes a branch, commits and opens a pull
@@ -54,9 +53,6 @@ export default function TaskPanel({
   onSavePrompt,
   run,
   noRunner,
-  machines = [],
-  machine,
-  onMachine,
   onRun,
   after,
   onAfter,
@@ -182,25 +178,6 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  {machines.length > 1 && (
-                    <select
-                      className={`select ${styles.runOn}`}
-                      tabIndex={-1}
-                      value={machine}
-                      onChange={(e) => {
-                        e.currentTarget.blur();
-                        onMachine(e.target.value);
-                      }}
-                      title={t("ai.runOn")}
-                      aria-label={t("ai.runOn")}
-                    >
-                      {machines.map((m) => (
-                        <option key={m.name} value={m.name}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
                   <RunButton run={run} disabled={!hasPrompt} reason={noRunner} onClick={() => onRun(task)} />
                 </div>
               </div>
