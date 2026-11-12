@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, TextArea, Checkbox } from "@ui";
 import MachineDot from "@components/MachineDot";
+import { StopIcon } from "@components/icons";
 import { formatDateTime } from "@utils/task";
 import * as api from "../api";
 import { duration } from "../duration";
@@ -27,13 +28,15 @@ function readPicked() {
 // showing the run (onOpenRun(run)). Above them the prompt and the run button: it starts Claude Code
 // with that prompt on every machine ticked (onRun(machine, prompt), resolving to the run, or null
 // when refused), on no task, in the home folder there (⌘ / ctrl + enter runs too). One machine
-// started: its run is shown at once. `runs` is every run the server has, by id (see useRuns); the
+// started: its run is shown at once. The prompt stays once run, greyed until it is changed. A run
+// still going has a stop button at its right end (onStop(run)). `runs` is every run the server has, by id (see useRuns); the
 // ones of this dialog are those on no task (`task.free`).
-export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose }) {
+export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
   const { t } = useTranslation();
   const [machines, setMachines] = useState(null); // null until first answered
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [sent, setSent] = useState(null); // the prompt as it was last run: shown grey while unchanged
   const [picked, setPicked] = useState(readPicked); // names; null: nothing chosen yet, a lone machine is
   const [busy, setBusy] = useState(false);
   const promptRef = useRef(null);
@@ -107,7 +110,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
     setBusy(true);
     try {
       const started = (await Promise.all(targets.map((m) => onRun(m.name, prompt)))).filter(Boolean);
-      if (started.length === targets.length) setPrompt(""); // a refusal keeps the prompt, to try again
+      if (started.length) setSent(prompt); // kept, greyed: changing it makes it a new one
       if (started.length === 1) onOpenRun(started[0]);
     } finally {
       setBusy(false);
@@ -120,7 +123,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
         <TextArea
           ref={promptRef}
           value={prompt}
-          className={styles.prompt}
+          className={`${styles.prompt}${sent !== null && prompt === sent ? ` ${styles.sent}` : ""}`}
           minHeight={80}
           aria-label={t("machines.prompt")}
           onChange={(e) => setPrompt(e.target.value)}
@@ -164,6 +167,11 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onClose 
                     <span className={`muted ${styles.state}`} data-pending={!!r.pending} title={r.error || ""}>
                       {stateOf(r)}
                     </span>
+                    {(r.status === "running" || r.status === "queued") && (
+                      <button type="button" className={styles.stop} tabIndex={-1} onClick={() => onStop(r)} title={t("ai.stop")} aria-label={t("ai.stop")}>
+                        <StopIcon />
+                      </button>
+                    )}
                   </div>
                 ))}
               </li>

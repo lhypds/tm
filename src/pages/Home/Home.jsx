@@ -2149,6 +2149,7 @@ export default function Home({ all = false }) {
         runs={ai.runs}
         onRun={ai.startOn}
         onOpenRun={(r) => setMachineRunId(r.id)}
+        onStop={ai.stop}
         onClose={() => {
           setMachinesOpen(false);
           closeMachineRun();

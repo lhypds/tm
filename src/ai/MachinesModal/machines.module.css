@@ -16,6 +16,11 @@
   height: 200px;
 }
 
+/* Once run, the prompt stays, grey, until it is changed. */
+.prompt.sent {
+  color: var(--muted);
+}
+
 .error {
   color: var(--err);
   line-height: 1.5;
@@ -99,6 +104,25 @@
 
 .state[data-pending="true"] {
   color: var(--warn);
+}
+
+/* Stop a run still going: a small square after its state, as a run's remove is (RunList). */
+.stop {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.stop:hover {
+  color: var(--err);
+}
+
+.stop svg {
+  width: 10px;
+  height: 10px;
 }
 
 .actions {
