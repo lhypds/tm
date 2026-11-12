@@ -9,6 +9,8 @@
 //   GET    /api/ai/machines          the machines Claude Code can be run on from here: { machines }
 //   POST   /api/ai/machine/run       { machine, prompt }: start Claude Code on that machine with the prompt as
 //                                    it is, on no task, in its user's home folder; 201 { run }
+//   POST   /api/ai/machine/command   { machine, command }: run a tm command ("/restart") on that machine, in a
+//                                    process of its own there; { ok: true, command }
 //   POST   /api/ai/runs/:id/answer   { pending, decision } or { pending, answers }: answer the run's question; { run }
 //   POST   /api/ai/runs/:id/stop     stop the run; { run }
 //   GET    /api/ai/saved/:folder     ?work&repository&rel: a run's record in the task folder (see ai/record.js); { run }
@@ -147,6 +149,16 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     if (typeof body.prompt !== 'string' || !body.prompt.trim()) throw httpError(400, 'Missing prompt.');
     const run = await remote.startPrompt({ machine: name, prompt: body.prompt });
     res.status(201).json({ run: remote.publicRun(run, true) });
+  });
+
+  // A tm command on a machine, typed in the Machines dialog as "/restart": started there by its runner,
+  // in a process of its own (the command may restart the runner itself; see utils/tmcommand.js).
+  app.post('/api/ai/machine/command', async (req, res) => {
+    const body = req.body || {};
+    const name = String(body.machine || '');
+    if (!name) throw httpError(400, 'Missing machine.');
+    const command = await remote.tmCommand(name, body.command);
+    res.json({ ok: true, command });
   });
 
   app.post('/api/ai/runs/:id/answer', async (req, res) => {

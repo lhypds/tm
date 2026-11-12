@@ -4,8 +4,9 @@
 //
 // It keeps one connection open to the server, GET /api/sync/ai/commands (a text/event-stream, see
 // server/ai/ai.js), reads the commands the server's browsers give (run, prompt, which runs a prompt on
-// no task, in the home folder here, answer, stop, and forget, which
-// removes a run's record from the task folder here, see ai/record.js; see ai/remote.js), carries
+// no task, in the home folder here, answer, stop, forget, which
+// removes a run's record from the task folder here, see ai/record.js, and tm, which runs a tm command
+// here, `tm restart` say, in a process of its own, see utils/tmcommand.js; see ai/remote.js), carries
 // each out on this machine's session (ai/session.js) and acknowledges it (an
 // `ack` event: ok, or the error for the browser). Every event of the session goes back as it happens,
 // POST /api/sync/ai/events, a snapshot of the runs first each time the connection is made, so the
@@ -28,6 +29,7 @@ const { resolveConfig } = require('../server/config');
 const { isDirectory, spaceOf, taskDirIn, taskDirsUnder, afterOf } = require('./task');
 const { deleteRecord } = require('./record');
 const { watchRuns } = require('./window');
+const { tmCommandOf, startTmCommand } = require('../utils/tmcommand');
 
 const RETRY_MS = [2000, 5000, 15000, 60000];  // waits before connecting again, the last one repeating
 const FLUSH_MS = 50;                          // events are sent together after this long
@@ -64,8 +66,9 @@ async function* sseMessages(body) {
 // change), `logFile` where the runs log what claude writes to stderr, `window` whether each run opens
 // a terminal window here (AI_RUNNER_WINDOW): false, or { terminal, closeAfter } as ai/window.js
 // watchRuns takes them (which terminal on macOS, and the seconds the window stays after the run).
+// `commandLog` is where a tm command run for the server (the `tm` command) writes what it prints.
 // Returns { stop }.
-function startRunner({ server, token, machineId, log, warn, logFile, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
+function startRunner({ server, token, machineId, log, warn, logFile, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
   session.configure({ logFile, machine: machineId });
   const unwatch = window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId) };
@@ -201,6 +204,14 @@ function startRunner({ server, token, machineId, log, warn, logFile, window = fa
           const { space, taskDir } = locate(cmd, false);
           deleteRecord(taskDir, String(cmd.folder || ''));
           log(`runner: forgot ${cmd.folder} of ${space.label} ${cmd.rel}`);
+          break;
+        }
+        case 'tm': {
+          // In a process of its own, not a child of this one: `tm restart` stops this very daemon.
+          const name = tmCommandOf(cmd.command);
+          if (!name) throw httpError(400, `"${cmd.command}" is not a tm command that can be run from the server.`);
+          startTmCommand(name, commandLog);
+          log(`runner: tm ${name} started for the server (its output: ${commandLog})`);
           break;
         }
         default:

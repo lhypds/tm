@@ -23,6 +23,11 @@ export const getMachines = () => request("/api/ai/machines");
 // resolves to { run } with its transcript (409 when the machine's runner is not connected).
 export const startMachineRun = (machine, prompt) => request("/api/ai/machine/run", json("POST", { machine, prompt }));
 
+// Run a tm command on `machine` ("/restart": `tm restart` there), started by its runner in a process
+// of its own; resolves to { ok, command } once started (400 when it is not a command that can be run
+// this way, 409 when the machine's runner is not connected).
+export const runMachineCommand = (machine, command) => request("/api/ai/machine/command", json("POST", { machine, command }));
+
 // Answer the run's pending question `pending`: { decision: "allow" | "deny" } for a permission,
 // { answers: { "<question>": "<answer>" } } for a question. { run }.
 export const answerRun = (id, pending, body) => request(`/api/ai/runs/${encodeURIComponent(id)}/answer`, json("POST", { pending, ...body }));

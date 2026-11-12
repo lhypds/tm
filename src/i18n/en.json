@@ -379,6 +379,7 @@
     "prompt": "What should Claude do on the machine?",
     "run": "Run",
     "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",
-    "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env."
+    "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env.",
+    "commandStarted": "{{command}} started on {{machines}}"
   }
 }

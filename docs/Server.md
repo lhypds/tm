@@ -253,6 +253,13 @@ id: "", title, key, free: true }` (`title` the prompt's first line, `key` `~prom
 `{ "prompt.txt": <the prompt> }`. It is followed, answered and stopped as any run; having no task folder, it leaves no  
 record. 400 without a prompt, 409 when the machine's runner is not connected, 504 when it does not answer in 15 seconds.  
 
+`POST /api/ai/machine/command` `{ machine, command }`  
+Run a tm command on that machine (the web UI's Machines dialog, a prompt that starts with `/`): `command` is `/restart`,  
+`/start`, `/stop`, `/push`, `/pull` or `/status` (the `/` may be left out; no arguments), run there as `tm restart` and so on  
+by the machine's runner, in a process of its own, so a restart of the daemon that got the command goes through.  
+`{ ok: true, command }` once the machine has started it; what it prints is in that machine's `logs/command.log`.  
+400 when it is not one of those commands, 409 when the machine's runner is not connected, 504 when it does not answer in 15 seconds.  
+
 `POST /api/ai/runs/:id/answer` `{ pending, decision }` or `{ pending, answers }`  
 Answer the run's pending question `pending` (its id): `decision` `allow` or `deny` for a permission, `answers` for a  
 question, an object from each question's text to the answer (the label picked, several joined by `, `, or a text of one's  

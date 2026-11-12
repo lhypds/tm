@@ -2,7 +2,7 @@
 // pushes from taskmgrd (server/sync.js), a task of a pushed copy is run where its tasks, the source
 // code and the claude login are: on the machine that pushed it, by its taskmgrd (ai/runner.js, with
 // AI_RUNNER=1 in its .env). That runner keeps one connection open here (GET /api/sync/ai/commands in
-// server/ai/ai.js) and gets the browsers' commands over it: run, prompt, answer, stop, forget (command). What
+// server/ai/ai.js) and gets the browsers' commands over it: run, prompt, answer, stop, forget, tm (command). What
 // its runs do comes back as the events of its own session (ai/session.js: snapshot, run, item, delta,
 // remove; POST /api/sync/ai/events, see receive) and is kept here, run by run, so the browsers see
 // those runs as they see the runs of this machine: the same events (subscribe), the same shape
@@ -17,6 +17,7 @@ const crypto = require('crypto');
 
 const { PROMPT_FILE } = require('../utils/task');
 const { FREE_KEY, TITLE_MAX } = require('./session');
+const { TM_COMMANDS, tmCommandOf } = require('../utils/tmcommand');
 
 const ACK_MS = 15 * 1000;   // how long a machine has to acknowledge a command
 
@@ -229,6 +230,17 @@ function forgetRecord(machine, task, folder) {
   return command(machine, { type: 'forget', work: task.work, repository: task.repository, rel: task.rel, folder });
 }
 
+// Have `machine` run a tm command (`text`: "/restart" or "restart", one of TM_COMMANDS, no arguments)
+// in a process of its own (see utils/tmcommand.js). Resolves to the command's name once the machine
+// has started it: how it ends is in the machine's logs/command.log, and a restart shows as its runner
+// connecting again.
+async function tmCommand(machine, text) {
+  const name = tmCommandOf(text);
+  if (!name) throw httpError(400, `Not a tm command that can be run on a machine: ${String(text || '').trim() || '(empty)'}. One of: ${TM_COMMANDS.map(c => `/${c}`).join(', ')}.`);
+  await command(machine, { type: 'tm', command: name });
+  return name;
+}
+
 // A run as the machine tells it (its publicRun, items included in a snapshot), kept as this machine's.
 function upsert(machine, pub) {
   if (!pub || typeof pub.id !== 'string') return;
@@ -296,4 +308,4 @@ function receive(machine, events) {
   }
 }
 
-module.exports = { subscribe, listRuns, publicRun, has, isConnected, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord };
+module.exports = { subscribe, listRuns, publicRun, has, isConnected, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord, tmCommand };

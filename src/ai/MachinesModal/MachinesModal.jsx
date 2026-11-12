@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Modal, TextArea, Checkbox } from "@ui";
+import { Modal, TextArea, Checkbox, showToast } from "@ui";
 import MachineDot from "@components/MachineDot";
 import { StopIcon } from "@components/icons";
 import { formatDateTime } from "@utils/task";
@@ -31,6 +31,12 @@ function readPicked() {
 // started: its run is shown at once. The prompt stays once run, greyed until it is changed. A run
 // still going has a stop button at its right end (onStop(run)). `runs` is every run the server has, by id (see useRuns); the
 // ones of this dialog are those on no task (`task.free`).
+//
+// A prompt that starts with "/" is a tm command, not a prompt for Claude: "/restart" runs `tm restart`
+// on every machine whose runner is connected, ticked or not (POST /api/ai/machine/command; each
+// machine starts it in a process of its own, so a restart of the daemon that got the command goes
+// through). A toast tells which machines started it, and what the
+// others answered.
 export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
   const { t } = useTranslation();
   const [machines, setMachines] = useState(null); // null until first answered
@@ -104,11 +110,32 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
               ? t("ai.stopped")
               : t("ai.failed");
 
-  const canRun = !busy && !!prompt.trim() && targets.length > 0;
+  const isCommand = prompt.trimStart().startsWith("/");
+  const canRun = !busy && !!prompt.trim() && (isCommand ? ready : targets).length > 0;
+  const runCommand = async () => {
+    const results = await Promise.all(
+      ready.map((m) =>
+        api.runMachineCommand(m.name, prompt.trim()).then(
+          (d) => ({ name: m.name, command: d.command }),
+          (e) => ({ name: m.name, error: e.message }),
+        ),
+      ),
+    );
+    const ok = results.filter((r) => !r.error);
+    const bad = results.filter((r) => r.error);
+    if (ok.length) setSent(prompt);
+    const lines = [
+      ...(ok.length ? [t("machines.commandStarted", { command: `tm ${ok[0].command}`, machines: ok.map((r) => r.name).join(", ") })] : []),
+      // one refusal said once when every machine answers the same (not a tm command, say)
+      ...(bad.length && bad.every((r) => r.error === bad[0].error) && !ok.length ? [bad[0].error] : bad.map((r) => `${r.name}: ${r.error}`)),
+    ];
+    showToast(lines.join("; "), bad.length ? 6000 : 3000, "bottom", bad.length ? "error" : "");
+  };
   const run = async () => {
     if (!canRun) return;
     setBusy(true);
     try {
+      if (isCommand) return await runCommand();
       const started = (await Promise.all(targets.map((m) => onRun(m.name, prompt)))).filter(Boolean);
       if (started.length) setSent(prompt); // kept, greyed: changing it makes it a new one
       if (started.length === 1) onOpenRun(started[0]);
