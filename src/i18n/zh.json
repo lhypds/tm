@@ -81,7 +81,6 @@
     "message": "删除“{{name}}”？整个任务文件夹（包括附件和子任务）都将被移除。"
   },
   "tree": {
-    "remote": "remote",
     "machineOnline": "在线：最近一次 push 或 polling 在 {{when}}",
     "machineOffline": "离线：自 {{when}} 起没有 push 或 polling",
     "machineUnknown": "离线：服务器启动后还没有 push 或 polling",

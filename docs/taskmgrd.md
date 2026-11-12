@@ -36,8 +36,8 @@ file under a renamed task, is never sent twice (the server keeps them in `data/.
 The server merges a pushed `taskmgr.json` into its own: origins, works and repositories it  
 does not have are added, the ones it has take the pushed settings, and the ones it has that were not  
 pushed are kept, with their folders (so several machines can push to one server; a work or  
-repository renamed or removed on one machine stays on the server until removed there, shown as  
-plain "remote" from then on: no longer as that machine's, with its dot). In the  
+repository renamed or removed on one machine stays on the server until removed there, shown by  
+its path from then on: no longer as that machine's, with its dot). A work or repository added in the server's web UI without a folder is kept under `data/origins/` too, where the copy of a machine pushing the same origin, work and repository goes: it is shown by its path until a machine syncs it, and the first push into it is refused while the server has tasks there the machine does not have (run `tm pull` first, or let the daemon with `POLLING=1`; `tm push --force` overwrites them instead). In the  
 merged file, the `tasks_path` of every pushed work (that has common tasks) and repository is its  
 copy under `data/origins/`, and a repository's `source_path` is left out, so the server's web UI  
 shows the pushed tasks. A work pushed without a `tasks_path` has none on the server either: the one  
@@ -115,7 +115,7 @@ changed in the copy only: the next push of its folder overwrites it.
 On the machine with the tasks: in `.env`, `SYNC_SERVER` is the server's URL (the one its web UI  
 answers at, e.g. `https://tm.example.com`) and `SYNC_SERVER_TOKEN` the same secret; `MACHINE_ID` names  
 this machine on the server, where each folder pushed from here is shown as coming from it in place of  
-"remote" (any short name; empty, the hostname is sent), with a dot beside it that is green while this machine  
+its path (any short name; empty, the hostname is sent), with a dot beside it that is green while this machine  
 has pushed or polled within the last three minutes and grey otherwise; `PUSHING`  
 (default 1), `POLLING` (default 0) and `POLLING_INTERVAL` (seconds, default 600) say what it does (see above).  
 `./start.sh` (Windows: `start.bat`) then starts the daemon under pm2 together with the web UI, and `./stop.sh`  

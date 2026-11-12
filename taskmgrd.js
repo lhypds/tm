@@ -128,8 +128,9 @@ async function drainQueue() {
       done = await pushJob(job);
     } catch (e) {
       // A space synced by enough other machines (see MAX_MACHINES in server/sync.js) is not tried
-      // again until the next rescan, nor does it hold up the others.
-      if (e.code === 'TOO_MANY_MACHINES') {
+      // again until the next rescan, nor does it hold up the others. Nor is one the server has
+      // tasks of its own in, which a `tm pull` here has to bring over first (PULL_FIRST).
+      if (e.code === 'TOO_MANY_MACHINES' || e.code === 'PULL_FIRST') {
         syncLog(false, `${name(job)}: ${e.message}`);
         warn(`${name(job)}: ${e.message}`);
         if (queue.get(job.key) === job) queue.delete(job.key);

@@ -220,8 +220,8 @@ function machinesOf({ work, repository, root }) {
   return w ? machinesWithRunner({ origin: w.origin, work: w.work, repository: repository || '' }) : [];
 }
 
-// The machine a mirror folder's tasks run on: { name, seenAt, online, runner }, or null (shown as
-// plain "remote").
+// The machine a mirror folder's tasks run on: { name, seenAt, online, runner }, or null: a folder
+// no machine syncs is this server's own, wherever it is (it is shown by its path, and runs here).
 const machineOf = (space) => runMachine(machinesOf(space));
 
 // How many tasks are todo, done, pending and aborted, subtasks included.
@@ -245,7 +245,7 @@ function listDir(space, rel) {
     dir: toRel(root, abs),
     absDir: abs,
     shownDir: shortPath(abs),
-    remote: isMirrored(config.dataDir, root),
+    remote: machinesOf(space).length > 0,
     machine: machineOf(space),
     machines: machinesOf(space),
     isRoot,
@@ -266,9 +266,9 @@ function listSpacesTasks(spaces, absDir) {
     for (const t of readTasks(s.root)) tasks.push({ ...serializeTask(s.root, t), work: s.work, repository: s.repository });
   }
   sortTasks(tasks);
-  const remote = isMirrored(config.dataDir, absDir);
   // absDir, when given, is the root of the first space (a work's common tasks).
-  const machines = remote && spaces[0] && spaces[0].root === absDir ? machinesOf(spaces[0]) : [];
+  const machines = spaces[0] && spaces[0].root === absDir ? machinesOf(spaces[0]) : [];
+  const remote = machines.length > 0;
   return { dir: '', absDir, shownDir: shortPath(absDir), remote, machine: runMachine(machines), machines, isRoot: true, parent: null, crumbs: [], tasks, counts: countTasks(tasks) };
 }
 
@@ -280,18 +280,20 @@ function workSpaces(w) {
   ];
 }
 
-// The works/repositories list with, for each folder, whether it exists, whether it is a copy
-// pushed by taskmgrd (remote) and, then, the machines that sync it and the one its tasks run on. A
-// work without a tasks folder of its own (root "") is not missing one.
+// The works/repositories list with, for each folder, whether it exists, whether it is synced by
+// taskmgrd on other machines (remote: a folder under data/origins/ that at least one machine pushes
+// or pulls) and, then, those machines and the one its tasks run on. A work without a tasks folder
+// of its own (root "") is not missing one.
 function listSpaces() {
   const describe = (root, space) => {
-    const remote = isMirrored(config.dataDir, root);
+    const mirrored = isMirrored(config.dataDir, root);
     // A mirror folder is ours to make (nothing has been pushed into it yet), so it is created
     // here instead of asking the user to.
-    if (remote && !fs.existsSync(root)) {
+    if (mirrored && !fs.existsSync(root)) {
       try { fs.mkdirSync(root, { recursive: true }); } catch (e) { /* shown as missing below */ }
     }
-    const machines = remote ? machinesWithRunner(space) : [];
+    const machines = mirrored ? machinesWithRunner(space) : [];
+    const remote = machines.length > 0;
     return {
       root,
       exists: !root || (fs.existsSync(root) && fs.statSync(root).isDirectory()),
@@ -994,7 +996,7 @@ app.use(createAiApp({
   config,
   logFile: path.join(PROJECT_ROOT, 'logs', 'ai.log'),
   machine: String(process.env.MACHINE_ID || '').trim() || undefined,
-  locate: (space) => ({ remote: isMirrored(config.dataDir, space.root), machine: machineOf(space) }),
+  locate: (space) => ({ remote: !!machineOf(space), machine: machineOf(space) }),
   machines: () => syncApp.allMachines()
 }));
 

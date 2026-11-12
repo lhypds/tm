@@ -79,7 +79,7 @@ Origins, works and repositories
 These change `taskmgr.json` and answer the tree. Removing one never removes its folders.  
 
 `GET /api/spaces`  
-The tree. Each work and repository says whether its folder `exists`, whether it is a copy pushed by taskmgrd (`remote`)  
+The tree. Each work and repository says whether its folder `exists`, whether machines sync it with taskmgrd (`remote`: a folder under `data/origins/` that at least one machine pushes or pulls; one no machine syncs is the server's own, shown by its path)  
 and, then, `machines`: `[{ name, seenAt, online, runner }]` for the machines that sync it (at most two, sorted by name;  
 `[]` when no push said), each with its `MACHINE_ID`, when (ms) it last pushed or polled this server (`null`: not since the  
 server started), whether that was within the last three minutes, and whether its runner is connected; and `machine`, the  
@@ -96,7 +96,9 @@ Rename an origin and set its income (`null` clears it).
 Remove an origin with its works.  
 
 `POST /api/work` `{ name, origin?, tasksPath?, income? }`  
-Add a work. Without a `tasksPath`, its tasks are kept in tm's own data folder, `./data/works/<work>/tasks`, which is written to `taskmgr.json` as its `tasks_path`. 201.  
+Add a work. Without a `tasksPath`, its tasks are kept in tm's own data folder, `./data/origins/<origin>/<work>/tasks` (where a machine pushing the same origin and work puts its copy, so the two are one folder once such a machine syncs it), which is written to `taskmgr.json` as its `tasks_path`. 201.
+
+Renaming an origin, a work or a repository (`PUT /api/origin`, `/api/work`, `/api/repository`) renames its folder under `./data/origins/` with it, when it has one, and rewrites the `tasks_path`s in it; 400 when a folder of the new name is there already.  
 
 `PUT /api/work` `{ work, name, income, hidden?, tasksPath? }`  
 Rename a work, set its income (`null` clears it), and, when given, whether it is hidden and its tasks folder.  
@@ -105,7 +107,7 @@ Rename a work, set its income (`null` clears it), and, when given, whether it is
 Remove a work.  
 
 `POST /api/repository` `{ work, name, tasksPath?, sourcePath? }`  
-Add a repository to a work. With neither a `tasksPath` nor a `sourcePath`, its tasks are kept in `./data/works/<work>/repositories/<repository>`, written as its `tasks_path`. 201.  
+Add a repository to a work. With neither a `tasksPath` nor a `sourcePath`, its tasks are kept in `./data/origins/<origin>/<work>/repositories/<repository>`, written as its `tasks_path`. 201.  
 
 `PUT /api/repository` `{ work, name, newName, tasksPath?, sourcePath? }`  
 Rename a repository and set its folders.  
@@ -315,10 +317,10 @@ The pushed works and repositories get their copies under `./data/origins/` as `t
 Origins, works and repositories only on the server are kept, those only pushed are added; a work in both  
 (same origin, same name) takes the pushed fields, its repositories merged the same way (the pushed one wins  
 for a repository in both). A work pushed without `tasks_path` loses the one it has on the server, and the copy  
-of its common tasks under `data/origins/` is removed (listed in `pruned`). A work pushed under another origin  
+of its common tasks under `data/origins/` is removed (listed in `pruned`), unless no machine syncs those common tasks (a work added in the server's web UI): they are the server's own, and stay. A work pushed under another origin  
 moves there. A space the pushing machine (`X-Machine-Id`) pushed before and no longer lists (a work or repository  
-renamed or removed there) is kept, but is no longer that machine's: it leaves the space's `machines` (plain "remote",  
-no dot, when none is left), freeing its place for another machine, and the space's snapshot is forgotten, so it is pushed whole should the machine list it again. 409 when the merge is invalid.  
+renamed or removed there) is kept, but is no longer that machine's: it leaves the space's `machines` (the folder is shown by its path  
+when none is left), freeing its place for another machine, and the space's snapshot is forgotten, so it is pushed whole should the machine list it again. 409 when the merge is invalid.  
 
 `POST /api/sync/blobs` `{ blobs }`  
 Which of these files (sha1 hashes of their content) the server does not have yet: `{ ok, missing }`.  
@@ -343,7 +345,7 @@ of the space's machines (409 `TOO_MANY_MACHINES` when it has two others).
 Bring one tasks folder to the snapshot, in place (a task that changed status is moved first, then only what differs is written, and what the snapshot lacks removed): `entries` are `{ path, content }` for task files (text),  
 `{ path, blob: sha1 }` for every other file (attachments included), taken from the blob store, and  
 `{ path, dir: true }` for an empty folder, paths relative to the tasks folder. After it, the server's copy  
-is the pushed folder exactly. `{ ok, files, dirs }`. 409 `MISSING_BLOBS` `{ missing }` when a blob is not in the  
+is the pushed folder exactly. `{ ok, files, dirs }`. 409 `PULL_FIRST`, nothing written, when no machine syncs the space yet and its folder has a task the snapshot lacks (a work or repository added in the server's web UI, with tasks made there): a `tm pull` on that machine brings them over and makes it one of the space's machines, and its pushes go through from then on, or `force: true` in the body (`tm push --force`) pushes anyway, removing them; taskmgrd logs the refusal and goes on with the other spaces, as `tm push` does, ending with an error. 409 `MISSING_BLOBS` `{ missing }` when a blob is not in the  
 store; nothing is written then. A blob no space refers to any more is removed once it is an hour old.  
 `machine` (optional, the pusher's `MACHINE_ID`, or its hostname) is remembered as one of the space's machines, in  
 `data/.sync-state.json` (409 `TOO_MANY_MACHINES`, nothing written, when it has two others), and the web UI shows it as  

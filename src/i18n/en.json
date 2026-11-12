@@ -81,7 +81,6 @@
     "message": "Delete “{{name}}”? The whole task folder, including attachments and subtasks, is removed."
   },
   "tree": {
-    "remote": "remote",
     "machineOnline": "In touch: last push or poll at {{when}}",
     "machineOffline": "Out of touch: no push or poll since {{when}}",
     "machineUnknown": "Out of touch: no push or poll since the server started",

@@ -60,7 +60,8 @@ const pointerFocus = {
   onBlur: (e) => delete e.currentTarget.dataset.pointer,
 };
 
-// The names of the machines that sync a remote folder, as its row shows them ("" for none).
+// The names of the machines that sync a folder, as its row shows them in place of its path ("" for
+// none: the row shows the path).
 const machineNames = (s) => (s.machines || []).map((m) => m.name).join(" ");
 
 // One space in the tree. `depth` is 0 for a work without an origin, 1 for a work under its origin
@@ -478,7 +479,7 @@ export default function SpaceTree({
                           active={activeTo === api.spacePath(g.origin, w.work)}
                           focused={focused}
                           label={w.work}
-                          root={w.remote ? machineNames(w) || t("tree.remote") : w.shownPath}
+                          root={machineNames(w) || w.shownPath}
                           machines={w.remote ? w.machines : []}
                           income={w.income}
                           onSelect={onSelect}
@@ -526,7 +527,7 @@ export default function SpaceTree({
                               active={activeTo === api.spacePath(g.origin, w.work, p.name)}
                               focused={focused}
                               label={p.name}
-                              root={p.remote ? machineNames(p) || t("tree.remote") : p.shownPath}
+                              root={machineNames(p) || p.shownPath}
                               machines={p.remote ? p.machines : []}
                               onSelect={onSelect}
                               actions={

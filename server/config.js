@@ -88,7 +88,7 @@ function resolvePath(p) {
   return path.resolve(PROJECT_ROOT, expandHome(p));
 }
 
-// A path as it is shown and written to taskmgr.json: "./data/works/a/tasks" for a folder inside the
+// A path as it is shown and written to taskmgr.json: "./data/origins/a/b/tasks" for a folder inside the
 // taskmgr folder, "~/code/a" for one inside the home folder, else the absolute path as it is.
 function shortPath(p) {
   if (!p) return p;
@@ -463,12 +463,14 @@ function resolveConfig() {
 
   // Set one work's name, income ({ monthly, once }; null removes it) and, when given, its tasks
   // folder ("" removes it) and whether it is hidden (false removes the key), and rewrite the file as 2-space
-  // indented JSON. Uniqueness and the "/" rule are checked by writeText.
+  // indented JSON. Uniqueness and the "/" rule are checked by writeText. A rename takes the work's
+  // folder under data/origins/ along (see renameFolder).
   function updateWork(work, { name, income, hidden, tasksPath }) {
     const raw = readRaw();
     const { w, list } = findRawWork(raw, work);
     const newName = name.trim();
     if (!newName) throw new Error('The name must not be empty.');
+    const oldName = String(w.work).trim();
     w.work = newName;
     if (tasksPath !== undefined) {
       const tasks = tasksPath.trim();
@@ -479,7 +481,8 @@ function resolveConfig() {
     if (hidden === true) out.hidden = true;
     else if (hidden === false) delete out.hidden;
     list[list.indexOf(w)] = out;
-    write(raw);
+    const o = originOf(raw, out) || '_';
+    writeRenamed(raw, renameFolder(raw, [o, oldName], [o, newName]));
   }
 
   // The origin entry with its color set ("" or null removes it, undefined leaves it), placed after
@@ -498,16 +501,18 @@ function resolveConfig() {
   }
 
   // Set one origin's name, income ({ monthly, once }; null removes it) and, when given, its color
-  // ("#rrggbb"; "" removes it), like updateWork.
+  // ("#rrggbb"; "" removes it), like updateWork. A rename takes the origin's folder under
+  // data/origins/ along (see renameFolder).
   function updateOrigin(origin, { name, income, color }) {
     const raw = readRaw();
     const g = origin && findRawOrigin(raw, origin, false);
     if (!g) throw new Error(`No origin named "${origin}".`);
     const newName = name.trim();
     if (!newName) throw new Error('The name must not be empty.');
+    const oldName = String(g.origin).trim();
     g.origin = newName;
     raw.origins[raw.origins.indexOf(g)] = withIncome(withColor(g, color), income, 'origin');
-    write(raw);
+    writeRenamed(raw, renameFolder(raw, [oldName], [newName]));
   }
 
   // Add an origin with no works yet, after the named ones.
@@ -522,13 +527,66 @@ function resolveConfig() {
   }
 
   // Where the tasks of a work or repository added without a folder are kept, until another one is
-  // given (the edit dialogs, or taskmgr.json): in this tm's data folder, by name,
-  //   data/works/<work>/tasks                      a work's common tasks
-  //   data/works/<work>/repositories/<repository>  a repository's tasks
-  // (not under data/origins/, which holds the copies taskmgrd pushes, see server/sync.js). It is
-  // written to taskmgr.json as the tasks_path, so a rename of the work or repository keeps the folder.
-  const defaultTasksPath = (work, repository) =>
-    shortPath(path.join(dataDir, 'works', work, ...(repository ? ['repositories', repository] : ['tasks'])));
+  // given (the edit dialogs, or taskmgr.json): in this tm's data folder, by name, laid out like the
+  // copies taskmgrd pushes (see spaceDir in server/sync.js),
+  //   data/origins/<origin>/<work>/tasks                      a work's common tasks
+  //   data/origins/<origin>/<work>/repositories/<repository>  a repository's tasks
+  // ("_" for the works without an origin), so a machine that later pushes the same origin, work and
+  // repository syncs with this very folder. It is written to taskmgr.json as the tasks_path.
+  const originsDir = path.join(dataDir, 'origins');
+  const plain = (name) => !!name && name !== '.' && name !== '..' && !/[/\\\0]/.test(name);
+  function defaultTasksPath(origin, work, repository) {
+    const names = [origin || '_', work, ...(repository ? [repository] : [])];
+    const bad = names.find(n => !plain(n));
+    if (bad !== undefined) throw new Error(`"${bad}" cannot name a folder: give a tasks folder.`);
+    return shortPath(path.join(originsDir, origin || '_', work, ...(repository ? ['repositories', repository] : ['tasks'])));
+  }
+
+  // The name of the origin holding the raw work entry `w` ("" for the works without one).
+  function originOf(raw, w) {
+    const g = (Array.isArray(raw.origins) ? raw.origins : []).find(x => x && Array.isArray(x.works) && x.works.includes(w));
+    return g && typeof g.origin === 'string' ? g.origin.trim() : '';
+  }
+
+  // A rename of an origin, work or repository takes its folder under data/origins/ along (`names`
+  // and `newNames` are the folder names below data/origins/, before and after), so the folder stays
+  // where a push of the new name puts its copy, and is not removed as one no longer listed (see
+  // pruneOrigins in server/sync.js). Every tasks_path of `raw` in that folder is rewritten. Nothing
+  // is done when there is no such folder, or a name cannot name one; refused when the new folder
+  // exists already. Returns the function that moves the folder back, should the file not be written.
+  function renameFolder(raw, names, newNames) {
+    const none = () => {};
+    if (![...names, ...newNames].every(plain)) return none;
+    const from = path.join(originsDir, ...names);
+    const to = path.join(originsDir, ...newNames);
+    if (from === to || !fs.existsSync(from) || !fs.statSync(from).isDirectory()) return none;
+    // A change of case only is the same folder where the file system ignores case.
+    if (fs.existsSync(to) && from.toLowerCase() !== to.toLowerCase()) throw new Error(`The folder ${shortPath(to)} exists already.`);
+    fs.renameSync(from, to);
+    const repoint = (x) => {
+      if (!x || typeof x.tasks_path !== 'string' || !x.tasks_path.trim()) return;
+      const rel = path.relative(from, resolvePath(x.tasks_path.trim()));
+      if (rel.startsWith('..') || path.isAbsolute(rel)) return;
+      x.tasks_path = shortPath(path.join(to, rel));
+    };
+    for (const g of Array.isArray(raw.origins) ? raw.origins : []) {
+      for (const w of g && Array.isArray(g.works) ? g.works : []) {
+        repoint(w);
+        for (const p of w && Array.isArray(w.repositories) ? w.repositories : []) repoint(p);
+      }
+    }
+    return () => { try { fs.renameSync(to, from); } catch (e) { /* left where it is */ } };
+  }
+
+  // Write `raw`, moving the folder back (see renameFolder) when the file is refused.
+  function writeRenamed(raw, undo) {
+    try {
+      write(raw);
+    } catch (e) {
+      undo();
+      throw e;
+    }
+  }
 
   // Add a work at the end of its origin (which must be named; it is added when it does not exist),
   // with no repositories. Its tasks folder (the one given, or else one in the data folder, see
@@ -539,7 +597,7 @@ function resolveConfig() {
     if (!work) throw new Error('The name must not be empty.');
     const originName = origin.trim();
     if (!originName) throw new Error('The origin must not be empty.');
-    const tasks = (tasksPath || '').trim() || defaultTasksPath(work);
+    const tasks = (tasksPath || '').trim() || defaultTasksPath(originName, work);
     const g = findRawOrigin(raw, originName, true);
     if (!Array.isArray(g.works)) g.works = [];
     g.works.push(withIncome({ work, tasks_path: tasks, repositories: [] }, income));
@@ -556,7 +614,7 @@ function resolveConfig() {
     const repository = name.trim();
     if (!repository) throw new Error('The name must not be empty.');
     const source = (sourcePath || '').trim();
-    const tasks = (tasksPath || '').trim() || (source ? '' : defaultTasksPath(String(w.work).trim(), repository));
+    const tasks = (tasksPath || '').trim() || (source ? '' : defaultTasksPath(originOf(raw, w), String(w.work).trim(), repository));
     if (!Array.isArray(w.repositories)) w.repositories = [];
     w.repositories.push({ repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}) });
     write(raw);
@@ -564,7 +622,8 @@ function resolveConfig() {
   }
 
   // Set one repository's name, source folder and tasks folder; an empty folder is left out, as
-  // when adding one. Uniqueness and the "/" rule are checked by writeText.
+  // when adding one. Uniqueness and the "/" rule are checked by writeText. A rename takes the
+  // repository's folder under data/origins/ along (see renameFolder).
   function updateRepository(work, from, { name, tasksPath, sourcePath }) {
     const raw = readRaw();
     const { w } = findRawWork(raw, work);
@@ -579,7 +638,8 @@ function resolveConfig() {
     // Rebuilt so the keys keep their usual order; any others stay after them.
     const { repository: _r, name: _n, source_path: _s, tasks_path: _t, ...rest } = p;
     list[list.indexOf(p)] = { repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}), ...rest };
-    write(raw);
+    const at = [originOf(raw, w) || '_', String(w.work).trim(), 'repositories'];
+    writeRenamed(raw, renameFolder(raw, [...at, String(from).trim()], [...at, repository]));
   }
 
   // Remove one work, with its repositories, from the file. Its folders are left as they are.

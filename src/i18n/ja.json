@@ -81,7 +81,6 @@
     "message": "「{{name}}」を削除しますか？添付ファイルとサブタスクを含むタスクフォルダ全体が削除されます。"
   },
   "tree": {
-    "remote": "remote",
     "machineOnline": "接続中：最後の push / polling は {{when}}",
     "machineOffline": "切断：{{when}} 以降 push / polling なし",
     "machineUnknown": "切断：サーバー起動後 push / polling なし",

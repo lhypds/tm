@@ -287,8 +287,11 @@ const isDir = (abs) => {
 };
 
 // Remove, under data/origins/, what the pushed config does not have any more: an origin, a work, the
-// tasks folder of a work that has none now, a repository. Returns what was removed (relative to data/).
+// tasks folder of a work that has none now, a repository. A folder a work or repository still has
+// as its tasks folder (one renamed in taskmgr.json by hand, say), or one such a folder is in, stays.
+// Returns what was removed (relative to data/).
 function pruneOrigins(dataDir, works) {
+  const roots = works.flatMap(w => [w.root, ...w.repositories.map(p => p.root)]).filter(Boolean).map(r => path.resolve(r));
   const expected = new Map();  // origin folder -> work -> { tasks, repositories }
   for (const w of works) {
     const o = w.origin || NO_ORIGIN_DIR;
@@ -304,6 +307,7 @@ function pruneOrigins(dataDir, works) {
   };
   const pruned = [];
   const remove = (abs) => {
+    if (roots.some(r => r === abs || inside(abs, r))) return;
     fs.rmSync(abs, { recursive: true, force: true });
     pruned.push(path.relative(dataDir, abs).split(path.sep).join('/'));
   };
@@ -349,10 +353,12 @@ function toMirror(dataDir, pushed) {
 // name, in the same origin) takes the pushed fields, with its repositories merged the same way (a
 // repository in both is the pushed one). A work pushed without common tasks (no tasks_path) loses
 // the tasks_path it has here: the pushed one is what the work is, and a pull could not keep the
-// folder anyway (its copy under data/origins/ goes with it, see pruneOrigins). A work pushed under
-// another origin than here moves there, as work names are unique across origins. Returns the merged
-// raw config.
-function mergeConfigs(here, pushed) {
+// folder anyway (its copy under data/origins/ goes with it, see pruneOrigins); unless `ownTasks`
+// (origin, work) says the common tasks here are this server's own, synced by no machine (a work
+// added here in the web UI): those are not the pushing machine's to remove, and stay. A work pushed
+// under another origin than here moves there, as work names are unique across origins. Returns the
+// merged raw config.
+function mergeConfigs(here, pushed, ownTasks = () => false) {
   const name = (v, key) => (v && typeof v[key] === 'string' ? v[key].trim() : '');
   const merged = { ...here, ...pushed, origins: (here.origins || []).map(g => ({ ...g, works: [...(g.works || [])] })) };
   for (const g of pushed.origins) {
@@ -378,7 +384,7 @@ function mergeConfigs(here, pushed) {
         else repositories[j] = p;
       }
       const out = { ...target.works[i], ...w, repositories };
-      if (!name(w, 'tasks_path')) delete out.tasks_path;
+      if (!name(w, 'tasks_path') && !ownTasks(origin, work)) delete out.tasks_path;
       target.works[i] = out;
     }
   }
@@ -550,7 +556,9 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       throw new SyncError(400, e.message);
     }
     const pushed = toMirror(dataDir, upgradeRaw(JSON.parse(text)));
-    const mergedText = JSON.stringify(mergeConfigs(upgradeRaw(JSON.parse(readConfig())), pushed), null, 2) + '\n';
+    const machinesNow = readState().machines;
+    const ownTasks = (origin, work) => !(machinesNow[spaceKey({ origin, work, repository: '' })] || []).length;
+    const mergedText = JSON.stringify(mergeConfigs(upgradeRaw(JSON.parse(readConfig())), pushed, ownTasks), null, 2) + '\n';
     let parsed;
     try {
       parsed = parseConfig(mergedText, 'taskmgr.json');
@@ -684,13 +692,14 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
   }
 
   app.put('/api/sync/space', json, (req, res) => {
-    const { origin = '', work, repository = '', machine, entries } = req.body || {};
+    const { origin = '', work, repository = '', machine, entries, force } = req.body || {};
     if (typeof origin !== 'string' || typeof repository !== 'string') throw new SyncError(400, 'origin and repository must be strings.');
     const target = spaceDir(dataDir, { origin, work, repository });
     if (!Array.isArray(entries)) throw new SyncError(400, '"entries" must be an array.');
     const list = entries.map(checkEntry);
     const key = spaceKey({ origin: origin.trim(), work: work.trim(), repository: repository.trim() });
     claim(readState(), key, machineName(machine), label({ origin, work, repository }));  // refused before anything is written
+    if (force !== true) pullFirst(key, machineName(machine), target, list, label({ origin, work, repository }));
     const kept = withoutDeleted(key, machineName(machine), list);
     const { files, dirs } = writeSnapshot(dataDir, target, kept.list);
     const state = readState();
@@ -704,6 +713,28 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     machineLog(req, 'success', `pushed ${label({ origin, work, repository })} (${files} file${files === 1 ? '' : 's'}, ${dirs} empty folder${dirs === 1 ? '' : 's'})`);
     res.json({ ok: true, files, dirs });
   });
+
+  // A push writes the folder as the pushing machine has it, so a task only here would go. That is
+  // right for a copy of what machines push, but not for a folder no machine syncs yet (a work or
+  // repository added here in the web UI, with tasks made here): the first push into it is refused
+  // while it holds a task the snapshot does not have. A `tm pull` there brings those tasks over, and
+  // counts the machine as one of the space's, after which its pushes go through as ever; `force`
+  // (`tm push --force`) pushes anyway, for when the pull is refused too (tasks never pushed there).
+  function pullFirst(key, machine, target, list, what) {
+    if (!machine || (readState().machines[key] || []).length) return;
+    const pushed = new Set(list.map(e => e.rel.split(path.sep).join('/')));
+    const walk = (dir, rel) => {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return false; }
+      for (const d of entries) {
+        if (isSyncSkipped(d.name)) continue;
+        const r = rel ? `${rel}/${d.name}` : d.name;
+        if (d.isDirectory() ? walk(path.join(dir, d.name), r) : d.name === 'task.txt' && !pushed.has(r)) return true;
+      }
+      return false;
+    };
+    if (walk(target, '')) throw new SyncError(409, `${what} has tasks on the server that this machine does not have: run "tm pull" first, or "tm push --force" to overwrite them.`, { code: 'PULL_FIRST' });
+  }
 
   // ---------- pull: what `tm pull` reads ----------
 

@@ -52,6 +52,9 @@ const SERVER = String(process.env.SYNC_SERVER || '').trim().replace(/\/+$/, '');
 const TOKEN = String(process.env.SYNC_SERVER_TOKEN || '').trim();
 // What the server shows a folder pushed from here as coming from: MACHINE_ID, or the hostname.
 const MACHINE_ID = String(process.env.MACHINE_ID || '').trim() || os.hostname();
+// `tm push --force`: also overwrite a folder the server has tasks of its own in (see PULL_FIRST in
+// server/sync.js). Never set for the daemon, which requires this file.
+const FORCE = require.main === module && process.argv.includes('--force');
 const CONFIG_PATH = DEFAULT_CONFIG_PATH;
 
 const sha1 = (text) => crypto.createHash('sha1').update(text).digest('hex');
@@ -370,7 +373,7 @@ async function pushSpace(space, { entries, blobs }) {
     const { missing } = await request('POST', '/api/sync/blobs', { blobs: [...blobs.keys()] });
     await upload(missing);
   }
-  const body = { origin: space.origin, work: space.work, repository: space.repository, machine: MACHINE_ID, entries };
+  const body = { origin: space.origin, work: space.work, repository: space.repository, machine: MACHINE_ID, entries, ...(FORCE ? { force: true } : {}) };
   let result;
   try {
     result = await request('PUT', '/api/sync/space', body);
@@ -410,7 +413,7 @@ async function main() {
       log(done);
       syncLog(true, done);
     } catch (e) {
-      if (e.code !== 'TOO_MANY_MACHINES') fail(`${what}: ${e.message}`);
+      if (e.code !== 'TOO_MANY_MACHINES' && e.code !== 'PULL_FIRST') fail(`${what}: ${e.message}`);
       warn(`${what}: ${e.message}`);
       syncLog(false, `${what}: ${e.message}`);
       refused.push(what);
