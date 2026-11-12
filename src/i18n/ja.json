@@ -29,7 +29,7 @@
     "showDone": "完了",
     "showPending": "保留",
     "showAbort": "中止",
-    "filter": "タスク・Work・Repository を検索...",
+    "filter": "検索...",
     "filterLabel": "タスクを絞り込む",
     "clearFilter": "絞り込みを解除",
     "refresh": "更新",

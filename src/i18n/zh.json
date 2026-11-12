@@ -29,7 +29,7 @@
     "showDone": "已完成",
     "showPending": "搁置",
     "showAbort": "中止",
-    "filter": "搜索任务、Work、Repository...",
+    "filter": "搜索...",
     "filterLabel": "筛选任务",
     "clearFilter": "清除筛选",
     "refresh": "刷新",

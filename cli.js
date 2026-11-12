@@ -173,8 +173,23 @@ function countTasks(dir) {
   return counts;
 }
 
-// Claude-like orange for the selected row (blessed maps hex to the nearest terminal color)
-const SELECTED_STYLE = { bg: '#DA7756', fg: 'white', bold: true };
+// Rows are highlighted by their background, as in repo-master: the row under the cursor gets a
+// pale grey bar, a row with something to do (isTodo(index)) a Claude-orange one, both written in
+// dark ink. The cursor's bar wins on a row that would wear both. (blessed maps hex to the nearest
+// terminal color.)
+const TODO_ORANGE = '#D97757';
+const CURSOR_GREY = '#D6D6D6';
+const BAR_INK = '#202020';
+function rowStyle(isTodo) {
+  const onTodo = (value) => function (item) {
+    const list = item.parent;
+    return list && isTodo(list.items.indexOf(item)) ? value : undefined;
+  };
+  return {
+    selected: { bg: CURSOR_GREY, fg: BAR_INK },
+    item: { bg: onTodo(TODO_ORANGE), fg: onTodo(BAR_INK) }
+  };
+}
 const MODAL_BORDER_COLOR = '#DA7756';
 const STATUS_BAR_STYLE = (process.platform === 'win32')
   ? { bg: 'green', fg: 'white' }
@@ -321,7 +336,7 @@ function createWorkPicker(screen, config, onPick) {
     parent: screen,
     top: 1, left: 0, width: '100%', height: '100%-2',
     keys: true, vi: true, mouse: true,
-    style: { selected: SELECTED_STYLE },
+    style: rowStyle(i => Boolean(entries[i] && entries[i].todo)), // a work or repository with todo tasks
     hidden: true
   });
   wheelOneRow(list);
@@ -376,6 +391,7 @@ function createWorkPicker(screen, config, onPick) {
     entries = buildEntries(config.getWorks(), config.getOrigins());
     header.setContent('  Origins');
     const infos = entries.map(e => describe(e.root));
+    entries.forEach((e, i) => { e.todo = /todo:[1-9]/.test(infos[i]); });
     const nameWidth = Math.max(4, ...entries.map(e => displayWidth(e.name)));
     const infoWidth = Math.max(4, ...infos.map(displayWidth));
     list.setItems(entries.map((e, i) =>
@@ -544,7 +560,7 @@ function createTaskView(screen, onBack) {
   const header = blessed.box({
     parent: screen,
     top: 0, left: 0, height: 1, width: '100%',
-    content: '     id            origin    edit_at       task',
+    content: '     id            origin    task',
     hidden: true
   });
 
@@ -552,7 +568,10 @@ function createTaskView(screen, onBack) {
     parent: screen,
     top: 1, left: 0, width: '100%', height: '100%-1',
     keys: true, vi: true, mouse: true,
-    style: { selected: SELECTED_STYLE },
+    style: rowStyle(i => { // a task still to do
+      const t = (list.tasksData || [])[i];
+      return Boolean(t) && statusOrder(t.status) === 0;
+    }),
     hidden: true
   });
 
@@ -608,6 +627,7 @@ function createTaskView(screen, onBack) {
 
     if (tasks.length === 0) {
       list.clearItems();
+      list.tasksData = []; // drop the rows of the list shown before, or keys would still act on them
 
       // If we're at the initial root directory, show the no-tasks box; otherwise show an empty list
       if (cwd === initialRoot) {
@@ -632,8 +652,8 @@ function createTaskView(screen, onBack) {
     try { header.show(); } catch (e) { }
     try { list.show(); } catch (e) { }
 
+    list.tasksData = tasks; // attach (before drawing: the rows' colors are read from it)
     renderList(screen, list, tasks, selectedIndex);
-    list.tasksData = tasks; // attach
 
     // Update the status bar
     updateStatusBar(tasks);
@@ -928,6 +948,7 @@ function createTaskView(screen, onBack) {
     '',
     '  j / k, up / down   move between tasks',
     '  h / l, left/right  go to parent / into subtasks (listed under their task as a tree)',
+    '  backspace          go to parent, like h',
     ...(onBack ? ['  h at the top       back to the Origins tree'] : []),
     '  a / n              add a task (type task.txt: first line name; esc :wq saves, :q cancels)',
     '  shift+a            add a subtask of the selected task',
@@ -1101,7 +1122,7 @@ function createTaskView(screen, onBack) {
 
   // 9. Change current working directory
   // - Right arrow / l: change cwd into the selected task's folder (the directory containing the task file)
-  // - Left arrow / h: go up to the parent directory; at the top, back to the picker (when there is one)
+  // - Left arrow / h / backspace: go up to the parent directory; at the top, back to the picker (when there is one)
   taskKey(['right', 'l'], () => {
     // do not navigate if preview is open
     if (isPreviewing) return;
@@ -1117,7 +1138,7 @@ function createTaskView(screen, onBack) {
     } catch (e) { /* ignore */ }
   });
 
-  taskKey(['left', 'h'], () => {
+  taskKey(['left', 'h', 'backspace'], () => {
     // do not navigate if preview is open
     if (isPreviewing) return;
 

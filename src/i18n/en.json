@@ -29,7 +29,7 @@
     "showDone": "done",
     "showPending": "pending",
     "showAbort": "aborted",
-    "filter": "Search tasks, works, repositories...",
+    "filter": "Search...",
     "filterLabel": "Filter tasks",
     "clearFilter": "Clear filter",
     "refresh": "Refresh",

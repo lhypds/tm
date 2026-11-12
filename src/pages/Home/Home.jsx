@@ -66,6 +66,17 @@ function readFlag(key, fallback) {
 // What Claude is told to do with its changes once a run's work is done, as the checkboxes under the
 // prompt last left it: "push" (commit and push), "pr" (a new branch, a commit and a pull request) or
 // null (nothing). One or the other, never both.
+// The texts last searched for, newest first (see `remember` in Home), kept across sessions.
+const MAX_SEARCH_HISTORY = 7;
+function readSearchHistory() {
+  try {
+    const v = JSON.parse(localStorage.getItem("search.history"));
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string" && x).slice(0, MAX_SEARCH_HISTORY) : [];
+  } catch {
+    return [];
+  }
+}
+
 function readRunAfter() {
   try {
     const v = localStorage.getItem("run.after");
@@ -140,6 +151,7 @@ function pollingTitle(polling, t) {
 }
 
 const MAX_SPACE_HITS = 8; // works and repositories listed under the search box
+const ALL_SCOPE = { all: "1" }; // the list of every work's tasks
 
 export default function Home({ all = false }) {
   const { t } = useTranslation();
@@ -152,7 +164,7 @@ export default function Home({ all = false }) {
   const dir = searchParams.get("dir") || "";
   // The tasks of several spaces in one list: every work, a whole origin, or a work at its top.
   const scope = useMemo(
-    () => (all ? { all: "1" } : origin && !work ? { origin } : work && !repository && !dir ? { work } : null),
+    () => (all ? ALL_SCOPE : origin && !work ? { origin } : work && !repository && !dir ? { work } : null),
     [all, origin, work, repository, dir],
   );
 
@@ -177,12 +189,38 @@ export default function Home({ all = false }) {
   // it (see useTaskFiles), since a file pushed from another machine changes no list.
   const [loads, setLoads] = useState(0);
   const [query, setQuery] = useState("");
+  // Text in the search box searches every work's tasks, not only the list of this path: that list
+  // (`everything`, read when the search starts and re-read with each load) is then the one shown,
+  // in place of the path's, which stays loaded and is back as soon as the box is emptied. Until
+  // the first one arrives the search is over the path's own list.
+  const searchAll = !all && query.trim() !== "";
+  const searchAllRef = useRef(searchAll);
+  searchAllRef.current = searchAll;
+  const [everything, setEverything] = useState(null);
+  const listData = searchAll && everything ? everything : data;
+  const listScope = searchAll ? ALL_SCOPE : scope;
   // The new task modal is open: { space, dir, status, parent }, where the task goes (in a task
   // folder with `parent`, the task it is a subtask of) and the board column it belongs to.
   const [creating, setCreating] = useState(null);
   const searchRef = useRef(null);
   const [searchFocused, setSearchFocused] = useState(false);
-  const [hitIndex, setHitIndex] = useState(-1); // the work / repository chosen under the search box, -1: none
+  const [hitIndex, setHitIndex] = useState(-1); // the work / repository (or the past search) chosen under the search box, -1: none
+  // The past searches, listed under the empty box once the down arrow asks for them: up / down
+  // choose one and enter (or a click) searches for it again. A search is remembered when enter
+  // leaves the box with it, for the tasks or for a work / repository.
+  const [searchHistory, setSearchHistory] = useState(readSearchHistory);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const remember = (text) => {
+    const q = text.trim();
+    if (!q) return;
+    const next = [q, ...searchHistory.filter((x) => x !== q)].slice(0, MAX_SEARCH_HISTORY);
+    setSearchHistory(next);
+    try {
+      localStorage.setItem("search.history", JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
   const [focusing, setFocusing] = useState(null); // { key, area }: the task whose text ("task") or prompt ("prompt") the panel should focus
   const [promptOpen, setPromptOpen] = useState(() => readFlag("panel.prompt", false)); // the panel shows the task's prompt.txt under its text
   const [peekPromptOpen, setPeekPromptOpen] = useState(() => readFlag("preview.prompt", false)); // and the preview, on its own
@@ -307,8 +345,20 @@ export default function Home({ all = false }) {
   // Only the latest load may set the list: an earlier one answering late (after the path changed)
   // would put another space's tasks on the right.
   const loadSeq = useRef(0);
+  const loadEverything = useCallback(async () => {
+    try {
+      const d = await api.listAllTasks(ALL_SCOPE);
+      setEverything((prev) => (JSON.stringify(prev) === JSON.stringify(d) ? prev : d));
+    } catch {
+      /* keep the last list: the search is then over it, or over the path's own */
+    }
+  }, []);
+  useEffect(() => {
+    if (searchAll) loadEverything();
+  }, [searchAll, loadEverything]);
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
+    if (searchAllRef.current) loadEverything(); // a change made to a task found shows there too
     try {
       const d = scope ? await api.listAllTasks(scope) : await api.listTasks(space, dir);
       if (seq !== loadSeq.current) return;
@@ -322,7 +372,7 @@ export default function Home({ all = false }) {
       setLoaded({ key: loadKey, dir: EMPTY_DIR });
       setLoadError(e.message);
     }
-  }, [scope, space, dir, loadKey]);
+  }, [scope, space, dir, loadKey, loadEverything]);
 
   // Whether taskmgrd polls the sync server and how its last pull went (see api.getPolling), for the
   // dot after the server's host in the status bar; null until the first answer. A failed read keeps
@@ -404,7 +454,7 @@ export default function Home({ all = false }) {
   );
   // The space on the right when its task folder does not exist. A list of several spaces just
   // leaves the missing ones out.
-  const missing = (!scope && spaces.find((s) => s.to === spaceTo && !s.exists)) || null;
+  const missing = (!listScope && spaces.find((s) => s.to === spaceTo && !s.exists)) || null;
 
   const selectSpace = (to, replace = false) => {
     if (to !== spaceTo || dir) navigate(to, { replace });
@@ -418,14 +468,14 @@ export default function Home({ all = false }) {
   const tree = useMemo(() => {
     // A task of one space has no space of its own to show on an origin's page (which can only
     // happen with a list that is not this path's), so it is left out.
-    const list = data.tasks.flatMap((t) => {
+    const list = listData.tasks.flatMap((t) => {
       const s =
         t.work !== undefined
           ? { origin: (works || []).find((item) => item.work === t.work)?.origin || "", work: t.work, repository: t.repository }
           : space;
       if (!s) return [];
       // On a work's page (which has the origin in its path too) a task is from its repository only.
-      const path = !scope ? [] : scope.work ? [s.repository].filter(Boolean) : [s.work, s.repository].filter(Boolean);
+      const path = !listScope ? [] : listScope.work ? [s.repository].filter(Boolean) : [s.work, s.repository].filter(Boolean);
       const from = path.join(" / ");
       const fromParts = path.slice(-1);
       const fromColor = origins.find((o) => o.origin === s.origin)?.color || "";
@@ -434,6 +484,7 @@ export default function Home({ all = false }) {
         space: s,
         key: keyOf(s, task.rel),
         from,
+        fromPath: path.join("/").toLowerCase(), // what a search with a slash ("/repository") is matched against
         fromParts,
         fromColor,
         subtaskCount: (task.subtasks || []).length, // all of them, whatever a filter keeps (the board's subtasks button)
@@ -443,13 +494,13 @@ export default function Home({ all = false }) {
     });
     // In the list of every origin's tasks, those of one origin are together: the origins in the
     // tree's order (the tasks of works without one last), each one's tasks in the list's order.
-    if (!scope?.all) return list;
+    if (!listScope?.all) return list;
     const rank = (t) => {
       const i = origins.findIndex((o) => o.origin === t.space.origin);
       return i < 0 ? origins.length : i;
     };
     return [...list].sort((a, b) => rank(a) - rank(b));
-  }, [data.tasks, space, scope, works, origins]);
+  }, [listData.tasks, space, listScope, works, origins]);
   const tasks = useMemo(() => flattenTasks(tree), [tree]);
 
   // The time filter's entries (all, last / this week, then the months, this one first); a month
@@ -468,7 +519,7 @@ export default function Home({ all = false }) {
     const q = query.trim().toLowerCase();
     const keep = (t) =>
       inPeriod(t, monthKey) &&
-      (!q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.from.toLowerCase().includes(q)) &&
+      (!q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.from.toLowerCase().includes(q) || t.fromPath.includes(q)) &&
       (showAbort || t.status !== "aborted") &&
       (view === "board" || ((showDone || t.status !== "done") && (showPending || t.status !== "pending")));
     // A task stays when a subtask of it is kept, so a filter never hides a task that matches it.
@@ -490,25 +541,40 @@ export default function Home({ all = false }) {
   // The works and repositories the search box's text names, listed under the box: those of the
   // tree (so a hidden work only while those are shown), a work by its name, a repository by its
   // own, each with the path it is under. Up / down choose one and enter (or a click) goes to it.
+  // Text with a slash is a path: what follows the last slash names a repository and what is
+  // before it the "origin/work" it is under, so "/api" is every repository named so and "tm/api"
+  // those of the works named "tm"; a work is then found by its own "origin/work".
   const spaceHits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
+    const cut = q.lastIndexOf("/");
+    const under = cut < 0 ? null : q.slice(0, cut).replace(/^\/+/, ""); // null: no slash typed
+    const last = q.slice(cut + 1);
     const hits = [];
     for (const w of treeWorks || []) {
       const origin = w.origin || "";
-      if (w.work.toLowerCase().includes(q)) hits.push({ to: api.spacePath(origin, w.work), name: w.work, under: [origin].filter(Boolean) });
+      const workPath = [origin, w.work].filter(Boolean).join("/").toLowerCase();
+      if (under === null ? w.work.toLowerCase().includes(q) : under !== "" && workPath.includes(q))
+        hits.push({ to: api.spacePath(origin, w.work), name: w.work, under: [origin].filter(Boolean) });
       for (const r of w.repositories || []) {
-        if (r.name.toLowerCase().includes(q))
+        if (r.name.toLowerCase().includes(last) && (!under || workPath.includes(under)))
           hits.push({ to: api.spacePath(origin, w.work, r.name), name: r.name, under: [origin, w.work].filter(Boolean) });
       }
     }
     return hits.slice(0, MAX_SPACE_HITS);
   }, [query, treeWorks]);
   const hitsOpen = searchFocused && spaceHits.length > 0;
+  const historyShown = searchFocused && historyOpen && !query && searchHistory.length > 0;
+  const searchAgain = (text) => {
+    setQuery(text);
+    setHistoryOpen(false);
+    setHitIndex(text.includes("/") ? 0 : -1);
+  };
 
   // Out of the search box and onto the tasks (the board's column of the selected task): enter
   // there, with nothing chosen under it. A selection the search left out moves to the first task.
   function focusTasks() {
+    remember(query);
     searchRef.current?.blur();
     const task = selected || visible[0] || null;
     if (task && !selected) setSelectedKey(task.key);
@@ -517,6 +583,7 @@ export default function Home({ all = false }) {
   const boardPaneOf = (p) => (boardStatuses.includes(p) ? p : boardStatuses[0]);
 
   function openHit(hit) {
+    remember(query);
     setQuery("");
     setHitIndex(-1);
     searchRef.current?.blur();
@@ -1426,6 +1493,9 @@ export default function Home({ all = false }) {
       return true;
     }
     if (name === "/") {
+      // a new search: what the box still had from the last one is dropped
+      setQuery("");
+      setHitIndex(-1);
       searchRef.current?.focus();
       return true;
     }
@@ -1609,7 +1679,7 @@ export default function Home({ all = false }) {
         </button>
       </div>
     );
-  } else if (view === "board" && !(loading && data.tasks.length === 0)) {
+  } else if (view === "board" && !(loading && listData.tasks.length === 0)) {
     // The board keeps its todo / done / pending columns (and the aborted column while aborted tasks
     // are shown) even with no tasks (or none matching).
     content = (
@@ -1633,7 +1703,7 @@ export default function Home({ all = false }) {
     // The list keeps its column header even with no tasks (or none matching); the message for
     // that sits under the header.
     let empty = null;
-    if (data.tasks.length === 0) {
+    if (listData.tasks.length === 0) {
       empty = loading ? (
         <p className="muted">{t("common.loading")}</p>
       ) : (
@@ -1698,11 +1768,17 @@ export default function Home({ all = false }) {
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setHitIndex(-1);
+              setHistoryOpen(false);
+              // a path (text with a slash) is after a work or repository: the first one is chosen
+              setHitIndex(e.target.value.includes("/") ? 0 : -1);
             }}
-            onFocus={() => setSearchFocused(true)}
+            onFocus={() => {
+              setSearchFocused(true);
+              if (query.includes("/")) setHitIndex(0);
+            }}
             onBlur={() => {
               setSearchFocused(false);
+              setHistoryOpen(false);
               setHitIndex(-1);
             }}
             onKeyDown={(e) => {
@@ -1714,13 +1790,29 @@ export default function Home({ all = false }) {
                 setHitIndex((i) => ((i + 1 + (e.key === "ArrowDown" ? 1 : n - 1)) % n) - 1);
                 return;
               }
+              // The empty box: the down arrow lists the past searches, the first one chosen.
+              if (!query && searchHistory.length > 0 && (e.key === "ArrowDown" || (historyOpen && e.key === "ArrowUp"))) {
+                e.preventDefault();
+                const n = searchHistory.length + 1;
+                setHitIndex((i) => (historyOpen ? ((i + 1 + (e.key === "ArrowDown" ? 1 : n - 1)) % n) - 1 : 0));
+                setHistoryOpen(true);
+                return;
+              }
               if (e.key === "Enter") {
                 e.preventDefault();
+                if (historyShown && searchHistory[hitIndex]) {
+                  searchAgain(searchHistory[hitIndex]);
+                  return;
+                }
                 if (hitsOpen && spaceHits[hitIndex]) openHit(spaceHits[hitIndex]);
                 else focusTasks();
                 return;
               }
               if (e.key !== "Escape") return;
+              // esc empties the box (the list that was open is back) and leaves it
+              setQuery("");
+              setHistoryOpen(false);
+              setHitIndex(-1);
               e.currentTarget.blur();
               if (pane !== "tree") {
                 const selectedTask = tasks.find((task) => task.key === selectedKey);
@@ -1744,6 +1836,24 @@ export default function Home({ all = false }) {
             >
               <XIcon />
             </button>
+          )}
+          {historyShown && (
+            <ul className={styles.searchHits} role="listbox">
+              {searchHistory.map((text, i) => (
+                <li
+                  key={text}
+                  role="option"
+                  aria-selected={i === hitIndex}
+                  data-selected={i === hitIndex}
+                  title={text}
+                  onMouseDown={(e) => e.preventDefault()} // the box keeps the focus until the click
+                  onMouseEnter={() => setHitIndex(i)}
+                  onClick={() => searchAgain(text)}
+                >
+                  {text}
+                </li>
+              ))}
+            </ul>
           )}
           {hitsOpen && (
             <ul className={styles.searchHits} role="listbox">
