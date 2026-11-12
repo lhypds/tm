@@ -56,8 +56,3 @@
 .input:checked + .box::before {
   opacity: 1;
 }
-
-.input:focus-visible + .box {
-  outline: var(--line) solid var(--focus);
-  outline-offset: 2px;
-}

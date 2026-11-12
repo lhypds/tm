@@ -30,7 +30,7 @@ function readPicked() {
 // showing the run (onOpenRun(run)). Above them the prompt and the run button: it starts Claude Code
 // with that prompt on every machine ticked (onRun(machine, prompt), resolving to the run, or null
 // when refused), on no task, in the home folder there (⌘ / ctrl + enter runs too). One machine
-// started: its run is shown at once. The prompt stays once run, greyed until it is changed. A run
+// started: its run is shown at once. Once run, the prompt is emptied and stays as its placeholder (tab brings it back as text). A run
 // still going has a stop button at its right end (onStop(run)). `runs` is every run the server has, by id (see useRuns); the
 // ones of this dialog are those on no task (`task.free`).
 //
@@ -45,7 +45,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   const [machines, setMachines] = useState(null); // null until first answered
   const [error, setError] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [sent, setSent] = useState(null); // the prompt as it was last run: shown grey while unchanged
+  const [sent, setSent] = useState(null); // the prompt as it was last run: the placeholder of the emptied box, tab brings it back
   const [picked, setPicked] = useState(readPicked); // names; null: nothing chosen yet, a lone machine is
   const [busy, setBusy] = useState(false);
   const promptRef = useRef(null);
@@ -116,6 +116,12 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
 
   const isCommand = prompt.trimStart().startsWith("/");
   const canRun = !busy && !!prompt.trim() && (isCommand ? ready : targets).length > 0;
+  // Once run, the box is emptied and what was run stays in it as its placeholder, grey and not to be
+  // edited; tab in the empty box brings it back as text.
+  const ran = () => {
+    setSent(prompt);
+    setPrompt("");
+  };
   const runCommand = async () => {
     const results = await Promise.all(
       ready.map((m) =>
@@ -127,7 +133,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     );
     const ok = results.filter((r) => !r.error);
     const bad = results.filter((r) => r.error);
-    if (ok.length) setSent(prompt);
+    if (ok.length) ran();
     const lines = [
       ...(ok.length
         ? [
@@ -157,7 +163,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     try {
       if (isCommand) return await runCommand();
       const started = (await Promise.all(targets.map((m) => onRun(m.name, prompt)))).filter(Boolean);
-      if (started.length) setSent(prompt); // kept, greyed: changing it makes it a new one
+      if (started.length) ran();
       if (started.length === 1) onOpenRun(started[0]);
     } finally {
       setBusy(false);
@@ -171,7 +177,8 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
           <TextArea
             ref={promptRef}
             value={prompt}
-            className={`${styles.prompt}${sent !== null && prompt === sent ? ` ${styles.sent}` : ""}`}
+            className={styles.prompt}
+            placeholder={sent || ""}
             minHeight={80}
             aria-label={t("machines.prompt")}
             onChange={(e) => {
@@ -182,6 +189,10 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 run();
+              } else if (e.key === "Tab" && !e.shiftKey && !prompt && sent) {
+                e.preventDefault();
+                setPrompt(sent);
+                setMenu({ off: true, index: 0 });
               } else if (options.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                 e.preventDefault();
                 setMenu({

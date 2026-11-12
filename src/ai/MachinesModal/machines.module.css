@@ -16,9 +16,10 @@
   height: 200px;
 }
 
-/* Once run, the prompt stays, grey, until it is changed. */
-.prompt.sent {
+/* Once run, the prompt is the placeholder of the emptied box (tab brings it back as text). */
+.prompt::placeholder {
   color: var(--muted);
+  opacity: 1;
 }
 
 .error {
