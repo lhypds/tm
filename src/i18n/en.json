@@ -328,7 +328,6 @@
   },
   "ai": {
     "run": "Run with Claude Code",
-    "runOn": "Machine to run on",
     "afterPush": "Commit & push",
     "afterPr": "Create PR",
     "show": "Show the run",
