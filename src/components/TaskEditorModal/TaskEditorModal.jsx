@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Modal, TextArea } from "@ui";
 import Attachments from "@components/Attachments";
 import { BrainIcon } from "@components/icons";
+import { isTyping } from "@utils/keys";
 import styles from "./editor.module.css";
 
 // A new task in one text area, the way the terminal opens it in $EDITOR; the first line becomes
@@ -13,7 +14,9 @@ import styles from "./editor.module.css";
 // again each time the editor opens): what is typed there becomes the task's prompt.txt, and the
 // save button is then "Save & Execute", which creates the task and runs Claude Code on it (`prompt`
 // is that text, blank or not; null with the prompt hidden, when the task is only saved). As big as
-// the task preview.
+// the task preview. Esc in a text takes the caret out of it rather than closing the editor (a second
+// esc closes it), and the page's keys work then: g shows the prompt and puts the caret in it, e / i
+// put it back in the task's text.
 export default function TaskEditorModal({ isOpen, space, parent, saving, onCancel, onSave, onPreview }) {
   const { t } = useTranslation();
   const title = parent ? t("editor.newSubtask", { name: parent.title || parent.id }) : t("editor.newTask");
@@ -40,6 +43,30 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
     setTimeout(() => (open ? promptRef : textRef).current?.focus());
   }
 
+  // esc: out of the text first, then (nothing being typed in) the editor closes
+  function onEscape() {
+    const el = document.activeElement;
+    if (el === textRef.current || el === promptRef.current) el.blur();
+    else onCancel();
+  }
+
+  // With the caret in no text: g edits the prompt (shown first when hidden), e / i the task's text.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isTyping(e)) return;
+      const key = e.key.toLowerCase();
+      if (key !== "g" && key !== "e" && key !== "i") return;
+      e.preventDefault(); // the key is not typed into the text it brings the caret to
+      if (key === "g") {
+        setPromptOpen(true);
+        setTimeout(() => promptRef.current?.focus());
+      } else textRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
   function submit(e) {
     e?.preventDefault();
     if (saving) return;
@@ -61,7 +88,7 @@ export default function TaskEditorModal({ isOpen, space, parent, saving, onCance
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} title={title} titleActions={brain} closeOnOverlay={false} className={styles.modal}>
+    <Modal isOpen={isOpen} onClose={onCancel} onEscape={onEscape} title={title} titleActions={brain} closeOnOverlay={false} className={styles.modal}>
       <form className={styles.form} onSubmit={submit} onKeyDown={onKeyDown}>
         <div className={styles.area}>
           <TextArea ref={textRef} className={styles.text} value={text} onChange={(e) => setText(e.target.value)} aria-label={title} />

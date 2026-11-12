@@ -204,7 +204,7 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "编辑任务的 prompt（在面板或预览中）"
+      "desc": "编辑任务的 prompt（在面板、预览中，或新建任务窗口按 esc 之后）"
     },
     "run": {
       "keys": "shift+r；预览中 r",

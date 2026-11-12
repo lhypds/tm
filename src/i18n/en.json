@@ -204,7 +204,7 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "edit the task's prompt (in the panel, or in the preview)"
+      "desc": "edit the task's prompt (in the panel, the preview, or a new task after esc)"
     },
     "run": {
       "keys": "shift+r; r in the preview",
