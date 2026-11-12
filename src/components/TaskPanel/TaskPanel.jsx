@@ -64,7 +64,7 @@ export default function TaskPanel({
   const promptRef = useRef(null);
   const [over, setOver] = useState(false);
   const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
-  const hasPrompt = attachments.prompt != null; // not while unread (undefined) or without a file (null)
+  const hasPrompt = !!attachments.prompt?.trim(); // not while unread (undefined), without a file (null), or with a blank one
   const focusOf = (area) => !!task && focusKey === task.key && focusArea === area;
   // The task's run when it is newer than its latest record (going, or over and not yet re-read): its
   // prompt is the one carried out, greyed from the start of the run (see PromptText).
