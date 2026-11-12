@@ -484,7 +484,7 @@ export default function Home({ all = false }) {
         space: s,
         key: keyOf(s, task.rel),
         from,
-        fromPath: path.join("/").toLowerCase(), // what a search with a slash ("/repository") is matched against
+        fromPath: path.map((p) => `/${p}`).join("").toLowerCase(), // what a search with a slash ("/work", "/repository") is matched against
         fromParts,
         fromColor,
         subtaskCount: (task.subtasks || []).length, // all of them, whatever a filter keeps (the board's subtasks button)
@@ -541,9 +541,9 @@ export default function Home({ all = false }) {
   // The works and repositories the search box's text names, listed under the box: those of the
   // tree (so a hidden work only while those are shown), a work by its name, a repository by its
   // own, each with the path it is under. Up / down choose one and enter (or a click) goes to it.
-  // Text with a slash is a path: what follows the last slash names a repository and what is
-  // before it the "origin/work" it is under, so "/api" is every repository named so and "tm/api"
-  // those of the works named "tm"; a work is then found by its own "origin/work".
+  // Text with a slash is a path: what follows the last slash names a work or a repository and
+  // what is before it the path that one is under (a work's origin, a repository's "origin/work"),
+  // so "/api" is every work and repository named so and "tm/api" those under a "tm".
   const spaceHits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
@@ -554,7 +554,7 @@ export default function Home({ all = false }) {
     for (const w of treeWorks || []) {
       const origin = w.origin || "";
       const workPath = [origin, w.work].filter(Boolean).join("/").toLowerCase();
-      if (under === null ? w.work.toLowerCase().includes(q) : under !== "" && workPath.includes(q))
+      if (under === null ? w.work.toLowerCase().includes(q) : w.work.toLowerCase().includes(last) && origin.toLowerCase().includes(under))
         hits.push({ to: api.spacePath(origin, w.work), name: w.work, under: [origin].filter(Boolean) });
       for (const r of w.repositories || []) {
         if (r.name.toLowerCase().includes(last) && (!under || workPath.includes(under)))
