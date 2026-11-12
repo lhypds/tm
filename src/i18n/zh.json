@@ -123,6 +123,8 @@
     "newTask": "新建任务",
     "saveHint": "⌘S / Ctrl+S 保存",
     "save": "保存",
+    "saveExecute": "保存并执行",
+    "executeHint": "⌘S / Ctrl+S 保存并用 Claude Code 执行任务",
     "saving": "保存中...",
     "newSubtask": "为“{{name}}”添加子任务"
   },
@@ -199,6 +201,14 @@
     "prompt": {
       "keys": "显示 prompt 时在 Task 中 j / k, enter",
       "desc": "在正文、prompt 和文件之间移动；enter 编辑所选"
+    },
+    "promptEdit": {
+      "keys": "g",
+      "desc": "编辑任务的 prompt（在面板或预览中）"
+    },
+    "run": {
+      "keys": "shift+r；预览中 r",
+      "desc": "用 Claude Code 执行任务的 prompt"
     },
     "pending": {
       "keys": "p",
@@ -355,6 +365,7 @@
     "turns_other": "{{count}} 轮",
     "queued": "等待 {{machine}}",
     "noRunner": "需在 {{machine}} 上运行，但它未连接：在那台机器的 .env 里设 AI_RUNNER=1 并启动 taskmgrd",
+    "noPrompt": "没有可执行的 prompt：按 g 编写",
     "noMachine": "这个副本推送时没有机器名，无法运行 Claude Code",
     "thinking": "思考中",
     "using": "正在使用 {{tool}}",

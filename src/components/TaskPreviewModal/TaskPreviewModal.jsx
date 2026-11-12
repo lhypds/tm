@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@ui";
 import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
+import { RunButton } from "@ai";
 import { fileUrl } from "@utils/api";
 import { noDoubleClickSelect } from "@utils/keys";
 import { formatSize, previewKind } from "@utils/task";
@@ -119,7 +120,9 @@ function HeaderButton({ label, dot, disabled, onClick, children }) {
 // show the task's prompt (the brain, `onTogglePrompt`: with `promptOpen`, `prompt`, its prompt.txt
 // text, null for none, undefined until read, is shown under the text, as the Task panel shows it;
 // the brain carries a dot while the task has one) and delete the task (`onDelete`, which asks
-// first). The prompt is under a head that says "Prompt", as the panel's divider does.
+// first). The prompt is under a head that says "Prompt", as the panel's divider does, with the run
+// button beside it (RunButton, as on the panel: `run` is the task's run, `noRunner` why it cannot
+// run now, onRun(task) starts Claude Code on it or shows the run going; r in Home does the same).
 // `section` is the text the keyboard is on, "task" or "prompt" (null while an attachment is, and
 // until j / k chose one: the preview opens with nothing chosen); that text is highlighted, as a
 // chosen attachment's row is. Opened with space or a double click on the task and closed with
@@ -141,6 +144,9 @@ export default function TaskPreviewModal({
   promptOpen,
   onTogglePrompt,
   section,
+  run,
+  noRunner,
+  onRun,
 }) {
   const { t } = useTranslation();
   const textRef = useRef(null); // the textarea being edited, task or prompt (one at a time)
@@ -182,6 +188,7 @@ export default function TaskPreviewModal({
             {/* the prompt's head, as the panel's divider: its name */}
             <div className={styles.promptHead}>
               <span>{t("panel.prompt")}</span>
+              <RunButton run={run} disabled={prompt == null} reason={noRunner} onClick={() => onRun(task)} />
             </div>
             {editing === "prompt" ? (
               <Editor

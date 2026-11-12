@@ -592,13 +592,20 @@ export default function Home({ all = false }) {
   // The reason it cannot now, for the run button; null when it can, or nothing is known yet. A
   // folder two machines sync can run while either's runner is connected: which one is asked once
   // the button is pressed (see openRun).
-  const runSpace = useMemo(() => {
-    const sp = selected?.space;
+  // The tree's entry of a task's space (a work, or a repository of one), which says where it runs.
+  const runSpaceOf = (sp) => {
     const w = sp && works?.find((x) => x.work === sp.work);
     return (w && (sp.repository ? w.repositories.find((p) => p.name === sp.repository) : w)) || null;
-  }, [selected, works]);
-  const runMachines = runSpace?.remote ? runSpace.machines || [] : [];
-  const noRunner = !runSpace?.remote ? null : !runSpace.machine ? t("ai.noMachine") : runSpace.machine.runner ? null : t("ai.noRunner", { machine: runSpace.machine.name });
+  };
+  const runMachinesOf = (sp) => {
+    const entry = runSpaceOf(sp);
+    return entry?.remote ? entry.machines || [] : [];
+  };
+  const noRunnerOf = (sp) => {
+    const entry = runSpaceOf(sp);
+    return !entry?.remote ? null : !entry.machine ? t("ai.noMachine") : entry.machine.runner ? null : t("ai.noRunner", { machine: entry.machine.name });
+  };
+  const noRunner = noRunnerOf(selected?.space);
   // The selected task's attachments; on the Task panel j / k walk them and space opens one. Also the
   // records of its runs of Claude Code (attachments.runs), which the run button shows when the task
   // has no run going.
@@ -608,13 +615,15 @@ export default function Home({ all = false }) {
   const [runFile, setRunFile] = useState(null); // the task.txt or prompt.txt previewed from the run dialog
   const [runPrompts, setRunPrompts] = useState([]); // those the run dialog lists, in its order (see RunModal)
   const [runPromptRel, setRunPromptRel] = useState(null); // the one of them the keyboard is on
-  const runTask = runKey ? tasks.find((task) => task.key === runKey) || null : null;
+  const [runSeed, setRunSeed] = useState(null); // the task the dialog was opened for, shown until the list has it (one just created)
+  const runTask = runKey ? tasks.find((task) => task.key === runKey) || (runSeed?.key === runKey ? runSeed : null) : null;
   // The records are the selected task's: the dialog shows them for that task only.
   const savedRuns = runTask && runTask.key === selected?.key ? attachments.runs : [];
   const [starting, setStarting] = useState(false); // a run asked for and not answered yet: the dialog says so, rather than showing the task's last run
   const isGoing = (run) => !!run && (run.status === "running" || run.status === "queued");
   const showRun = (task, folder) => {
     setRunKey(task.key);
+    setRunSeed(task);
     setRunFolder(folder);
     setRunFile(null);
     setRunPromptRel(null);
@@ -672,12 +681,24 @@ export default function Home({ all = false }) {
       return;
     }
     if (isGoing(ai.runFor(task))) return showRun(task, null); // the run going opens
-    if (runMachines.length > 1 && task.key === selected?.key) {
+    const machines = runMachinesOf(task.space);
+    if (machines.length > 1) {
       showRun(task, null);
-      setPickRun({ task, machines: runMachines, index: firstReady(runMachines) });
+      setPickRun({ task, machines, index: firstReady(machines) });
       return;
     }
     await startRun(task);
+  };
+  // r on a task (the selected one, or the preview's), as its run button: its run going is shown,
+  // else Claude Code starts on it; a toast says why not, where the button would be greyed out
+  // (no prompt.txt, or its machine not connected). `hook` is the task's useTaskFiles.
+  const runPrompt = (task, hook) => {
+    if (!task) return;
+    if (!isGoing(ai.runFor(task))) {
+      const reason = hook.prompt == null ? t("ai.noPrompt") : noRunnerOf(task.space);
+      if (reason) return showToast(reason, 4000);
+    }
+    openRun(task);
   };
   const movePick = (dir) => setPickRun((p) => p && { ...p, index: p.index < 0 ? firstReady(p.machines) : stepReady(p.machines, p.index, dir) });
   const confirmPick = (index) => {
@@ -693,6 +714,7 @@ export default function Home({ all = false }) {
   };
   const closeRun = () => {
     setRunKey(null);
+    setRunSeed(null);
     setRunFolder(null);
     setRunFile(null);
     setRunPromptRel(null);
@@ -997,7 +1019,10 @@ export default function Home({ all = false }) {
     }
   }
 
-  async function saveEditor(text, files = []) {
+  // `prompt`: the text of the editor's Prompt area when it is shown ("Save & Execute"), which
+  // becomes the task's prompt.txt, blank or not; Claude Code then runs on the task, as its run
+  // button would (asking which machine first, when two sync its folder). Null: saved only.
+  async function saveEditor(text, files = [], prompt = null) {
     setSaving(true);
     // the new task goes where the editor was opened for: the folder on the right (in a work's
     // list, the work's own tasks), or the folder of the task it is a subtask of
@@ -1022,10 +1047,24 @@ export default function Home({ all = false }) {
       } catch (e) {
         showToast(t("toast.createdUploadFailed", { error: e.message }), 5000);
       }
+      let run = prompt !== null;
+      if (run) {
+        try {
+          await api.saveTaskPrompt(inSpace, rel, prompt);
+        } catch (e) {
+          run = false; // created, but without its prompt: nothing to execute
+          showToast(e.message, 5000);
+        }
+      }
       setCreating(null);
       setSelectedKey(keyOf(inSpace, rel));
       await reload();
       showToast(t("toast.created"));
+      if (run) {
+        const reason = noRunnerOf(inSpace);
+        if (reason) showToast(reason, 5000);
+        else openRun({ ...created, space: inSpace, rel, key: keyOf(inSpace, rel) });
+      }
     } catch (e) {
       showToast(e.message, 4000);
     } finally {
@@ -1379,6 +1418,18 @@ export default function Home({ all = false }) {
         openFolder(peekTask);
         return true;
       }
+      // g edits the prompt, shown first when hidden; r runs it, as the run button beside it
+      if (name === "g" || name === "G") {
+        if (!peekPromptOpen) showPeekPrompt(true);
+        setPeekSection("prompt");
+        setPeekFileRel(null);
+        setPeekEditing("prompt");
+        return true;
+      }
+      if (name === "r" || name === "R") {
+        runPrompt(peekTask, peekAttachments);
+        return true;
+      }
       if (!["q", "enter", "space"].includes(name)) return false;
       closePeek();
       return true;
@@ -1413,6 +1464,20 @@ export default function Home({ all = false }) {
     }
     if (name === "r") {
       reload();
+      return true;
+    }
+    // g edits the selected task's prompt in the panel (shown first, when hidden); shift+r runs it,
+    // as the run button beside it (r alone refreshes here)
+    if (name === "g" || name === "G") {
+      if (selected) {
+        if (!promptOpen) showPrompt(true);
+        selectSection("prompt");
+        openEditor(selected, "prompt");
+      }
+      return true;
+    }
+    if (name === "R") {
+      runPrompt(selected, attachments);
       return true;
     }
     if (name === "v") {
@@ -2091,6 +2156,9 @@ export default function Home({ all = false }) {
         promptOpen={peekPromptOpen}
         onTogglePrompt={() => showPeekPrompt(!peekPromptOpen)}
         section={peekFile ? null : peekSection}
+        run={ai.runFor(peekTask)}
+        noRunner={noRunnerOf(peekTask?.space)}
+        onRun={openRun}
       />
 
       {/* the run of Claude Code on a task, opened by the run button beside its prompt */}

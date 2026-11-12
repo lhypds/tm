@@ -123,6 +123,8 @@
     "newTask": "New task",
     "saveHint": "⌘S / Ctrl+S saves",
     "save": "Save",
+    "saveExecute": "Save & Execute",
+    "executeHint": "⌘S / Ctrl+S saves and runs Claude Code on the task",
     "saving": "Saving...",
     "newSubtask": "New subtask of “{{name}}”"
   },
@@ -199,6 +201,14 @@
     "prompt": {
       "keys": "j / k, enter on Task with the prompt shown",
       "desc": "move between the text, the prompt and the files; enter edits the one chosen"
+    },
+    "promptEdit": {
+      "keys": "g",
+      "desc": "edit the task's prompt (in the panel, or in the preview)"
+    },
+    "run": {
+      "keys": "shift+r; r in the preview",
+      "desc": "run the task's prompt with Claude Code"
     },
     "pending": {
       "keys": "p",
@@ -355,6 +365,7 @@
     "turns_other": "{{count}} turns",
     "queued": "waiting for {{machine}}",
     "noRunner": "Runs on {{machine}}, which is not connected: start taskmgrd there with AI_RUNNER=1 in its .env",
+    "noPrompt": "No prompt to run: g writes one",
     "noMachine": "This copy was pushed without a machine id: Claude Code cannot run on it",
     "thinking": "Thinking",
     "using": "Using {{tool}}",

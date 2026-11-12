@@ -1,24 +1,50 @@
-.modal {
-  max-width: 640px;
+/* As big as the task preview (see taskPreview.module.css). */
+.modal.modal {
+  max-width: 900px;
+  width: 80vw;
+  height: 70vh;
 }
 
 .form {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+}
+
+/* A text's part of the height: the task's, and with the prompt shown the prompt's too, the two
+   sharing it equally (the TextArea's wrapper fills it, and the textarea its wrapper). */
+.area {
+  flex: 1;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+}
+
+.area > div {
+  flex: 1;
+  min-height: 0;
 }
 
 /* The whole task file: front matter and details, monospaced like the terminal editor (the grid
    comes with the TextArea). A long line wraps, as it does in the panel's text. */
 .text {
-  min-height: 320px;
+  height: 100%;
   font-family: var(--font);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* Above the prompt: its name, closer to the prompt under it than to the task's text above. */
+.promptHead {
+  flex: none;
+  font-size: 14px;
+  margin-bottom: -6px;
+}
+
 .actions {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;

@@ -123,6 +123,8 @@
     "newTask": "新規タスク",
     "saveHint": "⌘S / Ctrl+S で保存",
     "save": "保存",
+    "saveExecute": "保存して実行",
+    "executeHint": "⌘S / Ctrl+S で保存し、Claude Code でタスクを実行",
     "saving": "保存中...",
     "newSubtask": "「{{name}}」のサブタスクを追加"
   },
@@ -199,6 +201,14 @@
     "prompt": {
       "keys": "プロンプト表示中の Task で j / k, enter",
       "desc": "本文・プロンプト・ファイルの間を移動し、enter で編集"
+    },
+    "promptEdit": {
+      "keys": "g",
+      "desc": "タスクのプロンプトを編集（パネルまたはプレビューで）"
+    },
+    "run": {
+      "keys": "shift+r、プレビューでは r",
+      "desc": "タスクのプロンプトを Claude Code で実行"
     },
     "pending": {
       "keys": "p",
@@ -355,6 +365,7 @@
     "turns_other": "{{count}} ターン",
     "queued": "{{machine}} を待っています",
     "noRunner": "{{machine}} で実行しますが、接続されていません：そのマシンの .env で AI_RUNNER=1 にして taskmgrd を起動してください",
+    "noPrompt": "実行するプロンプトがありません：g で書けます",
     "noMachine": "このコピーはマシン名なしで送られたため、Claude Code を実行できません",
     "thinking": "考え中",
     "using": "{{tool}} を使用中",
