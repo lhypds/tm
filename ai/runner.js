@@ -66,9 +66,10 @@ async function* sseMessages(body) {
 // change), `logFile` where the runs log what claude writes to stderr, `window` whether each run opens
 // a terminal window here (AI_RUNNER_WINDOW): false, or { terminal, closeAfter } as ai/window.js
 // watchRuns takes them (which terminal on macOS, and the seconds the window stays after the run).
-// `commandLog` is where a tm command run for the server (the `tm` command) writes what it prints.
+// `commandLog` is where a tm command run for the server (the `tm` command) writes what it prints, and
+// `commandWindow` ({ terminal, closeAfter }) the terminal window it is shown in on macOS and Windows.
 // Returns { stop }.
-function startRunner({ server, token, machineId, log, warn, logFile, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
+function startRunner({ server, token, machineId, log, warn, logFile, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), commandWindow = {}, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
   session.configure({ logFile, machine: machineId });
   const unwatch = window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId) };
@@ -207,10 +208,11 @@ function startRunner({ server, token, machineId, log, warn, logFile, commandLog 
           break;
         }
         case 'tm': {
-          // In a process of its own, not a child of this one: `tm restart` stops this very daemon.
+          // In a process of its own, not a child of this one: `tm restart` stops this very daemon. Shown
+          // in a terminal window here where there is one (macOS, Windows).
           const name = tmCommandOf(cmd.command);
           if (!name) throw httpError(400, `"${cmd.command}" is not a tm command that can be run from the server.`);
-          startTmCommand(name, commandLog);
+          startTmCommand(name, commandLog, { ...commandWindow, warn: (m) => warn(`runner: ${m}`) });
           log(`runner: tm ${name} started for the server (its output: ${commandLog})`);
           break;
         }

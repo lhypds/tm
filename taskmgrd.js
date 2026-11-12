@@ -442,7 +442,7 @@ if (PUSHING) setInterval(rescan, RESCAN_MS);
 // stderr where the web UI's runs do, and each run in a terminal window here when asked (which
 // terminal on macOS, and how long it stays after the run; see ai/window.js).
 const window = AI_RUNNER_WINDOW ? { terminal: AI_RUNNER_TERMINAL, closeAfter: AI_RUNNER_WINDOW_CLOSE } : false;
-const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log'), window }) : null;
+const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log'), window, commandWindow: { terminal: AI_RUNNER_TERMINAL, closeAfter: AI_RUNNER_WINDOW_CLOSE } }) : null;
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {

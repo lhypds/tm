@@ -257,7 +257,7 @@ record. 400 without a prompt, 409 when the machine's runner is not connected, 50
 Run a tm command on that machine (the web UI's Machines dialog, a prompt that starts with `/`): `command` is `/restart`,  
 `/start`, `/stop`, `/push`, `/pull` or `/status` (the `/` may be left out; no arguments), run there as `tm restart` and so on  
 by the machine's runner, in a process of its own, so a restart of the daemon that got the command goes through.  
-`{ ok: true, command }` once the machine has started it; what it prints is in that machine's `logs/command.log`.  
+`{ ok: true, command }` once the machine has started it; what it prints is in that machine's `logs/command.log`, and in a terminal window there on macOS and Windows.  
 400 when it is not one of those commands, 409 when the machine's runner is not connected, 504 when it does not answer in 15 seconds.  
 
 `POST /api/ai/runs/:id/answer` `{ pending, decision }` or `{ pending, answers }`  

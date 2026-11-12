@@ -260,7 +260,6 @@ function finish(r) {
   if (!process.stdin.isTTY) process.exit(0);
   // The window then closes by itself `closeAfter` seconds later, or on Enter (see utils/terminal.js).
   nl();
-  if (closeAfter > 0) write('\n');
   waitToClose({ closeAfter, terminal, dim, dot: M.dot });
 }
 
