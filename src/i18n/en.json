@@ -222,9 +222,9 @@
       "keys": "d",
       "desc": "delete the selected task"
     },
-    "refresh": {
+    "machines": {
       "keys": "r",
-      "desc": "refresh the task list"
+      "desc": "open Machines Run (a prompt or a /command on the machines)"
     },
     "command": {
       "keys": ":",
@@ -376,6 +376,7 @@
   },
   "machines": {
     "title": "Machines",
+    "runTitle": "Machines Run",
     "prompt": "What should Claude do on the machine?",
     "run": "Run",
     "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",

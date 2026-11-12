@@ -222,9 +222,9 @@
       "keys": "d",
       "desc": "删除选中的任务"
     },
-    "refresh": {
+    "machines": {
       "keys": "r",
-      "desc": "刷新任务列表"
+      "desc": "打开机器运行（在机器上执行 prompt 或 /命令）"
     },
     "command": {
       "keys": ":",
@@ -376,6 +376,7 @@
   },
   "machines": {
     "title": "机器",
+    "runTitle": "机器运行",
     "prompt": "让 Claude 在这台机器上做什么？",
     "run": "执行",
     "runHint": "用这个 prompt 在勾选的机器上运行 Claude Code（⌘ / ctrl + enter）",

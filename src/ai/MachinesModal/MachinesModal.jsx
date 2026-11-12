@@ -38,7 +38,7 @@ function readPicked() {
 // on every machine whose runner is connected, ticked or not (POST /api/ai/machine/command; each
 // machine starts it in a process of its own, so a restart of the daemon that got the command goes
 // through). While only "/" and the start of a name are typed, the commands that fit are listed
-// under the first line (↑ / ↓ move, enter or tab takes one, a click too, esc puts the list away). A toast tells which machines started it, and what the
+// under the first line (↑ / ↓ move, enter or tab takes one, a click too). A toast tells which machines started it, and what the
 // others answered.
 export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
   const { t } = useTranslation();
@@ -157,6 +157,11 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     setMenu({ off: true, index: 0 });
     promptRef.current?.focus();
   };
+  // esc empties the box first (the list of commands goes with it); in an empty box it closes the dialog.
+  const clear = () => {
+    setPrompt("");
+    setMenu({ off: false, index: 0 });
+  };
   const run = async () => {
     if (!canRun) return;
     setBusy(true);
@@ -171,7 +176,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t("machines.title")} className={styles.modal} onEscape={options.length ? () => setMenu({ off: true, index: 0 }) : undefined}>
+    <Modal isOpen={isOpen} onClose={onClose} title={t("machines.runTitle")} className={styles.modal} onEscape={prompt ? clear : undefined}>
       <div className={styles.body}>
         <div className={styles.promptWrap}>
           <TextArea

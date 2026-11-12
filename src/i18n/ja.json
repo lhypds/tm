@@ -222,9 +222,9 @@
       "keys": "d",
       "desc": "選択中のタスクを削除"
     },
-    "refresh": {
+    "machines": {
       "keys": "r",
-      "desc": "タスク一覧を更新"
+      "desc": "マシン実行を開く（マシンで prompt や /コマンドを実行）"
     },
     "command": {
       "keys": ":",
@@ -376,6 +376,7 @@
   },
   "machines": {
     "title": "マシン",
+    "runTitle": "マシン実行",
     "prompt": "このマシンで Claude に何をさせますか？",
     "run": "実行",
     "runHint": "チェックしたマシンでこのプロンプトの Claude Code を実行（⌘ / ctrl + enter）",

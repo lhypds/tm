@@ -1499,12 +1499,14 @@ export default function Home({ all = false }) {
       searchRef.current?.focus();
       return true;
     }
+    // r opens the Machines Run dialog, as the header's button does (the list refreshes by itself, and
+    // with the button beside it)
     if (name === "r") {
-      reload();
+      setMachinesOpen(true);
       return true;
     }
     // g shows the selected task's prompt in the panel and puts the caret in it, and hides it again; shift+r runs it,
-    // as the run button beside it (r alone refreshes here)
+    // as the run button beside it (r alone opens Machines Run here)
     if (name === "g" || name === "G") {
       if (promptOpen) showPrompt(false); // again (once esc left the prompt): hidden
       else if (selected) {
@@ -1908,8 +1910,8 @@ export default function Home({ all = false }) {
               e.currentTarget.blur();
               setMachinesOpen(true);
             }}
-            title={t("machines.title")}
-            aria-label={t("machines.title")}
+            title={t("machines.runTitle")}
+            aria-label={t("machines.runTitle")}
           >
             <MonitorIcon />
           </button>
