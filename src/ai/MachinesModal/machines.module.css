@@ -131,3 +131,31 @@
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* The prompt and, under its first line while a tm command is being typed ("/"), the commands that fit. */
+.promptWrap {
+  position: relative;
+}
+
+.commands {
+  position: absolute;
+  top: 30px;
+  left: 8px;
+  z-index: 2;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 120px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+}
+
+.command {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.command[aria-selected="true"] {
+  background: var(--border);
+  color: var(--bg);
+}

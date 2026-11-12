@@ -10,6 +10,8 @@ import styles from "./machines.module.css";
 
 const REFRESH_MS = 5000; // how often the machines are asked for while the dialog is open
 const RUNS_SHOWN = 5; // the latest runs listed under a machine
+// The tm commands a machine can be given, typed as "/restart" (TM_COMMANDS in utils/tmcommand.js).
+const COMMANDS = ["restart", "start", "stop", "push", "pull", "status"];
 const PICKED_KEY = "machines.picked"; // the names of the machines ticked, kept for the next time
 
 function readPicked() {
@@ -35,7 +37,8 @@ function readPicked() {
 // A prompt that starts with "/" is a tm command, not a prompt for Claude: "/restart" runs `tm restart`
 // on every machine whose runner is connected, ticked or not (POST /api/ai/machine/command; each
 // machine starts it in a process of its own, so a restart of the daemon that got the command goes
-// through). A toast tells which machines started it, and what the
+// through). While only "/" and the start of a name are typed, the commands that fit are listed
+// under the first line (↑ / ↓ move, enter or tab takes one, a click too, esc puts the list away). A toast tells which machines started it, and what the
 // others answered.
 export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
   const { t } = useTranslation();
@@ -46,6 +49,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   const [picked, setPicked] = useState(readPicked); // names; null: nothing chosen yet, a lone machine is
   const [busy, setBusy] = useState(false);
   const promptRef = useRef(null);
+  const [menu, setMenu] = useState({ off: false, index: 0 }); // the commands listed under "/": put away, and the one the keys are on
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -125,11 +129,27 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     const bad = results.filter((r) => r.error);
     if (ok.length) setSent(prompt);
     const lines = [
-      ...(ok.length ? [t("machines.commandStarted", { command: `tm ${ok[0].command}`, machines: ok.map((r) => r.name).join(", ") })] : []),
+      ...(ok.length
+        ? [
+            t("machines.commandStarted", {
+              command: `tm ${ok[0].command}`,
+              machines: ok.map((r) => r.name).join(", "),
+            }),
+          ]
+        : []),
       // one refusal said once when every machine answers the same (not a tm command, say)
       ...(bad.length && bad.every((r) => r.error === bad[0].error) && !ok.length ? [bad[0].error] : bad.map((r) => `${r.name}: ${r.error}`)),
     ];
     showToast(lines.join("; "), bad.length ? 6000 : 3000, "bottom", bad.length ? "error" : "");
+  };
+  // The commands that fit what is typed, while it is only "/" and the start of a name.
+  const typed = /^\/[a-z]*$/i.test(prompt) ? prompt.slice(1).toLowerCase() : null;
+  const options = typed === null || menu.off ? [] : COMMANDS.filter((c) => c.startsWith(typed) && c !== typed);
+  const optionIndex = Math.min(menu.index, options.length - 1);
+  const take = (c) => {
+    setPrompt(`/${c}`);
+    setMenu({ off: true, index: 0 });
+    promptRef.current?.focus();
   };
   const run = async () => {
     if (!canRun) return;
@@ -145,22 +165,55 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t("machines.title")} className={styles.modal}>
+    <Modal isOpen={isOpen} onClose={onClose} title={t("machines.title")} className={styles.modal} onEscape={options.length ? () => setMenu({ off: true, index: 0 }) : undefined}>
       <div className={styles.body}>
-        <TextArea
-          ref={promptRef}
-          value={prompt}
-          className={`${styles.prompt}${sent !== null && prompt === sent ? ` ${styles.sent}` : ""}`}
-          minHeight={80}
-          aria-label={t("machines.prompt")}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              run();
-            }
-          }}
-        />
+        <div className={styles.promptWrap}>
+          <TextArea
+            ref={promptRef}
+            value={prompt}
+            className={`${styles.prompt}${sent !== null && prompt === sent ? ` ${styles.sent}` : ""}`}
+            minHeight={80}
+            aria-label={t("machines.prompt")}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              setMenu({ off: false, index: 0 });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                run();
+              } else if (options.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                e.preventDefault();
+                setMenu({
+                  off: false,
+                  index: (optionIndex + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length,
+                });
+              } else if (options.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                take(options[optionIndex]);
+              }
+            }}
+          />
+          {options.length > 0 && (
+            <ul className={styles.commands} role="listbox">
+              {options.map((c, i) => (
+                <li
+                  key={c}
+                  role="option"
+                  aria-selected={i === optionIndex}
+                  className={styles.command}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // the prompt keeps the focus
+                    take(c);
+                  }}
+                  onMouseEnter={() => setMenu({ off: false, index: i })}
+                >
+                  /{c}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {error && <div className={styles.error}>{error}</div>}
         {machines === null && !error && <div className="muted">{t("common.loading")}</div>}
