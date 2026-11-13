@@ -275,3 +275,13 @@ p {
 .machine-dot[data-state="failed"] {
   background: #e57373;
 }
+
+/* The underline of the url under the pointer in a text that is not being edited (see
+   @utils/links): a piece a line, laid over the text, in the text's color. */
+.link-underline {
+  position: fixed;
+  z-index: 9998;
+  height: var(--line);
+  background: currentColor;
+  pointer-events: none;
+}

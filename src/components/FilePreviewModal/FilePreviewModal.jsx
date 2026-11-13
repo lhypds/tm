@@ -78,7 +78,7 @@ function TextView({ url, highlight, editing, onEdit, onEndEdit, onSave, textRef 
     );
   }
   return (
-    <pre className={styles.text} data-wrap={!highlight} onMouseDown={noDoubleClickSelect} onDoubleClick={onEdit}>
+    <pre className={styles.text} data-wrap={!highlight} data-links onMouseDown={noDoubleClickSelect} onDoubleClick={onEdit}>
       {highlight ? <Highlighted text={text} highlight={highlight} /> : text}
     </pre>
   );

@@ -248,7 +248,7 @@ function ToolItem({ item }) {
         <span className={styles.toolName}>{item.name}</span>
         <span className={styles.toolSummary}>{item.summary}</span>
       </button>
-      {open && item.done && <pre className={styles.toolResult}>{item.result || t("ai.noOutput")}</pre>}
+      {open && item.done && <pre className={styles.toolResult} data-links>{item.result || t("ai.noOutput")}</pre>}
     </div>
   );
 }
@@ -270,7 +270,7 @@ function PermissionItem({ item, pending, onAnswer }) {
   return (
     <div className={styles.ask} data-open={pending}>
       <div className={styles.askTitle}>{t("ai.permission", { tool: item.toolName })}</div>
-      {item.summary && <pre className={styles.askBody}>{item.summary}</pre>}
+      {item.summary && <pre className={styles.askBody} data-links>{item.summary}</pre>}
       {item.reason && <div className={`muted ${styles.askNote}`}>{item.reason}</div>}
       {pending ? (
         <div className={styles.askActions}>

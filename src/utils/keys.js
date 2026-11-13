@@ -72,7 +72,7 @@ export function useShortcuts(handler) {
 // In any textarea, as in VS Code: cmd+x (ctrl+x off the Mac) with nothing selected cuts the line
 // the caret is on, newline and all, and cmd+a selects the textarea's text. Installed once, on the
 // document, so every editor has it. Ctrl on the Mac is left to its Emacs keys (ctrl+a is home).
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+export const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 
 // The key held for a chord, as a tooltip shows it: "⌘" on the Mac, "ctrl+" elsewhere.
 export const modKey = isMac ? "⌘" : "ctrl+";
