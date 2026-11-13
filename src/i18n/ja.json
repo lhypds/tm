@@ -184,7 +184,7 @@
     },
     "parent": {
       "keys": "backspace",
-      "desc": "親のパスへ：サブタスクから出て、repository → work → origin"
+      "desc": "親のパスへ：サブタスクから出て、repository → work → origin → すべての origin"
     },
     "copy": {
       "keys": "⌘c / ctrl+c",

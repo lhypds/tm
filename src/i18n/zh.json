@@ -184,7 +184,7 @@
     },
     "parent": {
       "keys": "backspace",
-      "desc": "回到上级路径：先退出子任务，再 repository → work → origin"
+      "desc": "回到上级路径：先退出子任务，再 repository → work → origin → 所有 origin"
     },
     "copy": {
       "keys": "⌘c / ctrl+c",

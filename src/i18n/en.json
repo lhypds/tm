@@ -184,7 +184,7 @@
     },
     "parent": {
       "keys": "backspace",
-      "desc": "to the parent path: out of a task's subtasks, then repository → work → origin"
+      "desc": "to the parent path: out of a task's subtasks, then repository → work → origin → all origins"
     },
     "copy": {
       "keys": "⌘c / ctrl+c",
