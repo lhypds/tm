@@ -86,31 +86,31 @@ server started), whether that was within the last three minutes, and whether its
 one of them its tasks run on (one with its runner connected, or else the first; `null` when there is none). The web UI  
 shows every machine's name, each with a green or grey dot.  
 
-`POST /api/origin` `{ name, income? }`  
+`POST /api/origin` `{ name, income?, color?, description? }`  
 Add an origin with no works yet. 201.  
 
-`PUT /api/origin` `{ origin, name, income }`  
-Rename an origin and set its income (`null` clears it).  
+`PUT /api/origin` `{ origin, name, income, color?, description? }`  
+Rename an origin and set its income (`null` clears it), and, when given, its color and description (`""` clears it).  
 
 `DELETE /api/origin?origin=`  
 Remove an origin with its works.  
 
-`POST /api/work` `{ name, origin?, tasksPath?, income? }`  
+`POST /api/work` `{ name, origin?, tasksPath?, income?, description? }`  
 Add a work. Without a `tasksPath`, its tasks are kept in tm's own data folder, `./data/origins/<origin>/<work>/tasks` (where a machine pushing the same origin and work puts its copy, so the two are one folder once such a machine syncs it), which is written to `taskmgr.json` as its `tasks_path`. 201.
 
 Renaming an origin, a work or a repository (`PUT /api/origin`, `/api/work`, `/api/repository`) renames its folder under `./data/origins/` with it, when it has one, and rewrites the `tasks_path`s in it; 400 when a folder of the new name is there already.  
 
-`PUT /api/work` `{ work, name, income, hidden?, tasksPath? }`  
-Rename a work, set its income (`null` clears it), and, when given, whether it is hidden and its tasks folder.  
+`PUT /api/work` `{ work, name, income, hidden?, tasksPath?, description? }`  
+Rename a work, set its income (`null` clears it), and, when given, whether it is hidden, its tasks folder and its description (`""` clears it).  
 
 `DELETE /api/work?work=`  
 Remove a work.  
 
-`POST /api/repository` `{ work, name, tasksPath?, sourcePath? }`  
+`POST /api/repository` `{ work, name, tasksPath?, sourcePath?, description? }`  
 Add a repository to a work. With neither a `tasksPath` nor a `sourcePath`, its tasks are kept in `./data/origins/<origin>/<work>/repositories/<repository>`, written as its `tasks_path`. 201.  
 
-`PUT /api/repository` `{ work, name, newName, tasksPath?, sourcePath? }`  
-Rename a repository and set its folders.  
+`PUT /api/repository` `{ work, name, newName, tasksPath?, sourcePath?, description? }`  
+Rename a repository and set its folders, and its description when given (`""` clears it).  
 
 `DELETE /api/repository?work=&name=`  
 Remove a repository from a work.  

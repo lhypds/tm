@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
+import { modKey, withKey } from "@utils/keys";
 import { FromTag, keepFocus } from "@components/TaskList";
 import { describe, formatStamp } from "@utils/task";
 import styles from "./board.module.css";
@@ -150,7 +151,7 @@ function Column({
                   <button
                     type="button"
                     className={styles.subtasks}
-                    title={tr("board.showSubtasks", { name: t.title || t.id })}
+                    title={withKey(tr("board.showSubtasks", { name: t.title || t.id }), `${modKey}↓`)}
                     onMouseDown={(e) => e.stopPropagation()}
                     onDragStart={(e) => {
                       // the button is in the card, which is draggable: a press on it must not pick the card up

@@ -11,7 +11,7 @@ const TYPES = ["origin", "work", "repository"];
 // Add an origin, a work or a repository to taskmgr.json, chosen at the top. `add` is what to start
 // with: { type, origin } (a work, into that origin) or { type, work } (a repository, into that
 // work), and may come with a `name`, a work with a `tasksPath`, a repository with a `sourcePath` (a
-// folder dropped on the tree). An origin has a name, color and income; a work an origin, name, tasks folder and income; a
+// folder dropped on the tree). Each has a name and an optional description (its tooltip in the tree). An origin has a color and income; a work an origin, name, tasks folder and income; a
 // repository a work, name, source folder and tasks folder (one of them at least; the tasks folder
 // defaults to the source folder's "tasks"). onSaved gets the new
 // { works, origins } and what was added ({ type, name, origin, work }).
@@ -21,6 +21,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
   const [origin, setOrigin] = useState("");
   const [work, setWork] = useState("");
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [tasksPath, setTasksPath] = useState("");
   const [sourcePath, setSourcePath] = useState("");
   const [color, setColor] = useState("");
@@ -35,6 +36,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
     setOrigin(add.origin || origins?.[0]?.origin || "");
     setWork(add.work || works?.[0]?.work || "");
     setName(add.name || "");
+    setDescription("");
     setTasksPath(add.tasksPath || "");
     setSourcePath(add.sourcePath || "");
     setColor("");
@@ -55,10 +57,10 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
     try {
       const spaces =
         type === "origin"
-          ? await api.addOrigin({ name: newName, income: read.income, color })
+          ? await api.addOrigin({ name: newName, income: read.income, color, description })
           : type === "work"
-            ? await api.addWork({ name: newName, origin, tasksPath, income: read.income })
-            : await api.addRepository({ work, name: newName, tasksPath, sourcePath });
+            ? await api.addWork({ name: newName, origin, tasksPath, income: read.income, description })
+            : await api.addRepository({ work, name: newName, tasksPath, sourcePath, description });
       onSaved(spaces, { type, name: newName, origin, work });
     } catch (e) {
       setError(e.message);
@@ -122,6 +124,11 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
         <label className={styles.field}>
           <span className={styles.label}>{t("work.name")}</span>
           <input className="input" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
+        </label>
+
+        <label className={styles.field}>
+          <span className={styles.label}>{t("work.description")}</span>
+          <input className="input" value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
         </label>
 
         {type === "work" && (

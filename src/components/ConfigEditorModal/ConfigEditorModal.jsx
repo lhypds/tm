@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
+import { modKey, withKey } from "@utils/keys";
 import { Modal, TextArea } from "@ui";
 import * as api from "@utils/api";
 import { jsonTokens } from "@utils/highlight";
@@ -67,7 +68,7 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
           <button type="button" className="btn lg" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </button>
-          <button type="button" className="btn lg primary" onClick={save} disabled={saving || text === null}>
+          <button type="button" className="btn lg primary" onClick={save} disabled={saving || text === null} title={withKey(t("editor.save"), `${modKey}S`)}>
             {t("editor.save")}
           </button>
         </div>

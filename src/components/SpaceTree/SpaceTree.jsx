@@ -8,17 +8,18 @@ import * as api from "@utils/api";
 import { formatIncome, formatIncomeShort } from "@utils/income";
 import { groupWorksByOrigin } from "@utils/works";
 import { lightColor } from "@utils/colors";
-import { useWheelScroll } from "@utils/keys";
+import { useWheelScroll, withKey } from "@utils/keys";
 import { TASKS_DRAG_TYPE } from "@utils/task";
 import styles from "./tree.module.css";
 
-// A small button at the right of a row's name line, shown while the row is hovered.
-function RowButton({ label, onClick, children }) {
+// A small button at the right of a row's name line, shown while the row is hovered. `keys` is the
+// key that does the same with the tree on the row, shown in the tooltip.
+function RowButton({ label, keys, onClick, children }) {
   return (
     <button
       type="button"
       className={styles.rowEdit}
-      title={label}
+      title={withKey(label, keys)}
       aria-label={label}
       onClick={(e) => {
         e.stopPropagation();
@@ -33,12 +34,13 @@ function RowButton({ label, onClick, children }) {
 // The name line of a row: the name, then its income in short (in 万) at the right end, which the
 // buttons replace while the row is hovered. With a `color` (an origin's; "" for none, which is
 // transparent) a small square of its light tint, as a task's from tag has, sits right after the name.
-function Top({ label, income, actions, color }) {
+// The name's tooltip is the `description` when there is one, else the name itself.
+function Top({ label, description, income, actions, color }) {
   const { t } = useTranslation();
   const swatch = color !== undefined;
   return (
     <div className={styles.top}>
-      <span className={styles.name} data-swatch={swatch} title={label}>
+      <span className={styles.name} data-swatch={swatch} title={description || label}>
         {label}
       </span>
       {swatch && <span className={styles.swatch} data-color={!!color} style={{ background: lightColor(color) || "transparent" }} aria-hidden="true" />}
@@ -67,9 +69,10 @@ const machineNames = (s) => (s.machines || []).map((m) => m.name).join(" ");
 // One space in the tree. `depth` is 0 for a work without an origin, 1 for a work under its origin
 // or a repository of a depth-0 work, and 2 for a repository of a work under an origin.
 // `machines` (see MachineDot) are the machines that sync a remote folder (at most two, by name), each
-// shown by its name and a dot in place of `root`.
+// shown by its name and a dot in place of `root`. `description` (from taskmgr.json; "" for none) is
+// the row's tooltip, above the path where the path has its own.
 // Anything else (`rest`: the drag and drop handlers and data attributes) goes on the row itself.
-function Row({ to, exists, hidden, depth, through = [], last, active, focused, label, root, machines = [], income, actions, onSelect, ...rest }) {
+function Row({ to, exists, hidden, depth, through = [], last, active, focused, label, description, root, machines = [], income, actions, onSelect, ...rest }) {
   const ref = useRef(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
@@ -85,6 +88,7 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
       data-focused={active && focused}
       data-missing={!exists}
       data-hidden={!!hidden}
+      title={description || undefined}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(to)}
@@ -92,8 +96,8 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
       {...rest}
     >
       <TreeLines depth={depth} through={through} last={last} />
-      <Top label={label} income={income} actions={actions} />
-      <div className={`mono ${styles.root}`} title={root}>
+      <Top label={label} description={description} income={income} actions={actions} />
+      <div className={`mono ${styles.root}`} title={description ? `${description}\n${root}` : root}>
         {/* The line is right-to-left so a long path is cut at its start; this keeps the path itself
             left-to-right, or its leading "/" would show at the end. */}
         <bdi dir="ltr">
@@ -113,8 +117,8 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
 
 // An origin's name (with its color's square, and income) at the top of its tree; choosing it (`to`) shows every task of its
 // works. "All origins" above the trees is one too, for every task. `rest` goes on the element, as
-// for a Row.
-function Origin({ name, to, active, focused, income, color, actions, onSelect, ...rest }) {
+// for a Row; `description` is its tooltip, as a Row's.
+function Origin({ name, description, to, active, focused, income, color, actions, onSelect, ...rest }) {
   const ref = useRef(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
@@ -126,13 +130,14 @@ function Origin({ name, to, active, focused, income, color, actions, onSelect, .
       className={styles.origin}
       data-active={active}
       data-focused={active && focused}
+      title={description || undefined}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(to)}
       {...pointerFocus}
       {...rest}
     >
-      <Top label={name} income={income} color={color} actions={actions} />
+      <Top label={name} description={description} income={income} color={color} actions={actions} />
     </div>
   );
 }
@@ -426,6 +431,7 @@ export default function SpaceTree({
                   {g.origin && (
                     <Origin
                       name={g.origin}
+                      description={g.description}
                       to={api.originPath(g.origin)}
                       color={g.color || ""}
                       income={g.income}
@@ -434,16 +440,17 @@ export default function SpaceTree({
                       onSelect={onSelect}
                       actions={
                         <>
-                          <RowButton label={t("add.workInto")} onClick={() => onAdd({ type: "work", origin: g.origin })}>
+                          <RowButton label={t("add.workInto")} keys="a" onClick={() => onAdd({ type: "work", origin: g.origin })}>
                             <PlusIcon />
                           </RowButton>
                           <RowButton
                             label={t("origin.edit")}
-                            onClick={() => onEditOrigin({ origin: g.origin, income: g.income, color: g.color })}
+                            keys="e"
+                            onClick={() => onEditOrigin({ origin: g.origin, description: g.description, income: g.income, color: g.color })}
                           >
                             <EditIcon />
                           </RowButton>
-                          <RowButton label={t("origin.delete")} onClick={() => onDelete({ origin: g.origin })}>
+                          <RowButton label={t("origin.delete")} keys="d" onClick={() => onDelete({ origin: g.origin })}>
                             <TrashIcon />
                           </RowButton>
                         </>
@@ -479,6 +486,7 @@ export default function SpaceTree({
                           active={activeTo === api.spacePath(g.origin, w.work)}
                           focused={focused}
                           label={w.work}
+                          description={w.description}
                           root={machineNames(w) || w.shownPath}
                           machines={w.remote ? w.machines : []}
                           income={w.income}
@@ -487,19 +495,20 @@ export default function SpaceTree({
                             <>
                               <RowButton
                                 label={t("add.repositoryInto")}
+                                keys="a"
                                 onClick={() => onAdd({ type: "repository", work: w.work })}
                               >
                                 <PlusIcon />
                               </RowButton>
-                              <RowButton label={t("work.edit")} onClick={() => onEditWork(w)}>
+                              <RowButton label={t("work.edit")} keys="e" onClick={() => onEditWork(w)}>
                                 <EditIcon />
                               </RowButton>
                               {w.root && (
-                                <RowButton label={t("tree.openFolder")} onClick={() => onOpenFolder({ work: w.work })}>
+                                <RowButton label={t("tree.openFolder")} keys="o" onClick={() => onOpenFolder({ work: w.work })}>
                                   <FolderIcon />
                                 </RowButton>
                               )}
-                              <RowButton label={t("work.delete")} onClick={() => onDelete({ work: w.work })}>
+                              <RowButton label={t("work.delete")} keys="d" onClick={() => onDelete({ work: w.work })}>
                                 <TrashIcon />
                               </RowButton>
                             </>
@@ -527,6 +536,7 @@ export default function SpaceTree({
                               active={activeTo === api.spacePath(g.origin, w.work, p.name)}
                               focused={focused}
                               label={p.name}
+                              description={p.description}
                               root={machineNames(p) || p.shownPath}
                               machines={p.remote ? p.machines : []}
                               onSelect={onSelect}
@@ -534,18 +544,21 @@ export default function SpaceTree({
                                 <>
                                   <RowButton
                                     label={t("repository.edit")}
-                                    onClick={() => onEditRepository({ work: w.work, name: p.name, paths: p.paths })}
+                                    keys="e"
+                                    onClick={() => onEditRepository({ work: w.work, name: p.name, description: p.description, paths: p.paths })}
                                   >
                                     <EditIcon />
                                   </RowButton>
                                   <RowButton
                                     label={t("tree.openFolder")}
+                                    keys="o"
                                     onClick={() => onOpenFolder({ work: w.work, repository: p.name })}
                                   >
                                     <FolderIcon />
                                   </RowButton>
                                   <RowButton
                                     label={t("repository.delete")}
+                                    keys="d"
                                     onClick={() => onDelete({ work: w.work, repository: p.name })}
                                   >
                                     <TrashIcon />

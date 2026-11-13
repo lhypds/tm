@@ -305,16 +305,17 @@ function listSpaces() {
   return config.getWorks().map(w => ({
     work: w.work,
     origin: w.origin,
+    description: w.description,
     income: w.income,
     hidden: w.hidden,
     shownPath: w.shownPath,
     ...describe(w.root, { origin: w.origin, work: w.work, repository: '' }),
-    repositories: w.repositories.map(p => ({ name: p.name, sourcePath: p.sourcePath, shownPath: p.shownPath, paths: p.paths, ...describe(p.root, { origin: w.origin, work: w.work, repository: p.name }) }))
+    repositories: w.repositories.map(p => ({ name: p.name, description: p.description, sourcePath: p.sourcePath, shownPath: p.shownPath, paths: p.paths, ...describe(p.root, { origin: w.origin, work: w.work, repository: p.name }) }))
   }));
 }
 
 // What every change to taskmgr.json answers with: the works and the named origins ({ origin,
-// income, color }, an origin possibly without works yet).
+// description, income, color }, an origin possibly without works yet).
 function spacesBody() {
   return { works: listSpaces(), origins: config.getOrigins(), filters: config.getFilters() };
 }
@@ -487,54 +488,64 @@ app.put('/api/filters', (req, res) => {
   res.json(spacesBody());
 });
 
+// A description (of an origin, work or repository) in a request: a string, or left out.
+function checkDescription(description) {
+  if (description !== undefined && typeof description !== 'string') throw new HttpError(400, '"description" must be a string.');
+}
+
 // Add a work to taskmgr.json.
 app.post('/api/work', (req, res) => {
-  const { name, origin = '', tasksPath = '', income = null } = req.body || {};
+  const { name, origin = '', tasksPath = '', income = null, description } = req.body || {};
   if (typeof name !== 'string' || typeof origin !== 'string' || typeof tasksPath !== 'string') throw new HttpError(400, 'Missing name.');
+  checkDescription(description);
   try {
-    config.addWork({ name, origin, tasksPath, income });
+    config.addWork({ name, origin, tasksPath, income, description });
   } catch (e) {
     throw new HttpError(400, e.message);
   }
   res.status(201).json(spacesBody());
 });
 
-// Set the name, income (null clears it) and, when given, the tasks folder and whether it is hidden,
-// of one work in taskmgr.json.
+// Set the name, income (null clears it) and, when given, the description ("" clears it), the tasks
+// folder and whether it is hidden, of one work in taskmgr.json.
 app.put('/api/work', (req, res) => {
-  const { work, name, income, hidden, tasksPath } = req.body || {};
+  const { work, name, income, hidden, tasksPath, description } = req.body || {};
   if (typeof work !== 'string' || typeof name !== 'string' || income === undefined) throw new HttpError(400, 'Missing work, name or income.');
   if (hidden !== undefined && typeof hidden !== 'boolean') throw new HttpError(400, '"hidden" must be true or false.');
   if (tasksPath !== undefined && typeof tasksPath !== 'string') throw new HttpError(400, '"tasksPath" must be a string.');
+  checkDescription(description);
   try {
-    config.updateWork(work, { name, income, hidden, tasksPath });
+    config.updateWork(work, { name, income, hidden, tasksPath, description });
   } catch (e) {
     throw new HttpError(400, e.message);
   }
   res.json(spacesBody());
 });
 
-// Set the name, income (null clears it) and, when given, the color ("" clears it) of one origin in
+// Set the name, income (null clears it) and, when given, the color and description ("" clears it) of one origin in
 // taskmgr.json.
 app.put('/api/origin', (req, res) => {
-  const { origin, name, income, color } = req.body || {};
+  const { origin, name, income, color, description } = req.body || {};
   if (typeof origin !== 'string' || typeof name !== 'string' || income === undefined) throw new HttpError(400, 'Missing origin, name or income.');
+  checkDescription(description);
   try {
-    config.updateOrigin(origin, { name, income, color });
+    config.updateOrigin(origin, { name, income, color, description });
   } catch (e) {
     throw new HttpError(400, e.message);
   }
   res.json(spacesBody());
 });
 
-// Set the name, source folder and tasks folder of one repository of a work in taskmgr.json.
+// Set the name, source folder and tasks folder, and the description when given ("" clears it), of one
+// repository of a work in taskmgr.json.
 app.put('/api/repository', (req, res) => {
-  const { work, name, newName, tasksPath = '', sourcePath = '' } = req.body || {};
+  const { work, name, newName, tasksPath = '', sourcePath = '', description } = req.body || {};
   if (typeof work !== 'string' || typeof name !== 'string' || typeof newName !== 'string' || typeof tasksPath !== 'string' || typeof sourcePath !== 'string') {
     throw new HttpError(400, 'Missing work, name or newName.');
   }
+  checkDescription(description);
   try {
-    config.updateRepository(work, name, { name: newName, tasksPath, sourcePath });
+    config.updateRepository(work, name, { name: newName, tasksPath, sourcePath, description });
   } catch (e) {
     throw new HttpError(400, e.message);
   }
@@ -577,10 +588,11 @@ app.delete('/api/repository', (req, res) => {
 
 // Add an origin (with no works yet) to taskmgr.json.
 app.post('/api/origin', (req, res) => {
-  const { name, income = null, color } = req.body || {};
+  const { name, income = null, color, description } = req.body || {};
   if (typeof name !== 'string') throw new HttpError(400, 'Missing name.');
+  checkDescription(description);
   try {
-    config.addOrigin({ name, income, color });
+    config.addOrigin({ name, income, color, description });
   } catch (e) {
     throw new HttpError(400, e.message);
   }
@@ -589,12 +601,13 @@ app.post('/api/origin', (req, res) => {
 
 // Add a repository to a work in taskmgr.json.
 app.post('/api/repository', (req, res) => {
-  const { work, name, tasksPath = '', sourcePath = '' } = req.body || {};
+  const { work, name, tasksPath = '', sourcePath = '', description } = req.body || {};
   if (typeof work !== 'string' || typeof name !== 'string' || typeof tasksPath !== 'string' || typeof sourcePath !== 'string') {
     throw new HttpError(400, 'Missing work or name.');
   }
+  checkDescription(description);
   try {
-    config.addRepository({ work, name, tasksPath, sourcePath });
+    config.addRepository({ work, name, tasksPath, sourcePath, description });
   } catch (e) {
     throw new HttpError(400, e.message);
   }

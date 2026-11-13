@@ -41,7 +41,7 @@ import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
 import { getMachines } from "@ai/api";
-import { useShortcuts, useWheelSteps, moveIndex, isTyping } from "@utils/keys";
+import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
 import styles from "./home.module.css";
 
 const EMPTY_DIR = {
@@ -246,8 +246,8 @@ export default function Home({ all = false }) {
   const [configOpen, setConfigOpen] = useState(false);
   const [editingWork, setEditingWork] = useState(null); // work whose name and income are being edited
   const [adding, setAdding] = useState(null); // what the add modal starts with: { type, origin, work }
-  const [editingOrigin, setEditingOrigin] = useState(null); // { origin, income, color } of the origin being edited
-  const [editingRepository, setEditingRepository] = useState(null); // { work, name, paths } of the repository being edited
+  const [editingOrigin, setEditingOrigin] = useState(null); // { origin, description, income, color } of the origin being edited
+  const [editingRepository, setEditingRepository] = useState(null); // { work, name, description, paths } of the repository being edited
   const [removing, setRemoving] = useState(null); // { origin } or { work, repository? } to remove from taskmgr.json
   const [showHidden, setShowHidden] = useState(() => readFlag("tree.showHidden", false)); // the tree shows hidden works too
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -438,15 +438,16 @@ export default function Home({ all = false }) {
   }, [load]);
 
   // The tree's rows in order (all origins, each origin, then its works and their repositories),
-  // including the spaces whose folder is missing.
+  // including the spaces whose folder is missing. `group`, `item` and `repository` are what the
+  // row is of (an origin's group, a work, a repository of it), for the row's keys (see treeKey).
   const spaces = useMemo(
     () => [
       { to: api.allPath, exists: true },
       ...groupWorksByOrigin(treeWorks, origins).flatMap((g) => [
-        ...(g.origin ? [{ to: api.originPath(g.origin), exists: true }] : []),
+        ...(g.origin ? [{ to: api.originPath(g.origin), exists: true, group: g }] : []),
         ...g.works.flatMap((w) => [
-          { to: api.spacePath(g.origin, w.work), root: w.root, exists: w.exists },
-          ...w.repositories.map((p) => ({ to: api.spacePath(g.origin, w.work, p.name), root: p.root, exists: p.exists })),
+          { to: api.spacePath(g.origin, w.work), root: w.root, exists: w.exists, item: w },
+          ...w.repositories.map((p) => ({ to: api.spacePath(g.origin, w.work, p.name), root: p.root, exists: p.exists, item: w, repository: p })),
         ]),
       ]),
     ],
@@ -1363,12 +1364,31 @@ export default function Home({ all = false }) {
   });
 
   // On the tree: j / k move through the spaces (the right side follows), l / enter go over to
-  // the tasks.
+  // the tasks. a, e, o and d are the buttons of the row the tree is on: a adds into it (a work into
+  // an origin, a repository into a work, also from one of its repositories; an origin from "All
+  // origins"), e edits it, o opens its folder and d removes it, once confirmed.
   function treeKey(name) {
     const i = spaces.findIndex((s) => s.to === spaceTo);
     const move = moveIndex(name, i, spaces.length);
     if (move !== null) {
       if (move >= 0) selectSpace(spaces[move].to, true);
+      return true;
+    }
+    if (["a", "e", "o", "d"].includes(name)) {
+      const { group: g, item: w, repository: p } = spaces[i] || {};
+      if (name === "a") setAdding(w ? { type: "repository", work: w.work } : g ? { type: "work", origin: g.origin } : { type: "origin" });
+      else if (p) {
+        if (name === "e") setEditingRepository({ work: w.work, name: p.name, description: p.description, paths: p.paths });
+        else if (name === "o") openSpaceFolder({ work: w.work, repository: p.name });
+        else setRemoving({ work: w.work, repository: p.name });
+      } else if (w) {
+        if (name === "e") setEditingWork(w);
+        else if (name === "o") w.root && openSpaceFolder({ work: w.work });
+        else setRemoving({ work: w.work });
+      } else if (g) {
+        if (name === "e") setEditingOrigin({ origin: g.origin, description: g.description, income: g.income, color: g.color });
+        else if (name === "d") setRemoving({ origin: g.origin });
+      }
       return true;
     }
     if (["l", "right", "enter"].includes(name)) {
@@ -1383,6 +1403,7 @@ export default function Home({ all = false }) {
   useShortcuts((name) => {
     if (
       confirm ||
+      removing ||
       removingFile ||
       configOpen ||
       editingWork ||
@@ -1528,7 +1549,7 @@ export default function Home({ all = false }) {
       setCommand("");
       return true;
     }
-    if (["a", "n"].includes(name)) {
+    if (name === "n" || (name === "a" && pane !== "tree")) {
       openCreator(view === "board" && boardStatuses.includes(pane) ? pane : "todo");
       return true;
     }
@@ -1712,7 +1733,7 @@ export default function Home({ all = false }) {
         <>
           <p className="muted">{data.isRoot ? t("home.noTasks") : t("home.noSubtasks")}</p>
           {canAdd && (
-            <button type="button" className="btn" onClick={() => openCreator()}>
+            <button type="button" className="btn" onClick={() => openCreator()} title={withKey(t("header.newTask"), "a / n")}>
               <PlusIcon />
               {t("header.newTask")}
             </button>
@@ -1885,7 +1906,7 @@ export default function Home({ all = false }) {
             tabIndex={-1}
             onMouseDown={(e) => e.preventDefault()}
             onClick={toggleView}
-            title={t(view === "board" ? "header.listView" : "header.boardView")}
+            title={withKey(t(view === "board" ? "header.listView" : "header.boardView"), "v")}
             aria-label={t(view === "board" ? "header.listView" : "header.boardView")}
           >
             {view === "board" ? <ListIcon /> : <BoardIcon />}
@@ -1910,7 +1931,7 @@ export default function Home({ all = false }) {
               e.currentTarget.blur();
               setMachinesOpen(true);
             }}
-            title={t("machines.runTitle")}
+            title={withKey(t("machines.runTitle"), "r")}
             aria-label={t("machines.runTitle")}
           >
             <MonitorIcon />
@@ -1956,7 +1977,7 @@ export default function Home({ all = false }) {
             e.currentTarget.blur();
             toggleTreePane();
           }}
-          title={t(treeOpen ? "header.hideTree" : "header.showTree")}
+          title={withKey(t(treeOpen ? "header.hideTree" : "header.showTree"), `${modKey}B`)}
           aria-label={t(treeOpen ? "header.hideTree" : "header.showTree")}
         >
           {treeOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
@@ -2029,7 +2050,7 @@ export default function Home({ all = false }) {
                 className={`btn ${styles.addTask}`}
                 onClick={() => openCreator()}
                 disabled={!canAdd && !selected}
-                title={selected ? t("header.newSubtaskOf", { name: selected.title || selected.id }) : undefined}
+                title={withKey(selected ? t("header.newSubtaskOf", { name: selected.title || selected.id }) : t("header.newTask"), "a / n")}
               >
                 <PlusIcon />
                 {t(selected ? "header.newSubtask" : "header.newTask")}
@@ -2047,7 +2068,7 @@ export default function Home({ all = false }) {
             e.currentTarget.blur();
             toggleDetailPane();
           }}
-          title={t(detailOpen ? "header.hideDetails" : "header.showDetails")}
+          title={withKey(t(detailOpen ? "header.hideDetails" : "header.showDetails"), modKey === "⌘" && "⌘⌥B")}
           aria-label={t(detailOpen ? "header.hideDetails" : "header.showDetails")}
         >
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}

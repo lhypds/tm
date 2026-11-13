@@ -4,13 +4,13 @@ import { Modal } from "@ui";
 import Attachments from "@components/Attachments";
 import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
-import { moveIndex } from "@utils/keys";
+import { moveIndex, modKey, withKey } from "@utils/keys";
 import { formatSize, previewKind } from "@utils/task";
 import styles from "./editor.module.css";
 
 // An icon button beside the title, framed as the Task panel's (`.btn`); `dot` marks it. It never
 // keeps the focus, so the dialog's keys stay the dialog's.
-function HeaderButton({ label, dot, pressed, onClick, children }) {
+function HeaderButton({ label, keys, dot, pressed, onClick, children }) {
   return (
     <button
       type="button"
@@ -18,7 +18,7 @@ function HeaderButton({ label, dot, pressed, onClick, children }) {
       tabIndex={-1}
       data-dot={dot}
       aria-pressed={pressed}
-      title={label}
+      title={withKey(label, keys)}
       aria-label={label}
       onClick={(e) => {
         e.currentTarget.blur();
@@ -222,15 +222,15 @@ export default function TaskEditorModal({
   const actions = (
     <div className={styles.headerButtons}>
       {task && (
-        <HeaderButton label={t("tree.openFolder")} onClick={() => onOpenFolder(task)}>
+        <HeaderButton label={t("tree.openFolder")} keys="o" onClick={() => onOpenFolder(task)}>
           <FolderIcon />
         </HeaderButton>
       )}
-      <HeaderButton label={brainLabel} dot={!!prompt.trim()} pressed={promptOpen} onClick={() => showPrompt(!promptOpen)}>
+      <HeaderButton label={brainLabel} keys="g" dot={!!prompt.trim()} pressed={promptOpen} onClick={() => showPrompt(!promptOpen)}>
         <BrainIcon />
       </HeaderButton>
       {task && (
-        <HeaderButton label={t("delete.title")} onClick={() => onDelete(task)}>
+        <HeaderButton label={t("delete.title")} keys="d" onClick={() => onDelete(task)}>
           <TrashIcon />
         </HeaderButton>
       )}
@@ -310,7 +310,7 @@ export default function TaskEditorModal({
           <button type="button" className="btn lg" onClick={onCancel} disabled={saving}>
             {t("common.cancel")}
           </button>
-          <button type="submit" className="btn lg primary" disabled={saving || blocked}>
+          <button type="submit" className="btn lg primary" disabled={saving || blocked} title={withKey(t(execute ? "editor.saveExecute" : "editor.save"), `${modKey}S`)}>
             {saving ? t("editor.saving") : t(execute ? "editor.saveExecute" : "editor.save")}
           </button>
         </div>

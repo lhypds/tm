@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
 import Attachments from "@components/Attachments";
 import { RunButton, RunList } from "@ai";
+import { withKey } from "@utils/keys";
 import { Checkbox } from "@ui";
 import styles from "./panel.module.css";
 
@@ -106,7 +107,7 @@ export default function TaskPanel({
               e.currentTarget.blur();
               onOpenFolder(task);
             }}
-            title={t("tree.openFolder")}
+            title={withKey(t("tree.openFolder"), "o")}
             aria-label={t("tree.openFolder")}
           >
             <FolderIcon />
@@ -125,7 +126,7 @@ export default function TaskPanel({
               e.currentTarget.blur();
               onTogglePrompt();
             }}
-            title={t(promptOpen ? "panel.hidePrompt" : "panel.showPrompt")}
+            title={withKey(t(promptOpen ? "panel.hidePrompt" : "panel.showPrompt"), "g")}
             aria-label={t(promptOpen ? "panel.hidePrompt" : "panel.showPrompt")}
           >
             <BrainIcon />
@@ -139,7 +140,7 @@ export default function TaskPanel({
               e.currentTarget.blur();
               onDelete(task);
             }}
-            title={t("delete.title")}
+            title={withKey(t("delete.title"), "d")}
             aria-label={t("delete.title")}
           >
             <TrashIcon />
@@ -178,7 +179,7 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  <RunButton run={run} disabled={!attachments.prompt?.trim()} reason={noRunner} onClick={() => onRun(task)} />
+                  <RunButton run={run} keys="shift+r" disabled={!attachments.prompt?.trim()} reason={noRunner} onClick={() => onRun(task)} />
                 </div>
               </div>
               {/* The prompt's part: its text, with the task's runs under it when it has had any. */}

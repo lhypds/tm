@@ -154,6 +154,10 @@
       "keys": "目录树上按 l / enter",
       "desc": "回到任务列表"
     },
+    "treeRow": {
+      "keys": "目录树上按 a / e / o / d",
+      "desc": "向该项追加（origin 下加 work，work 下加 repository）、编辑、打开文件夹、删除"
+    },
     "tab": {
       "keys": "tab",
       "desc": "在目录树和任务列表间切换"
@@ -291,6 +295,7 @@
   },
   "work": {
     "name": "名称",
+    "description": "描述",
     "nameEmpty": "名称不能为空。",
     "edit": "编辑 work",
     "saved": "work 已保存",

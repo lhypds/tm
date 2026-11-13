@@ -61,7 +61,7 @@ export const locateFolder = ({ name, entries }) => request("/api/folder/locate",
 // Make a space's missing tasks folder; resolves to { works, origins }.
 export const createSpaceFolder = (space) => request("/api/space/create", json("POST", sp(space)));
 
-// The works and origins: { works, origins }, origins being the named ones ({ origin, income, color }),
+// The works and origins: { works, origins }, origins being the named ones ({ origin, description, income, color }),
 // some possibly without works yet. Every change to taskmgr.json below resolves to the new ones.
 
 // The raw taskmgr.json: { configPath, text }.
@@ -70,28 +70,31 @@ export const getConfig = () => request("/api/config");
 export const saveConfig = (text) => request("/api/config", json("PUT", { text }));
 
 // Add an origin, with no works yet.
-export const addOrigin = ({ name, income, color }) => request("/api/origin", json("POST", { name, income, color }));
+export const addOrigin = ({ name, income, color, description }) => request("/api/origin", json("POST", { name, income, color, description }));
 
 // Add a repository to a work; its tasks folder is created when missing.
-export const addRepository = ({ work, name, tasksPath, sourcePath }) => request("/api/repository", json("POST", { work, name, tasksPath, sourcePath }));
+export const addRepository = ({ work, name, tasksPath, sourcePath, description }) =>
+  request("/api/repository", json("POST", { work, name, tasksPath, sourcePath, description }));
 
 // Add a work to an origin.
-export const addWork = ({ name, origin, tasksPath, income }) => request("/api/work", json("POST", { name, origin, tasksPath, income }));
+export const addWork = ({ name, origin, tasksPath, income, description }) => request("/api/work", json("POST", { name, origin, tasksPath, income, description }));
 
 // Set the list bar filters ({ month, showDone, showPending, showAbort }) of one space, by its path,
 // in taskmgr.json; null resets them.
 export const saveFilter = (space, filter) => request("/api/filters", json("PUT", { space, filter }));
 
 // Set one work's name, income ({ monthly, once }, lists of { amount, currency }; null clears it),
-// tasks folder and whether it is hidden.
-export const saveWork = (work, { name, income, hidden, tasksPath }) => request("/api/work", json("PUT", { work, name, income, hidden, tasksPath }));
+// tasks folder, whether it is hidden and its description (the tooltip of its row in the tree; "" for none).
+export const saveWork = (work, { name, income, hidden, tasksPath, description }) =>
+  request("/api/work", json("PUT", { work, name, income, hidden, tasksPath, description }));
 
-// Set one origin's name, income and color ("" for none), as saveWork does for a work.
-export const saveOrigin = (origin, { name, income, color }) => request("/api/origin", json("PUT", { origin, name, income, color }));
+// Set one origin's name, income, color ("" for none) and description, as saveWork does for a work.
+export const saveOrigin = (origin, { name, income, color, description }) =>
+  request("/api/origin", json("PUT", { origin, name, income, color, description }));
 
-// Set one repository's name, source folder and tasks folder (either may be "", not both).
-export const saveRepository = (work, name, { newName, sourcePath, tasksPath }) =>
-  request("/api/repository", json("PUT", { work, name, newName, sourcePath, tasksPath }));
+// Set one repository's name, source folder and tasks folder (either may be "", not both) and description.
+export const saveRepository = (work, name, { newName, sourcePath, tasksPath, description }) =>
+  request("/api/repository", json("PUT", { work, name, newName, sourcePath, tasksPath, description }));
 
 // Reorder taskmgr.json, which is the tree's order: put an origin before the named origin `before`,
 // a work before the work `before` of its origin, a repository before the repository `before` of its

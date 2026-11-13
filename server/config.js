@@ -7,6 +7,7 @@
 //     "origins": [
 //       {
 //         "origin": "gcc3",                       // "" or left out for works without an origin
+//         "description": "...",                   // optional (an origin, a work, a repository): its tooltip in the tree
 //         "income": { "monthly": [...] },         // optional, what the origin pays besides its works
 //         "color": "#93c5fd",                     // optional, "#rrggbb": the origin's square in the tree and its tasks' tags
 //         "works": [
@@ -177,6 +178,13 @@ function normalizeColor(color) {
   return color.trim().toLowerCase();
 }
 
+// Validate the description of an origin, work or repository and return it trimmed, "" when it has none.
+function normalizeDescription(description) {
+  if (description === undefined || description === null) return '';
+  if (typeof description !== 'string') throw new Error('must be a string.');
+  return description.trim();
+}
+
 // The raw config in the "origins" form: an older top-level "works" list is grouped by each work's
 // "origin", in the order each origin first appears, with works without one in a last group.
 function toOrigins(raw) {
@@ -246,7 +254,13 @@ function normalizeOrigins(raw) {
     } catch (e) {
       throw new Error(`origins[${i}].color${origin ? ` ("${origin}")` : ''}: ${e.message}`);
     }
-    if (origin) origins.push({ origin, income: originIncome, color });
+    let description;
+    try {
+      description = normalizeDescription(g.description);
+    } catch (e) {
+      throw new Error(`origins[${i}].description${origin ? ` ("${origin}")` : ''}: ${e.message}`);
+    }
+    if (origin) origins.push({ origin, description, income: originIncome, color });
     const list = g.works === undefined ? [] : g.works;
     if (!Array.isArray(list)) throw new Error(`origins[${i}].works${origin ? ` ("${origin}")` : ''} must be an array.`);
     list.forEach((w, j) => works.push(normalizeWork(w, `origins[${i}].works[${j}]`, origin, seenWorks)));
@@ -277,6 +291,7 @@ function normalizeWork(w, at, origin, seenWorks) {
     throw new Error(`${at}.${w.income === undefined ? 'reward' : 'income'} ("${work}"): ${e.message}`);
   }
 
+  if (w.description !== undefined && w.description !== null && typeof w.description !== 'string') throw new Error(`${at}.description ("${work}") must be a string.`);
   if (w.hidden !== undefined && typeof w.hidden !== 'boolean') throw new Error(`${at}.hidden ("${work}") must be true or false.`);
 
   const seenRepositories = new Set();
@@ -285,6 +300,7 @@ function normalizeWork(w, at, origin, seenWorks) {
   return {
     work,
     origin,
+    description: normalizeDescription(w.description),
     income,
     hidden: w.hidden === true,
     // "" when the work has no common tasks folder, only its repositories'.
@@ -300,11 +316,13 @@ function normalizeWork(w, at, origin, seenWorks) {
       seenRepositories.add(name);
       if (p.source_path !== undefined && typeof p.source_path !== 'string') throw new Error(`Repository "${name}" of "${work}": "source_path" must be a string.`);
       if (p.tasks_path !== undefined && typeof p.tasks_path !== 'string') throw new Error(`Repository "${name}" of "${work}": "tasks_path" must be a string.`);
+      if (p.description !== undefined && p.description !== null && typeof p.description !== 'string') throw new Error(`Repository "${name}" of "${work}": "description" must be a string.`);
       const source = (p.source_path || '').trim();
       const tasks = (p.tasks_path || '').trim();
       if (!source && !tasks) throw new Error(`Repository "${name}" of "${work}" needs a "tasks_path" or a "source_path" folder.`);
       return {
         name,
+        description: normalizeDescription(p.description),
         root: repositoryTasksRoot(tasks, source),
         sourcePath: source ? resolvePath(source) : '',
         // Its source code folder, or its tasks folder when it has none, in its short form.
@@ -392,7 +410,7 @@ function resolveConfig() {
     return cached;
   }
   const getWorks = () => current().works;
-  // The named origins, { origin, income, color }, in file order.
+  // The named origins, { origin, description, income, color }, in file order.
   const getOrigins = () => current().origins;
   const getFilters = () => current().filters;
 
@@ -461,11 +479,27 @@ function resolveConfig() {
     return out;
   }
 
-  // Set one work's name, income ({ monthly, once }; null removes it) and, when given, its tasks
+  // The entry (an origin, work or repository, named by `nameKey`) with its description set ("" or
+  // null removes it, undefined leaves it), placed right after the name.
+  function withDescription(x, description, nameKey) {
+    if (description === undefined) return x;
+    const value = normalizeDescription(description);
+    const out = {};
+    for (const [k, v] of Object.entries(x)) {
+      if (k === 'description') continue;
+      out[k] = v;
+      if (k === nameKey && value) out.description = value;
+    }
+    if (value && !out.description) out.description = value;
+    return out;
+  }
+
+  // Set one work's name, income ({ monthly, once }; null removes it) and, when given, its description
+  // ("" removes it), its tasks
   // folder ("" removes it) and whether it is hidden (false removes the key), and rewrite the file as 2-space
   // indented JSON. Uniqueness and the "/" rule are checked by writeText. A rename takes the work's
   // folder under data/origins/ along (see renameFolder).
-  function updateWork(work, { name, income, hidden, tasksPath }) {
+  function updateWork(work, { name, income, hidden, tasksPath, description }) {
     const raw = readRaw();
     const { w, list } = findRawWork(raw, work);
     const newName = name.trim();
@@ -477,7 +511,7 @@ function resolveConfig() {
       if (tasks) w.tasks_path = tasks;
       else delete w.tasks_path;
     }
-    const out = withIncome(w, income);
+    const out = withDescription(withIncome(w, income), description, 'work');
     if (hidden === true) out.hidden = true;
     else if (hidden === false) delete out.hidden;
     list[list.indexOf(w)] = out;
@@ -501,9 +535,9 @@ function resolveConfig() {
   }
 
   // Set one origin's name, income ({ monthly, once }; null removes it) and, when given, its color
-  // ("#rrggbb"; "" removes it), like updateWork. A rename takes the origin's folder under
+  // ("#rrggbb"; "" removes it) and description, like updateWork. A rename takes the origin's folder under
   // data/origins/ along (see renameFolder).
-  function updateOrigin(origin, { name, income, color }) {
+  function updateOrigin(origin, { name, income, color, description }) {
     const raw = readRaw();
     const g = origin && findRawOrigin(raw, origin, false);
     if (!g) throw new Error(`No origin named "${origin}".`);
@@ -511,18 +545,18 @@ function resolveConfig() {
     if (!newName) throw new Error('The name must not be empty.');
     const oldName = String(g.origin).trim();
     g.origin = newName;
-    raw.origins[raw.origins.indexOf(g)] = withIncome(withColor(g, color), income, 'origin');
+    raw.origins[raw.origins.indexOf(g)] = withDescription(withIncome(withColor(g, color), income, 'origin'), description, 'origin');
     writeRenamed(raw, renameFolder(raw, [oldName], [newName]));
   }
 
   // Add an origin with no works yet, after the named ones.
-  function addOrigin({ name, income, color }) {
+  function addOrigin({ name, income, color, description }) {
     const raw = readRaw();
     const origin = name.trim();
     if (!origin) throw new Error('The name must not be empty.');
     if (findRawOrigin(raw, origin, false)) throw new Error(`Duplicate origin "${origin}".`);
     const g = findRawOrigin(raw, origin, true);
-    raw.origins[raw.origins.indexOf(g)] = withIncome(withColor(g, color), income, 'origin');
+    raw.origins[raw.origins.indexOf(g)] = withDescription(withIncome(withColor(g, color), income, 'origin'), description, 'origin');
     write(raw);
   }
 
@@ -591,7 +625,7 @@ function resolveConfig() {
   // Add a work at the end of its origin (which must be named; it is added when it does not exist),
   // with no repositories. Its tasks folder (the one given, or else one in the data folder, see
   // defaultTasksPath) is created when it does not exist yet, so the work can be opened right away.
-  function addWork({ name, origin, tasksPath, income }) {
+  function addWork({ name, origin, tasksPath, income, description }) {
     const raw = readRaw();
     const work = name.trim();
     if (!work) throw new Error('The name must not be empty.');
@@ -600,7 +634,7 @@ function resolveConfig() {
     const tasks = (tasksPath || '').trim() || defaultTasksPath(originName, work);
     const g = findRawOrigin(raw, originName, true);
     if (!Array.isArray(g.works)) g.works = [];
-    g.works.push(withIncome({ work, tasks_path: tasks, repositories: [] }, income));
+    g.works.push(withDescription(withIncome({ work, tasks_path: tasks, repositories: [] }, income), description || '', 'work'));
     write(raw);
     fs.mkdirSync(resolvePath(tasks), { recursive: true });
   }
@@ -608,7 +642,7 @@ function resolveConfig() {
   // Add a repository at the end of a work; its tasks folder is created like a new work's. With a
   // source folder and no tasks folder, tasks_path is left out and the "tasks" folder in the source
   // folder is used; with neither, the tasks are kept in the data folder (see defaultTasksPath).
-  function addRepository({ work, name, tasksPath, sourcePath }) {
+  function addRepository({ work, name, tasksPath, sourcePath, description }) {
     const raw = readRaw();
     const { w } = findRawWork(raw, work);
     const repository = name.trim();
@@ -616,15 +650,15 @@ function resolveConfig() {
     const source = (sourcePath || '').trim();
     const tasks = (tasksPath || '').trim() || (source ? '' : defaultTasksPath(originOf(raw, w), String(w.work).trim(), repository));
     if (!Array.isArray(w.repositories)) w.repositories = [];
-    w.repositories.push({ repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}) });
+    w.repositories.push(withDescription({ repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}) }, description || '', 'repository'));
     write(raw);
     fs.mkdirSync(repositoryTasksRoot(tasks, source), { recursive: true });
   }
 
-  // Set one repository's name, source folder and tasks folder; an empty folder is left out, as
-  // when adding one. Uniqueness and the "/" rule are checked by writeText. A rename takes the
+  // Set one repository's name, source folder and tasks folder, and its description when given ("" removes
+  // it); an empty folder is left out, as when adding one. Uniqueness and the "/" rule are checked by writeText. A rename takes the
   // repository's folder under data/origins/ along (see renameFolder).
-  function updateRepository(work, from, { name, tasksPath, sourcePath }) {
+  function updateRepository(work, from, { name, tasksPath, sourcePath, description }) {
     const raw = readRaw();
     const { w } = findRawWork(raw, work);
     const list = Array.isArray(w.repositories) ? w.repositories : [];
@@ -637,7 +671,7 @@ function resolveConfig() {
     if (!tasks && !source) throw new Error('Give a tasks folder or a source folder.');
     // Rebuilt so the keys keep their usual order; any others stay after them.
     const { repository: _r, name: _n, source_path: _s, tasks_path: _t, ...rest } = p;
-    list[list.indexOf(p)] = { repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}), ...rest };
+    list[list.indexOf(p)] = withDescription({ repository, ...(source ? { source_path: source } : {}), ...(tasks ? { tasks_path: tasks } : {}), ...rest }, description === undefined ? p.description : description, 'repository');
     const at = [originOf(raw, w) || '_', String(w.work).trim(), 'repositories'];
     writeRenamed(raw, renameFolder(raw, [...at, String(from).trim()], [...at, repository]));
   }

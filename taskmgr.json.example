@@ -2,13 +2,16 @@
   "origins": [
     {
       "origin": "gcc3",
+      "description": "GCC3 Inc.",
       "color": "#93c5fd",
       "works": [
         {
           "work": "taskmgr",
+          "description": "Task manager development",
           "repositories": [
             {
               "repository": "tm",
+              "description": "The tm CLI and web UI",
               "source_path": "~/code/tm"
             }
           ]

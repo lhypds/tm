@@ -4,7 +4,7 @@ import { Highlighted, Modal, showToast, useHighlight } from "@ui";
 import { DownloadIcon, TrashIcon } from "@components/icons";
 import { fileUrl, saveFile } from "@utils/api";
 import { highlighterFor } from "@utils/highlight";
-import { noDoubleClickSelect } from "@utils/keys";
+import { noDoubleClickSelect, withKey } from "@utils/keys";
 import { previewKind } from "@utils/task";
 import styles from "./preview.module.css";
 
@@ -145,7 +145,7 @@ export default function FilePreviewModal({ space, file, editing, onEdit, onEndEd
                 e.currentTarget.blur();
                 onDelete();
               }}
-              title={t("attach.deleteTitle")}
+              title={withKey(t("attach.deleteTitle"), "d")}
               aria-label={t("attach.deleteTitle")}
             >
               <TrashIcon />

@@ -154,6 +154,10 @@
       "keys": "ツリー上で l / enter",
       "desc": "タスク一覧へ戻る"
     },
+    "treeRow": {
+      "keys": "ツリー上で a / e / o / d",
+      "desc": "その行に追加（origin に work、work に repository）、編集、フォルダを開く、削除"
+    },
     "tab": {
       "keys": "tab",
       "desc": "ツリーとタスク一覧を切り替え"
@@ -291,6 +295,7 @@
   },
   "work": {
     "name": "名前",
+    "description": "説明",
     "nameEmpty": "名前を入力してください。",
     "edit": "work を編集",
     "saved": "work を保存しました",

@@ -154,6 +154,10 @@
       "keys": "l / enter on the tree",
       "desc": "back to the tasks"
     },
+    "treeRow": {
+      "keys": "a / e / o / d on the tree",
+      "desc": "add into the row (a work into an origin, a repository into a work), edit it, open its folder, delete it"
+    },
     "tab": {
       "keys": "tab",
       "desc": "switch between the tree and the tasks"
@@ -291,6 +295,7 @@
   },
   "work": {
     "name": "Name",
+    "description": "Description",
     "nameEmpty": "The name must not be empty.",
     "edit": "Edit work",
     "saved": "Work saved",

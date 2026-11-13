@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { XIcon } from "@components/icons";
 import { formatDateTime } from "@utils/task";
+import { withKey } from "@utils/keys";
 import { duration } from "../duration";
 import styles from "./runs.module.css";
 
@@ -35,7 +36,7 @@ export default function RunList({ className, runs, selectedFolder, onOpen, onRem
                 {outcome(r)}
                 {r.machine ? ` · ${r.machine}` : ""}
               </span>
-              <button type="button" className={styles.remove} onClick={() => onRemove(r)} aria-label={t("ai.forget", { when })}>
+              <button type="button" className={styles.remove} onClick={() => onRemove(r)} title={withKey(t("ai.forget", { when }), "d")} aria-label={t("ai.forget", { when })}>
                 <XIcon />
               </button>
             </li>

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useMemo, useRef, useState } from "react";
+import { withKey } from "@utils/keys";
 import { MinusIcon, PlusIcon, XIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
 import { FileName } from "@ui";
@@ -81,7 +82,7 @@ export default function Attachments({ className, space, files, pending = [], bus
                   </a>
                 )}
                 <span className={`muted ${styles.fileMeta}`}>{f.isDir ? t("attach.folder") : formatSize(f.size)}</span>
-                <button type="button" className={styles.fileRemove} onClick={() => onRemove(f)} disabled={busy} aria-label={t("attach.remove", { name: f.name })}>
+                <button type="button" className={styles.fileRemove} onClick={() => onRemove(f)} disabled={busy} title={withKey(t("attach.remove", { name: f.name }), "d")} aria-label={t("attach.remove", { name: f.name })}>
                   <XIcon />
                 </button>
               </li>

@@ -5,6 +5,7 @@ import * as api from "@utils/api";
 import TreeLines from "@components/TreeLines";
 import { TASKS_DRAG_TYPE, describe, formatStamp } from "@utils/task";
 import { lightColor } from "@utils/colors";
+import { withKey } from "@utils/keys";
 import styles from "./tasklist.module.css";
 
 // The status box: a tick for done, a "p" for pending, an "a" for aborted, empty for todo.
@@ -155,7 +156,7 @@ export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSe
                 pending={t.status === "pending"}
                 aborted={t.status === "aborted"}
                 onChange={() => onToggleDone(t)}
-                title={tr(t.status === "done" ? "list.markTodo" : "list.markDone")}
+                title={withKey(tr(t.status === "done" ? "list.markTodo" : "list.markDone"), "x")}
               />
             </div>
             <div className="mono">{formatStamp(t.id)}</div>

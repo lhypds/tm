@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@store";
 import { UserIcon } from "@components/icons";
+import { withKey } from "@utils/keys";
 import styles from "./usermenu.module.css";
 
 // The person who is logged in, as fin shows them: an icon that opens a menu with the name and the
@@ -45,6 +46,7 @@ export default function UserMenu() {
         <span>@{user}</span>
         <button
           type="button"
+          title={withKey(t("login.logout"), ":q")}
           onClick={() => {
             close();
             logout();

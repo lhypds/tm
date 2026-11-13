@@ -72,6 +72,13 @@ export function useShortcuts(handler) {
 // document, so every editor has it. Ctrl on the Mac is left to its Emacs keys (ctrl+a is home).
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 
+// The key held for a chord, as a tooltip shows it: "⌘" on the Mac, "ctrl+" elsewhere.
+export const modKey = isMac ? "⌘" : "ctrl+";
+
+// A button's tooltip with its shortcut after it, "Delete (d)"; just the label without `keys`.
+// Every button a key stands for says so this way.
+export const withKey = (label, keys) => (keys ? `${label} (${keys})` : label);
+
 export function useTextKeys() {
   useEffect(() => {
     const onKeyDown = (e) => {

@@ -4,12 +4,14 @@ import { Modal } from "@ui";
 import * as api from "@utils/api";
 import styles from "./repository.module.css";
 
-// Edit one repository: its name, source folder and tasks folder (either folder may be left empty,
-// not both). `repository` is { work, name, paths: { source, tasks } }; the changes are written into
+// Edit one repository: its name, description (the tooltip of its row in the tree), source folder and
+// tasks folder (either folder may be left empty, not both). `repository` is
+// { work, name, description, paths: { source, tasks } }; the changes are written into
 // taskmgr.json and passed to onSaved as the new { works, origins }, along with the new name.
 export default function RepositoryEditModal({ repository, onClose, onSaved }) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [sourcePath, setSourcePath] = useState("");
   const [tasksPath, setTasksPath] = useState("");
   const [error, setError] = useState("");
@@ -18,6 +20,7 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
   useEffect(() => {
     if (!repository) return;
     setName(repository.name);
+    setDescription(repository.description || "");
     setSourcePath(repository.paths?.source || "");
     setTasksPath(repository.paths?.tasks || "");
     setError("");
@@ -35,7 +38,7 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      onSaved(await api.saveRepository(repository.work, repository.name, { newName, sourcePath, tasksPath }), newName);
+      onSaved(await api.saveRepository(repository.work, repository.name, { newName, sourcePath, tasksPath, description }), newName);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -55,6 +58,10 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
         <label className={styles.field}>
           <span className={styles.label}>{t("repository.name")}</span>
           <input className="input" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t("work.description")}</span>
+          <input className="input" value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t("add.sourcePath")}</span>
