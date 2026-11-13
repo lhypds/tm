@@ -3,3 +3,4 @@ export { default as Modal } from "./Modal";
 export { default as TextArea } from "./TextArea";
 export { default as Checkbox } from "./Checkbox";
 export { Highlighted, useHighlight } from "./Highlight";
+export { default as FileName } from "./FileName";

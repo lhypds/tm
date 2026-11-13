@@ -1,0 +1,15 @@
+.root {
+  display: flex;
+  min-width: 0;
+  white-space: pre;
+}
+
+.stem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ext {
+  flex: none;
+}

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useMemo, useRef, useState } from "react";
 import { MinusIcon, PlusIcon, XIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
+import { FileName } from "@ui";
 import { fileRows, formatSize, previewKind } from "@utils/task";
 import styles from "./attachments.module.css";
 
@@ -66,6 +67,7 @@ export default function Attachments({ className, space, files, pending = [], bus
                   <a
                     className={styles.fileName}
                     href={fileUrl(space, f.rel)}
+                    title={f.name}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => {
@@ -75,7 +77,7 @@ export default function Attachments({ className, space, files, pending = [], bus
                       onPreview(f);
                     }}
                   >
-                    {f.name}
+                    <FileName name={f.name} />
                   </a>
                 )}
                 <span className={`muted ${styles.fileMeta}`}>{f.isDir ? t("attach.folder") : formatSize(f.size)}</span>
@@ -86,7 +88,9 @@ export default function Attachments({ className, space, files, pending = [], bus
             ))}
             {pending.map((f, i) => (
               <li key={`${f.name}-${i}`}>
-                <span className={styles.fileName}>{f.name}</span>
+                <span className={styles.fileName} title={f.name}>
+                  <FileName name={f.name} />
+                </span>
                 <span className={`muted ${styles.fileMeta}`}>{formatSize(f.size)}</span>
                 <button type="button" className={styles.fileRemove} onClick={() => onRemovePending(i)} aria-label={t("attach.remove", { name: f.name })}>
                   <XIcon />
