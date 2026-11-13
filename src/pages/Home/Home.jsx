@@ -1505,6 +1505,15 @@ export default function Home({ all = false }) {
       if (!data.isRoot) goUp();
       return true;
     }
+    // backspace goes to the parent path, one step each time: out of a task's subtasks to the folder
+    // above, then from a repository to its work, and from a work to its origin, where it stops (as
+    // it does at a work without an origin, and at "All origins").
+    if (name === "backspace") {
+      if (!data.isRoot) goUp();
+      else if (repository) selectSpace(api.spacePath(origin, work));
+      else if (work && origin) selectSpace(api.originPath(origin));
+      return true;
+    }
     if (name === "Tab") {
       if (pane !== "tree") {
         setTreeOpen(true);

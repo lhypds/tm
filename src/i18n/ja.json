@@ -182,6 +182,10 @@
       "keys": "⌘↓ / ⌘↑",
       "desc": "選択中のタスクの中へ（サブタスク）/ 上の階層へ"
     },
+    "parent": {
+      "keys": "backspace",
+      "desc": "親のパスへ：サブタスクから出て、repository → work → origin"
+    },
     "copy": {
       "keys": "⌘c / ctrl+c",
       "desc": "選択中のタスクの id を tm run 用にコピー（repository:id または work:id）"

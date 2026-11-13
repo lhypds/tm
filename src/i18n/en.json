@@ -182,6 +182,10 @@
       "keys": "⌘↓ / ⌘↑",
       "desc": "into the selected task (its subtasks) / up out of it"
     },
+    "parent": {
+      "keys": "backspace",
+      "desc": "to the parent path: out of a task's subtasks, then repository → work → origin"
+    },
     "copy": {
       "keys": "⌘c / ctrl+c",
       "desc": "copy the selected task's id for tm run (repository:id or work:id)"

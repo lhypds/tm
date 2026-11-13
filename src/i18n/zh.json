@@ -182,6 +182,10 @@
       "keys": "⌘↓ / ⌘↑",
       "desc": "进入选中的任务（其子任务）/ 返回上级"
     },
+    "parent": {
+      "keys": "backspace",
+      "desc": "回到上级路径：先退出子任务，再 repository → work → origin"
+    },
     "copy": {
       "keys": "⌘c / ctrl+c",
       "desc": "复制选中任务的 id，供 tm run 使用（repository:id 或 work:id）"

@@ -18,7 +18,7 @@ export function noDoubleClickSelect(e) {
   if (e.detail > 1) e.preventDefault();
 }
 
-// Key name in the terminal's terms: "j", "enter", "space", "up", "left", ...
+// Key name in the terminal's terms: "j", "enter", "space", "backspace", "up", "left", ...
 export function keyName(e) {
   switch (e.key) {
     case "ArrowUp":
@@ -35,6 +35,8 @@ export function keyName(e) {
       return "space";
     case "Escape":
       return "escape";
+    case "Backspace":
+      return "backspace";
     default:
       return e.key;
   }
