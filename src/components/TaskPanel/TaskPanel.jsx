@@ -299,9 +299,12 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
 
   // Take the read or reloaded text unless it was typed on since saving; a new run greys it again.
   // The answer to a save older than the last one sent is passed over: the last one's is coming.
+  // So is a text that comes while a save is waiting on the typing (the periodic re-read, a run
+  // ending): what is typed stays, and is written over it by the save.
   useEffect(() => {
     if (prompt === undefined) return;
     if (sent.current !== null && (prompt ?? "") !== sent.current) return;
+    if (sent.current === null && timer.current !== null) return;
     // a save of one's own leaves the text as typed, also when it is the prompt that ran
     if (sent.current === null) setTaken(false);
     else if (ranOf(prompt)) setTaken(true);

@@ -27,6 +27,8 @@ export default function useTaskFiles(space, rel, version) {
   const [open, setOpen] = useState(() => new Set());
   const taskKey = space && rel ? `${space.work}/${space.repository || ""}/${rel}` : null;
   const shown = useRef(null); // the taskKey the files are of
+  const writes = useRef(0); // counts up as a save of the prompt starts and as it ends
+  const fileWrites = useRef(0); // the same for the files: an upload or a delete
 
   useEffect(() => {
     if (shown.current !== taskKey) {
@@ -39,12 +41,20 @@ export default function useTaskFiles(space, rel, version) {
     }
     if (!taskKey) return;
     let stale = false;
+    const seen = writes.current;
+    const seenFiles = fileWrites.current;
     api
       .getTask(space, rel)
       .then((d) => {
         if (stale) return;
-        setFiles(attachmentsOf(d.files));
-        setPrompt(d.prompt ?? null);
+        // the same goes for the files (see below): a list read during an upload or a delete
+        // lacks what that one changed, and its own answer has the list after it
+        if (fileWrites.current === seenFiles) setFiles(attachmentsOf(d.files));
+        // A read that started before a save ended may carry the text from before it: the
+        // read is slower (it goes through the run records), so its answer can come after the
+        // save's, and would put the old text back over the new one. The save's answer has the
+        // prompt as written; such a read's is passed over.
+        if (writes.current === seen) setPrompt(d.prompt ?? null);
         setLastPrompt(d.lastPrompt ?? null);
         setRuns(d.runs || []);
       })
@@ -57,21 +67,25 @@ export default function useTaskFiles(space, rel, version) {
   const add = useCallback(
     async (list) => {
       setUploading(true);
+      fileWrites.current++;
+      let latest;
       try {
-        let latest;
         for (const f of list) latest = await api.uploadFile(space, rel, f);
-        setFiles(attachmentsOf(latest.files));
       } catch (e) {
         showToast(e.message, 4000);
       } finally {
+        fileWrites.current++;
+        // the files that got there are shown, also when a later one failed
+        if (latest && shown.current === taskKey) setFiles(attachmentsOf(latest.files));
         setUploading(false);
       }
     },
-    [space, rel],
+    [space, rel, taskKey],
   );
 
   const remove = useCallback(
     async (file) => {
+      fileWrites.current++;
       try {
         const d = await api.deleteFile(space, file.rel);
         setFiles(attachmentsOf(d.files));
@@ -79,6 +93,8 @@ export default function useTaskFiles(space, rel, version) {
       } catch (e) {
         showToast(e.message, 4000);
         return false;
+      } finally {
+        fileWrites.current++;
       }
     },
     [space],
@@ -86,6 +102,7 @@ export default function useTaskFiles(space, rel, version) {
 
   const savePrompt = useCallback(
     async (text) => {
+      writes.current++;
       try {
         const d = text === null ? await api.deleteTaskPrompt(space, rel) : await api.saveTaskPrompt(space, rel, text);
         // the answer is this task's; by now another one may be shown (the save ran on blur)
@@ -97,6 +114,8 @@ export default function useTaskFiles(space, rel, version) {
       } catch (e) {
         showToast(e.message, 4000);
         return false;
+      } finally {
+        writes.current++; // a read under way meanwhile may have the text from before the save
       }
     },
     [space, rel, taskKey],

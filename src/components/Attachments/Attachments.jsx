@@ -43,6 +43,7 @@ export default function Attachments({ className, space, files, pending = [], bus
         onDragLeave={() => setOver(false)}
         onDrop={(e) => {
           e.preventDefault();
+          e.stopPropagation(); // the panel around takes drops too, and would upload the files again
           setOver(false);
           add(e.dataTransfer.files);
         }}
