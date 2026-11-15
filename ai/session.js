@@ -24,6 +24,9 @@
 // permission for ExitPlanMode), `auto` lets a classifier decide, `bypassPermissions` asks nothing
 // (`dontAsk` refuses instead). The allow rules of the user's and the repository's Claude settings
 // apply in every mode, as in the terminal.
+//
+// Every run is started with Claude in Chrome (claude --chrome), so Claude can open pages in this
+// machine's Chrome, with the logins it has there, when the extension is installed.
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -294,6 +297,7 @@ async function loop(run, prompt) {
       additionalDirectories: !run.taskDir || samePath(run.cwd, run.taskDir) ? [] : [run.taskDir],
       permissionMode: mode,
       ...(mode === 'bypassPermissions' ? { allowDangerouslySkipPermissions: true } : {}),
+      extraArgs: { chrome: null },
       canUseTool: (name, toolInput, opts) => ask(run, name, toolInput, opts),
       abortController: run.abort,
       includePartialMessages: true,
