@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
 import Attachments from "@components/Attachments";
 import { RunButton, RunList } from "@ai";
-import { withKey } from "@utils/keys";
+import { modKey, withKey } from "@utils/keys";
 import { Checkbox } from "@ui";
 import styles from "./panel.module.css";
 
@@ -179,7 +179,7 @@ export default function TaskPanel({
               <div className={styles.divider} data-focused={focused && section === "prompt"}>
                 <span className={styles.barTitle}>{t("panel.prompt")}</span>
                 <div className={styles.barActions}>
-                  <RunButton run={run} keys="shift+r" disabled={!attachments.prompt?.trim()} reason={noRunner} onClick={() => onRun(task)} />
+                  <RunButton run={run} keys={`${modKey}enter`} disabled={!attachments.prompt?.trim()} reason={noRunner} onClick={() => onRun(task)} />
                 </div>
               </div>
               {/* The prompt's part: its text, with the task's runs under it when it has had any. */}
@@ -195,6 +195,10 @@ export default function TaskPanel({
                   onFocused={onFocused}
                   onFocus={() => onSection("prompt")}
                   onSave={onSavePrompt}
+                  onSubmit={() => {
+                    const going = !!run && (run.status === "running" || run.status === "queued");
+                    if (going || !noRunner) onRun(task);
+                  }}
                 />
                 {/* what to do with the changes after the work: one of the two, or neither */}
                 <div className={styles.after}>
@@ -271,6 +275,8 @@ function TaskText({ task, textRef, focus, onFocused, onFocus, onSave }) {
 const PROMPT_SAVE_MS = 800;
 
 // The task's prompt.txt under its text, edited the same way: saved on blur, cmd/ctrl+s and esc, and
+// cmd/ctrl+enter submits it: saved, then run as the run button does (onSubmit(), once the save is
+// in; nothing while the prompt is blank), and
 // by itself once the typing rests (PROMPT_SAVE_MS after the last key; onSave(task, text, true), the
 // third argument saying it is such a save, which goes without a word). A blank text is not saved
 // over a blank prompt (nothing was typed); over one that had a text, it deletes the file.
@@ -280,7 +286,7 @@ const PROMPT_SAVE_MS = 800;
 // folder) was given, going or over, it is carried out: the text is empty with the prompt as its placeholder, greyed, and
 // the file stays as it is when nothing is typed. Tab in the empty text takes the placeholder in as
 // typed; what is typed instead replaces the prompt once saved.
-function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocused, onFocus, onSave }) {
+function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocused, onFocus, onSave, onSubmit }) {
   const ranOf = (p) => !!p?.trim() && p === lastPrompt;
   const [taken, setTaken] = useState(false); // the placeholder taken in by tab
   const ran = !taken && ranOf(prompt);
@@ -288,6 +294,7 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
   const [draft, setDraft] = useState(saved);
   const sent = useRef(null); // the text last saved, until the folder is re-read with it
   const timer = useRef(null); // the save waiting for the typing to rest
+  const saving = useRef(null); // the save on its way: a promise of whether it was saved
 
   useEffect(() => {
     const el = textRef.current;
@@ -313,17 +320,30 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
     sent.current = null;
   }, [prompt, lastPrompt, lastRun]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // `auto`: the save is the timer's, not asked for.
+  // `auto`: the save is the timer's, not asked for. Resolves to whether the text is saved (also
+  // when there was nothing to save, or once a save already on its way is in).
   function save(auto = false) {
     clearTimeout(timer.current);
     timer.current = null;
-    if (draft === saved || draft === sent.current) return;
-    if (!draft.trim() && !saved.trim()) return; // nothing typed
+    if (draft === sent.current) return saving.current || Promise.resolve(true);
+    if (draft === saved) return Promise.resolve(true);
+    if (!draft.trim() && !saved.trim()) return Promise.resolve(true); // nothing typed
     const text = draft.trim() ? draft : ""; // emptied: the file goes (prompt null, read as "")
     sent.current = text;
-    Promise.resolve(onSave(task, text, auto)).then((ok) => {
+    const done = Promise.resolve(onSave(task, text, auto)).then((ok) => {
       if (ok === false && sent.current === text) sent.current = null; // not saved: to be tried again
+      if (saving.current === done) saving.current = null;
+      return ok !== false;
     });
+    saving.current = done;
+    return done;
+  }
+
+  // cmd/ctrl+enter: the prompt as typed is saved, then run; with nothing typed over the prompt
+  // that ran (the placeholder), that one runs again. A blank prompt is not run.
+  function submit() {
+    if (!(draft.trim() || (ran && draft === ""))) return;
+    save().then((ok) => ok && onSubmit());
   }
 
   // The save as of the last render, for the timer and for leaving with one waiting.
@@ -360,6 +380,9 @@ function PromptText({ task, prompt, lastPrompt, lastRun, textRef, focus, onFocus
         if ((e.metaKey || e.ctrlKey) && e.key === "s") {
           e.preventDefault();
           save();
+        } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          submit();
         } else if (e.key === "Escape") {
           e.currentTarget.blur(); // saved by onBlur
         } else if (e.key === "Tab" && ran && draft === "") {

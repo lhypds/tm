@@ -50,7 +50,8 @@ function HeaderButton({ label, keys, dot, pressed, onClick, children }) {
 // what was typed is dropped), and the page's keys then work, handed over by Home through `keysRef`
 // (keysRef.current(name) says whether it used the key): j / k walk the task's text, the prompt
 // (when shown) and the attachments (onSelectRel(rel)), the one chosen shaded; e / i put the caret
-// in the text chosen; g shows the prompt and puts the caret in it, and hides it again; r saves and executes, as the
+// in the text chosen; g shows the prompt and puts the caret in it, and hides it again; r (and cmd/ctrl+enter
+// with the caret in the prompt) saves and executes, as the
 // button does (or shows the task's run, `run`, through onRun(task) while one is going; not while
 // `noRunner` says the task cannot run). On
 // an existing task also: enter / space open the attachment chosen, d deletes it (onDeleteFile), or
@@ -264,6 +265,12 @@ export default function TaskEditorModal({
               data-selected={chosen === "prompt"}
               onFocus={() => choose("prompt")}
               onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                // cmd/ctrl+enter in the prompt: saved and executed, as r out of the text
+                if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                runNow();
+              }}
               aria-label={t("panel.prompt")}
             />
           </>

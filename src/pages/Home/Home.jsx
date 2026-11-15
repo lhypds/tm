@@ -756,14 +756,6 @@ export default function Home({ all = false }) {
     }
     await startRun(task);
   };
-  // r on a task (the selected one, or the preview's), as its run button: its run going is shown,
-  // else Claude Code starts on it; nothing happens where the button would be greyed out (no
-  // prompt, or a blank one, or its machine not connected). `hook` is the task's useTaskFiles.
-  const runPrompt = (task, hook) => {
-    if (!task) return;
-    if (!isGoing(ai.runFor(task)) && (!hook.prompt?.trim() || noRunnerOf(task.space))) return;
-    openRun(task);
-  };
   const movePick = (dir) => setPickRun((p) => p && { ...p, index: p.index < 0 ? firstReady(p.machines) : stepReady(p.machines, p.index, dir) });
   const confirmPick = (index) => {
     const m = pickRun?.machines[index];
@@ -1536,8 +1528,8 @@ export default function Home({ all = false }) {
       setMachinesOpen(true);
       return true;
     }
-    // g shows the selected task's prompt in the panel and puts the caret in it, and hides it again; shift+r runs it,
-    // as the run button beside it (r alone opens Machines Run here)
+    // g shows the selected task's prompt in the panel and puts the caret in it, and hides it again (cmd/ctrl+enter
+    // in the prompt saves and runs it, see TaskPanel; r opens Machines Run here)
     if (name === "g" || name === "G") {
       if (promptOpen) showPrompt(false); // again (once esc left the prompt): hidden
       else if (selected) {
@@ -1545,10 +1537,6 @@ export default function Home({ all = false }) {
         selectSection("prompt");
         openEditor(selected, "prompt");
       }
-      return true;
-    }
-    if (name === "R") {
-      runPrompt(selected, attachments);
       return true;
     }
     if (name === "v") {

@@ -215,7 +215,7 @@
       "desc": "edit the task's prompt (in the panel, or in the task dialog once esc left the text)"
     },
     "run": {
-      "keys": "shift+r; r in the task dialog",
+      "keys": "⌘ / ctrl + enter in the prompt; r in the task dialog",
       "desc": "run the task's prompt with Claude Code"
     },
     "pending": {
