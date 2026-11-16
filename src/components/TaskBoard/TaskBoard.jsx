@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { modKey, withKey } from "@utils/keys";
 import { FromTag, keepFocus } from "@components/TaskList";
-import { describe, formatStamp } from "@utils/task";
+import { TASKS_DRAG_TYPE, describe, formatStamp } from "@utils/task";
 import styles from "./board.module.css";
 
 // Every column the board can have, in order; the "aborted" column shows only when aborted tasks
@@ -70,7 +70,9 @@ export default function TaskBoard({
           onDragStart={(e, t) => {
             e.dataTransfer.effectAllowed = "move";
             e.dataTransfer.setData("text/plain", t.title || t.id);
-            setDragKeys(chosenKeys.has(t.key) ? [...chosenKeys] : [t.key]);
+            const keys = chosenKeys.has(t.key) ? [...chosenKeys] : [t.key];
+            e.dataTransfer.setData(TASKS_DRAG_TYPE, JSON.stringify(keys)); // for a drop on the scheduler
+            setDragKeys(keys);
             onSelect(t); // a card not chosen is selected alone; the chosen ones stay chosen
           }}
           onDragEnd={() => setDragKeys([])}

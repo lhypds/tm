@@ -230,6 +230,10 @@
       "keys": "d",
       "desc": "delete the selected task"
     },
+    "scheduler": {
+      "keys": "t",
+      "desc": "swap the right pane between the task and the scheduler (on it: j / k choose a task, space / enter open it, e / i write)"
+    },
     "machines": {
       "keys": "r",
       "desc": "open Machines Run (a prompt or a /command on the machines)"
@@ -327,6 +331,17 @@
     "pathEmpty": "Give a tasks folder or a source folder.",
     "submit": "Add",
     "workEmpty": "Choose a work."
+  },
+  "scheduler": {
+    "title": "Scheduler",
+    "show": "Scheduler",
+    "hide": "Task",
+    "today": "today",
+    "prev": "Previous day",
+    "next": "Next day",
+    "notes": "Notes of the day",
+    "remove": "Remove from this day",
+    "missing": "This task no longer exists"
   },
   "analysis": {
     "title": "Income analysis",

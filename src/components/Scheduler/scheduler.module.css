@@ -1,0 +1,224 @@
+/* The scheduler fills the right pane: its title bar, the day's buttons, then the day's page. */
+.scheduler {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg);
+  border-bottom: var(--line) solid var(--border);
+}
+
+/* Shaded while the keyboard is on the scheduler, as the task panel's bar is. */
+.bar[data-focused="true"] {
+  background: var(--bg-hover);
+}
+
+.barTitle {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Under the title: the day's buttons at the left, the day shown at the right. */
+.days {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: var(--line) solid var(--border);
+}
+
+/* A day back, today, a day forward, joined into one strip as the month picker is. */
+.steps {
+  display: flex;
+  align-items: center;
+}
+
+.step,
+.today {
+  height: 22px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.step {
+  flex: none;
+  width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.step svg {
+  width: 10px;
+  height: 10px;
+}
+
+.today {
+  margin: 0 calc(-1 * var(--line));
+  padding: 0 12px;
+}
+
+.step:hover,
+.today:hover {
+  background: var(--border);
+  color: var(--bg);
+}
+
+/* Today is on the page already: the button is shaded, as the month on screen is in its list. */
+.today[data-current="true"]:not(:hover) {
+  background: var(--bg-hover);
+}
+
+.date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The page: squared paper, a square two characters wide and a line high, scrolling with what is
+   on it. A card takes two lines (36px), so the text under it stays on the squares. */
+.page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px 0; /* a little room above the first line */
+  overflow-y: auto;
+  line-height: 18px;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 2ch 18px;
+  background-repeat: repeat; /* ress turns it off everywhere */
+  background-origin: content-box;
+  background-attachment: local;
+}
+
+/* A task on the day: one line, where it is from and its title, cut short with an ellipsis; the ×
+   shows on hover. It is dragged to another line of the page. */
+.card {
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  margin: 4px 0;
+  padding-left: 6px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  cursor: grab;
+}
+
+/* Hovered, or the one the keyboard is on. */
+.card:hover,
+.card[data-chosen="true"] {
+  background: var(--bg-hover);
+}
+
+.card > :global(.tag) {
+  flex: none;
+}
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.card[data-status="done"] .cardTitle,
+.card[data-status="aborted"] .cardTitle {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.card[data-missing="true"] .cardTitle {
+  color: var(--faint);
+  cursor: default;
+}
+
+.remove {
+  flex: none;
+  width: 24px;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.card:hover .remove,
+.remove:focus-visible {
+  display: inline-flex;
+}
+
+.remove:hover {
+  color: var(--fg);
+}
+
+.remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* A run of the text, on the paper itself, as tall as what is typed in it; the last one fills what
+   is left of the page. */
+.text {
+  flex: none;
+  display: block;
+  width: 100%;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  line-height: 18px;
+}
+
+.text[data-fill="true"] {
+  flex: 1 0 auto;
+}
+
+/* Where a dragged card would go: a line across the page, on top of the row it would take. */
+.mark {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: var(--line);
+  background: var(--faint);
+  pointer-events: none;
+}

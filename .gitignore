@@ -24,3 +24,6 @@ dist/
 /.tm-hash-cache.json
 # how taskmgrd's last pull went, for the web UI's status bar
 /.tm-poll-state.json
+
+# the scheduler's days, one json each (see server/scheduler.js)
+/data/scheduler/

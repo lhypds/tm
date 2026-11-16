@@ -16,6 +16,7 @@ import {
   AddSpaceModal,
   RepositoryEditModal,
   IncomeAnalysisModal,
+  Scheduler,
   LanguageSwitcher,
   UserMenu,
 } from "@components";
@@ -30,6 +31,8 @@ import {
   ListIcon,
   BoardIcon,
   MonitorIcon,
+  SundialIcon,
+  TaskIcon,
 } from "@components/icons";
 import { BOARD_STATUSES, boardStatus } from "@components/TaskBoard";
 import { showToast, Checkbox } from "@ui";
@@ -173,6 +176,8 @@ export default function Home({ all = false }) {
   const [worksError, setWorksError] = useState("");
   const [treeOpen, setTreeOpen] = useState(() => !isNarrow() && readFlag("panel.tree", true));
   const [detailOpen, setDetailOpen] = useState(() => !isNarrow() && readFlag("panel.detail", true));
+  const [scheduler, setScheduler] = useState(() => readFlag("panel.scheduler", false)); // the right pane shows the scheduler, not the task
+  const schedulerKeys = useRef(null); // the scheduler's keys while the keyboard is on it (see Scheduler)
   const [pane, setPane] = useState("tasks"); // where j / k and friends go: "tree" or "tasks"
   // The list last loaded and the path it is for. On any other path `data` is empty and `loading`
   // until this path's own list arrives. That is decided while rendering, not in an effect after a
@@ -281,6 +286,7 @@ export default function Home({ all = false }) {
   useEffect(() => {
     if (!isNarrow()) writeFlag("panel.detail", detailOpen);
   }, [detailOpen]);
+  useEffect(() => writeFlag("panel.scheduler", scheduler), [scheduler]);
   useEffect(() => writeFlag("panel.prompt", promptOpen), [promptOpen]);
   useEffect(() => writeFlag("preview.prompt", peekPromptOpen), [peekPromptOpen]);
   useEffect(() => {
@@ -822,6 +828,25 @@ export default function Home({ all = false }) {
   const peekFiles = peekAttachments.files.filter((f) => !f.isDir);
   const [peekFileRel, setPeekFileRel] = useState(null);
   const peekFile = peekFiles.find((f) => f.rel === peekFileRel) || null;
+  // A task on a scheduler day, clicked: its preview, as a double click on it in the list opens.
+  // The task is read where it is now (it may be of a space that is not listed).
+  async function openScheduled(entry) {
+    const s = { origin: (works || []).find((w) => w.work === entry.work)?.origin || "", work: entry.work, repository: entry.repository };
+    try {
+      const { task } = await api.getTask(s, entry.rel);
+      setPeek({ ...task, space: s, key: keyOf(s, task.rel) });
+    } catch (e) {
+      showToast(e.message, 4000);
+      setLoads((n) => n + 1); // the day is read again: the task has moved, or is gone
+    }
+  }
+  // The sundial in the header: the scheduler takes the right pane (opened when it was folded), and
+  // gives it back to the task on the next click.
+  function toggleScheduler() {
+    const next = !(scheduler && detailOpen);
+    setScheduler(next);
+    setDetailOpen(true);
+  }
   const closePeek = () => {
     setPeek(null);
     setPeekFileRel(null);
@@ -927,6 +952,7 @@ export default function Home({ all = false }) {
   // `area` "prompt", in its prompt, which is shown).
   const openEditor = (task, area = "task") => {
     setSelectedKey(task.key);
+    setScheduler(false); // the panel is back in place of the scheduler
     setDetailOpen(true);
     setPane("detail");
     setFocusing({ key: task.key, area });
@@ -1501,6 +1527,8 @@ export default function Home({ all = false }) {
     // above, then from a repository to its work, from a work to its origin, and from an origin (or
     // a work without one) to "All origins", where it stops.
     if (name === "backspace") {
+      // on the scheduler, with one of its tasks chosen, it takes that task off the day
+      if (pane === "detail" && scheduler && schedulerKeys.current?.(name)) return true;
       if (!data.isRoot) goUp();
       else if (repository) selectSpace(api.spacePath(origin, work));
       else if (work && origin) selectSpace(api.originPath(origin));
@@ -1543,6 +1571,11 @@ export default function Home({ all = false }) {
       toggleView();
       return true;
     }
+    // t swaps the right pane between the task and the scheduler, as the sundial in the header does
+    if (name === "t") {
+      toggleScheduler();
+      return true;
+    }
     if (name === ":") {
       setCommand("");
       return true;
@@ -1562,7 +1595,12 @@ export default function Home({ all = false }) {
     }
     if (pane === "tree") return treeKey(name);
 
-    if (pane === "detail") {
+    // On the scheduler (h / l get there as they get to the task panel) j / k walk the day's tasks,
+    // space or enter opens the one chosen, and e and i put the caret in the day's text (see
+    // Scheduler); the other keys are the selected task's, as on the list.
+    if (pane === "detail" && scheduler) {
+      if (schedulerKeys.current?.(name)) return true;
+    } else if (pane === "detail") {
       // j / k walk the attachments; with the prompt shown, the task's text first, then its prompt
       // and the run records listed under it last, as the panel shows them, so the keyboard moves
       // from the text (where enter, e and i put the caret) down through the attachments to the
@@ -1901,6 +1939,18 @@ export default function Home({ all = false }) {
           <button
             type="button"
             className="btn"
+            onClick={(e) => {
+              e.currentTarget.blur();
+              toggleScheduler();
+            }}
+            title={withKey(t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show"), "t")}
+            aria-label={t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show")}
+          >
+            {scheduler && detailOpen ? <TaskIcon /> : <SundialIcon />}
+          </button>
+          <button
+            type="button"
+            className="btn"
             tabIndex={-1}
             onMouseDown={(e) => e.preventDefault()}
             onClick={toggleView}
@@ -2072,7 +2122,8 @@ export default function Home({ all = false }) {
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
         <aside className={styles.detail} data-open={detailOpen} onMouseDown={() => setPane("detail")} onFocus={() => setPane("detail")}>
-          {spaceTo && (
+          {scheduler && <Scheduler tasks={tasks} works={works} origins={origins} reloadKey={loads} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} />}
+          {!scheduler && spaceTo && (
             <TaskPanel
               task={selected}
               focused={pane === "detail"}

@@ -33,6 +33,7 @@ const {
   openTask,
   openFolder,
   readTasks,
+  folderId,
   compareIdsDesc
 } = require('../utils/task');
 const { getEditor } = require('../utils/editor');
@@ -40,6 +41,7 @@ const { resolveConfig, shortPath, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
 const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
+const { createSchedulerApp } = require('./scheduler');
 const { listRecords, lastPrompt } = require('../ai/record');
 const { trimLogs } = require('../utils/logfile');
 
@@ -419,6 +421,37 @@ app.use(express.json({ limit: '10mb' }));
 
 // Login first: everything under /api below needs a session (see server/auth.js).
 app.use(createAuthApp({ usersPath: config.usersPath }));
+
+// The scheduler's days (see server/scheduler.js), which are no task's folder: mounted before the
+// guard below, as a write to them leaves the pushed copies as they were. A task there is found
+// again by its ids, from its space's root down, whatever its title and status have become.
+app.use(createSchedulerApp({
+  dataDir: config.dataDir,
+  find: ({ work, repository, ids }) => {
+    const space = findSpace(work, repository);
+    if (!space || !space.root) return null;
+    let dir = space.root;
+    let task = null;
+    for (const id of ids) {
+      task = readTasks(dir).find(t => t.id === id);
+      if (!task) return null;
+      dir = path.dirname(task.path);
+    }
+    return task && { rel: toRel(space.root, dir), title: firstDetailLine(task.details), status: normalizeStatus(task.status) };
+  },
+  idsOf: (params) => {
+    const { root } = spaceFrom(params);
+    const rel = String(params.rel || '');
+    resolveTaskDir(root, rel);
+    const ids = [];
+    let abs = root;
+    for (const name of rel.split('/')) {
+      abs = path.join(abs, name);
+      if (isTaskFolder(abs)) ids.push(folderId(name));
+    }
+    return ids;
+  }
+}));
 
 // A change made here (a task moved, edited, deleted, a file added...) leaves the pushed copies no
 // longer what taskmgrd pushed: the hashes of its snapshots are forgotten, or the next push, finding

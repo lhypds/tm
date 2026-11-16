@@ -230,6 +230,10 @@
       "keys": "d",
       "desc": "删除选中的任务"
     },
+    "scheduler": {
+      "keys": "t",
+      "desc": "在任务和日程之间切换右侧面板（在日程上：j / k 选择任务，space / enter 打开，e / i 写字）"
+    },
     "machines": {
       "keys": "r",
       "desc": "打开机器运行（在机器上执行 prompt 或 /命令）"
@@ -327,6 +331,17 @@
     "pathEmpty": "请填写任务文件夹或源代码文件夹。",
     "submit": "添加",
     "workEmpty": "请选择一个 work。"
+  },
+  "scheduler": {
+    "title": "日程",
+    "show": "日程",
+    "hide": "任务",
+    "today": "今天",
+    "prev": "前一天",
+    "next": "后一天",
+    "notes": "当天的笔记",
+    "remove": "从这一天移除",
+    "missing": "该任务已不存在"
   },
   "analysis": {
     "title": "收入分析",

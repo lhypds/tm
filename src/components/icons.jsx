@@ -195,6 +195,32 @@ export function PieIcon({ className }) {
   );
 }
 
+// The scheduler: a sundial, its round dial with the gnomon standing in the middle and the hour
+// marks around the lower half.
+export function SundialIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 13V5l5 8Z" />
+      <line x1="12" y1="17" x2="12" y2="19" />
+      <line x1="6.5" y1="15.5" x2="7.9" y2="14.7" />
+      <line x1="17.5" y1="15.5" x2="16.1" y2="14.7" />
+    </Icon>
+  );
+}
+
+// The task panel (what the scheduler's button goes back to): a sheet with a ticked box and its lines.
+export function TaskIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <path d="M8 9l1.5 1.5L12 8" />
+      <line x1="14" y1="9" x2="16" y2="9" />
+      <line x1="8" y1="15" x2="16" y2="15" />
+    </Icon>
+  );
+}
+
 // Machines (the computers Claude Code can be run on): a screen on its stand.
 export function MonitorIcon({ className }) {
   return (

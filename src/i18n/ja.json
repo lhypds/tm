@@ -230,6 +230,10 @@
       "keys": "d",
       "desc": "選択中のタスクを削除"
     },
+    "scheduler": {
+      "keys": "t",
+      "desc": "右のペインをタスクとスケジューラで切り替える（スケジューラ上：j / k でタスクを選択、space / enter で開く、e / i で書く）"
+    },
     "machines": {
       "keys": "r",
       "desc": "マシン実行を開く（マシンで prompt や /コマンドを実行）"
@@ -327,6 +331,17 @@
     "pathEmpty": "タスクフォルダかソースフォルダを入力してください。",
     "submit": "追加",
     "workEmpty": "work を選んでください。"
+  },
+  "scheduler": {
+    "title": "スケジューラ",
+    "show": "スケジューラ",
+    "hide": "タスク",
+    "today": "今日",
+    "prev": "前の日",
+    "next": "次の日",
+    "notes": "その日のメモ",
+    "remove": "この日から外す",
+    "missing": "このタスクはもうありません"
   },
   "analysis": {
     "title": "収入分析",

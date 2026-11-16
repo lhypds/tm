@@ -298,6 +298,21 @@ whenever the machine connects, then `run`, `item`, `delta`, `remove`), and `ack`
 `id` the command's. `{ ok: true }`. The server keeps the runs so sent and passes them on to its browsers.  
 
 
+Scheduler
+---------
+
+Defined in `server/scheduler.js`. One page a day, kept as `data/scheduler/<YYYY-MM-DD>.json` (git-ignored, not synced):  
+`{ date, text, tasks }`, `text` what was typed on the page, `tasks` those put on it, each `{ work, repository, ids, title, line }`:  
+`ids` is the task's id after those of the tasks it is under (its path changes with its title and status, its ids do not); `line` is the row of the page it sits on, how many lines of the text are above it.  
+A day has no file until a task is put on it or a text typed, and the file is removed when both are gone again.  
+Every route answers the day, each task with `title`, `rel` and `status` as they are now, or `missing: true` when it is gone.
+
+`GET /api/scheduler?date=` the day (empty when it has no file). 400 for a date that is not `YYYY-MM-DD`.  
+`PUT /api/scheduler` `{ date, text, tasks: [{ work, repository, ids, line }] }` writes the text and, with `tasks`, puts the day's tasks in that order, each on its line.  
+`POST /api/scheduler/tasks` `{ date, tasks: [{ work, repository, rel }], line, index }` puts tasks on the day, on `line`, as the `index`th of its tasks (one already there stays). 404 for a task that is not found.  
+`DELETE /api/scheduler/task?date=&work=&repository=&ids=<id>/<id>` takes a task off the day.
+
+
 Sync
 ----
 
