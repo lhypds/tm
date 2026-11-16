@@ -126,6 +126,15 @@ const taskFromDir = readTaskDir;
 // with `tm run`): edited under the task's text in the web UI's Task panel. It is not an attachment
 // (listFiles leaves it out); GET /api/task answers it, PUT /api/task/prompt writes it and DELETE /api/task/prompt removes it.
 
+// What a write here to a pushed copy has to tell the sync (see server/sync.js): `abs`, a file or
+// folder of the space, is about to be written ('edition') or deleted ('deletion') here, while the
+// machines the copy came from still have it as it was, and their next push would bring that back.
+// Returns the function to call once it is done. Nothing to tell for a folder that is not such a copy.
+function synced(what, space, abs) {
+  const w = isMirrored(config.dataDir, space.root) && config.getWorks().find(x => x.work === space.work);
+  return w ? syncApp[what]({ origin: w.origin, work: w.work, repository: space.repository || '' }, space.root, abs) : () => {};
+}
+
 // Write a task's prompt.txt as typed, overwriting it; a blank text too (the web UI makes the file,
 // blank, as the prompt is opened), so the file stays once made.
 function writePrompt(taskDirAbs, text) {
@@ -803,18 +812,24 @@ app.get('/api/task', (req, res) => {
 // task's attachments.
 app.put('/api/task/prompt', (req, res) => {
   const body = req.body || {};
-  const { root } = spaceFrom(body);
+  const space = spaceFrom(body);
+  const { root } = space;
   const taskDir = resolveTaskDir(root, body.rel);
   if (typeof body.text !== 'string') throw new HttpError(400, 'Missing text.');
+  const edited = synced('edition', space, path.join(taskDir, PROMPT_FILE));
   writePrompt(taskDir, body.text.replace(/\r\n/g, '\n'));
+  edited();
   res.json({ prompt: readPrompt(taskDir), files: listFiles(root, taskDir) });
 });
 
 // Remove a task's prompt.txt (the web UI does when a prompt is emptied); fine when there is none.
 app.delete('/api/task/prompt', (req, res) => {
-  const { root } = spaceFrom(req.query);
+  const space = spaceFrom(req.query);
+  const { root } = space;
   const taskDir = resolveTaskDir(root, String(req.query.rel || ''));
+  const deleted = synced('deletion', space, path.join(taskDir, PROMPT_FILE));
   fs.rmSync(path.join(taskDir, PROMPT_FILE), { force: true });
+  deleted();
   res.json({ prompt: readPrompt(taskDir), files: listFiles(root, taskDir) });
 });
 
@@ -938,12 +953,15 @@ function freeFileName(dir, name) {
 // are in the query, so no multipart parser is needed. A lock or cache file (see isSyncSkipped)
 // dropped along with the others is not written.
 app.post('/api/task/file', express.raw({ type: () => true, limit: '200mb' }), (req, res) => {
-  const { root } = spaceFrom(req.query);
+  const space = spaceFrom(req.query);
+  const { root } = space;
   const taskDir = resolveTaskDir(root, String(req.query.rel || ''));
   const wanted = attachmentName(req.query.name);
   if (isSyncSkipped(wanted)) return res.status(201).json({ files: listFiles(root, taskDir) });
   const name = freeFileName(taskDir, wanted);
+  const edited = synced('edition', space, path.join(taskDir, name));
   fs.writeFileSync(path.join(taskDir, name), Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
+  edited();
   res.status(201).json({ files: listFiles(root, taskDir) });
 });
 
@@ -973,8 +991,7 @@ app.delete('/api/file', (req, res) => {
   const taskDir = taskDirOfAttachment(root, abs);
   // In a pushed copy, what goes is remembered: the machines it came from still have it, and are
   // told to delete it (see deletion in server/sync.js), or their next push would bring it back.
-  const w = isMirrored(config.dataDir, root) && config.getWorks().find(x => x.work === space.work);
-  const deleted = w ? syncApp.deletion({ origin: w.origin, work: w.work, repository: space.repository || '' }, root, abs) : () => {};
+  const deleted = synced('deletion', space, abs);
   // lstat: a link is removed as the link it is, whatever it points to
   const stat = fs.lstatSync(abs, { throwIfNoEntry: false });
   if (!stat) throw new HttpError(404, 'File not found.');
@@ -994,12 +1011,15 @@ app.delete('/api/file', (req, res) => {
 // the task's attachments, with the file's new size.
 app.put('/api/file', (req, res) => {
   const body = req.body || {};
-  const { root } = spaceFrom(body);
+  const space = spaceFrom(body);
+  const { root } = space;
   const abs = resolveInsideRoot(root, String(body.rel || ''));
   const taskDir = taskDirOfAttachment(root, abs);
   if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) throw new HttpError(404, 'File not found.');
   if (typeof body.text !== 'string') throw new HttpError(400, 'Missing text.');
+  const edited = synced('edition', space, abs);
   fs.writeFileSync(abs, body.text.replace(/\r\n/g, '\n'), 'utf8');
+  edited();
   res.json({ files: listFiles(root, taskDir) });
 });
 

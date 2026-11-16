@@ -273,7 +273,8 @@ async function pullSpace(s, root, stats) {
   }
 
   // An attachment deleted on the server in its web UI (a file, or a folder with all in it; `deleted`,
-  // { path: hash }, '' for a folder) is deleted here too while it is still what was deleted there:
+  // { path: hash }, '' for a folder; a list of hashes for a file also edited there before, any of
+  // which may be the one here) is deleted here too while it is still what was deleted there:
   // the files first, then the folders left empty, the deepest first. One changed here is left (the
   // next push puts it back on the server). The server is then told which are dealt with, and
   // stops leaving them out of the pushes from here (see deletion in server/sync.js).
@@ -286,7 +287,7 @@ async function pullSpace(s, root, stats) {
       if (deleted[p] === '') {
         if (stat && stat.isDirectory() && !fs.readdirSync(abs).length) { fs.rmdirSync(abs); stats.updated++; }
       } else if (stat && stat.isFile()) {
-        if (await fileHash(abs, stat) !== deleted[p]) continue;
+        if (![].concat(deleted[p]).includes(await fileHash(abs, stat))) continue;
         fs.rmSync(abs);
         stats.updated++;
       }

@@ -55,7 +55,8 @@
 //       (task files as text, the others by sha1 and size), and one file of it. Nothing is changed,
 //       but the pulling machine (X-Machine-Id) counts as one of the space's machines, and is refused
 //       (409 TOO_MANY_MACHINES) as a push would be. The space's answer also has `deleted`
-//       ({ path: hash }): what was deleted here in the web UI and that machine still has.
+//       ({ path: hash }): what was deleted here in the web UI and that machine still has (a list of
+//       hashes when the file was also edited here before, see "what was edited here", below).
 //   POST /api/sync/pull/deleted  { origin, work, repository, paths }  -> { ok }
 //       the pulling machine has deleted those paths too (see "what was deleted here", below).
 //
@@ -92,6 +93,7 @@ const BLOB_RE = /^[0-9a-f]{40}$/;
 const MACHINE_MAX = 80;             // the longest MACHINE_ID kept (longer ones are cut)
 const ONLINE_MS = 3 * 60 * 1000;    // how long after its last request a machine counts as in touch
 const MAX_MACHINES = 2;             // how many machines may sync one space
+const EDITED_MAX = 100;             // how many versions of a file edited here are remembered for a machine
 
 class SyncError extends Error {
   constructor(status, message, extra) { super(message); this.status = status; Object.assign(this, extra || {}); }
@@ -208,7 +210,8 @@ function moveTasks(root, entries, { onMove = () => {}, onError = () => {} } = {}
 // moveTasks), then each file that differs is written (through data/.sync-tmp/, so a file is never half
 // written), and whatever the snapshot does not have is removed. A file placed from the blob store and
 // still the same is told by its inode, so the attachments are not read again at every push. Nothing
-// is written when a blob is not in the store (409).
+// is written when a blob is not in the store (409). An entry with keep: true is a file that stays as
+// it is here (one edited here, see withoutEdited).
 function writeSnapshot(dataDir, target, entries) {
   const list = entries.map(e => {
     const abs = path.resolve(target, e.rel);
@@ -247,6 +250,7 @@ function writeSnapshot(dataDir, target, entries) {
       continue;
     }
     files++;
+    if (e.keep) continue;
     let stat = null;
     try { stat = fs.statSync(e.abs); } catch (err) { /* not there yet */ }
     if (e.blob) {
@@ -462,10 +466,11 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
         blobs: s.blobs && typeof s.blobs === 'object' ? s.blobs : {},  // space key -> the blobs of its snapshot
         machines: machinesOf(s.machines),  // space key -> the MACHINE_IDs that sync it, the first to first
         deleted: s.deleted && typeof s.deleted === 'object' ? s.deleted : {},  // space key -> what was deleted here (see app.deletion)
+        edited: s.edited && typeof s.edited === 'object' ? s.edited : {},  // space key -> what was edited here (see app.edition)
         filters: s.filters && typeof s.filters === 'object' ? s.filters : {}  // MACHINE_ID -> the list bar filters it pushed last (see mergeFilters)
       };
     } catch (e) {
-      return { config: null, spaces: {}, blobs: {}, machines: {}, deleted: {}, filters: {} };
+      return { config: null, spaces: {}, blobs: {}, machines: {}, deleted: {}, edited: {}, filters: {} };
     }
   }
 
@@ -600,6 +605,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const keys = spaceKeys(parsed.works);
     for (const k of Object.keys(state.spaces)) if (!keys.has(k)) { delete state.spaces[k]; delete state.blobs[k]; }
     for (const k of Object.keys(state.machines)) if (!keys.has(k)) delete state.machines[k];
+    for (const k of Object.keys(state.edited)) if (!keys.has(k)) delete state.edited[k];
     // A space this machine pushed before and its config no longer lists (a work or repository
     // renamed or removed there) stays here, as one of this server's own (see mergeConfigs), but is
     // no longer this machine's: the machine is forgotten, so the web UI shows the copy as plain
@@ -683,7 +689,14 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       const machines = state.machines[key] || [];
       if (!machines.length || !Object.keys(going).length) return;
       const deleted = state.deleted[key] || {};
-      for (const p of Object.keys(going)) deleted[p] = { hash: going[p], machines: [...machines] };
+      // A file edited here before (see app.edition) takes along the versions the machines may still
+      // have (`had`): a push of one of those is left out as well.
+      const edited = state.edited[key] || {};
+      for (const p of Object.keys(going)) {
+        deleted[p] = { hash: going[p], machines: [...machines] };
+        if (edited[p]) { deleted[p].had = edited[p]; delete edited[p]; }
+      }
+      if (!Object.keys(edited).length) delete state.edited[key];
       state.deleted[key] = deleted;
       writeState(state);
     };
@@ -704,7 +717,8 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       const d = deleted[p];
       if (!d) return true;
       const hash = e.dir ? '' : e.blob || sha1(Buffer.from(e.content, 'utf8'));
-      if (d.machines.includes(machine) && d.hash === hash) { left.push(p); return false; }
+      const had = (d.had && d.had[machine]) || [];
+      if (d.machines.includes(machine) && (d.hash === hash || had.includes(hash))) { left.push(p); return false; }
       delete deleted[p];  // changed there, or put there anew: what is there wins
       return true;
     });
@@ -719,6 +733,92 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     return { list: kept, deleted: Object.keys(deleted).length ? deleted : null };
   }
 
+  // ---------- what was edited here ----------
+  //
+  // A file written here (the web UI: a task's prompt, an attachment edited or uploaded) is still the
+  // old one, or missing, on the machines that sync the space, and a push from one of them that comes
+  // before its pull would put the old one back (or, for a new file, remove it). So what the machines
+  // may have instead is remembered, in the state: edited[space key][path] = { MACHINE_ID: [hash] },
+  // the path relative to the space's folder, the hashes as a snapshot has them (the sha1 of the file;
+  // null for no file there), one for each version the file had here before an edit: any of them may
+  // be what that machine has, the oldest if it never pulled, a later one if it pulled in between.
+  // Until a machine pushes the path as it is here (it has pulled the edit), its push of the path:
+  //   - still as one of those versions, leaves the file here as it is (see withoutEdited);
+  //   - with another content, was changed there, which wins: it is written, and nothing is
+  //     remembered for that machine any more.
+
+  const hashOfFile = (abs) => {
+    try {
+      return fs.statSync(abs).isFile() ? sha1(fs.readFileSync(abs)) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // To be called before the file `abs` of the space (whose folder is `root`) is written here: reads
+  // what it is, and returns the function to call once it is written, which remembers that version
+  // for the machines that sync the space. Nothing is remembered for a space no machine syncs, nor
+  // when the file is the same after as before. A file put back after it was deleted here (see
+  // app.deletion) is no longer a deleted one: what the machines have of it is remembered here instead.
+  app.edition = (space, root, abs) => {
+    const before = hashOfFile(abs);
+    return () => {
+      if (hashOfFile(abs) === before) return;
+      const state = readState();
+      const key = spaceKey(space);
+      const machines = state.machines[key] || [];
+      if (!machines.length) return;
+      const p = path.relative(root, abs).split(path.sep).join('/');
+      const edited = state.edited[key] || {};
+      const rec = edited[p] || {};
+      const gone = (state.deleted[key] || {})[p];
+      for (const m of machines) {
+        const mine = gone && gone.machines.includes(m) ? [...((gone.had && gone.had[m]) || []), gone.hash] : [before];
+        const had = [...new Set([...(rec[m] || []), ...mine])];
+        // The oldest stays (what a machine that never pulled has), then the latest ones.
+        rec[m] = had.length > EDITED_MAX ? [had[0], ...had.slice(1 - EDITED_MAX)] : had;
+      }
+      edited[p] = rec;
+      state.edited[key] = edited;
+      if (gone) {
+        delete state.deleted[key][p];
+        if (!Object.keys(state.deleted[key]).length) delete state.deleted[key];
+      }
+      writeState(state);
+    };
+  };
+
+  // A pushed snapshot (`list`, checked entries) of the space `key`, whose folder is `target`, with
+  // the files edited here that `machine` still has an older version of (see above) staying as they
+  // are here: { list, edited }, `edited` being what is still remembered for the space after this
+  // push (null: nothing). A file made here that the machine does not have yet stays too, while the
+  // push still has something else of its folder (the task was not deleted there).
+  function withoutEdited(key, machine, target, list) {
+    const edited = readState().edited[key];
+    if (!edited) return { list, edited: null };
+    const posix = (e) => e.rel.split(path.sep).join('/');
+    const at = new Map(list.map((e, i) => [posix(e), i]));
+    const out = [...list];
+    for (const p of Object.keys(edited)) {
+      const had = edited[p][machine];
+      if (!had) continue;
+      const i = at.get(p);
+      const e = i === undefined ? null : list[i];
+      const pushed = !e ? null : e.dir ? undefined : e.blob || sha1(Buffer.from(e.content, 'utf8'));
+      const here = hashOfFile(path.join(target, ...p.split('/')));
+      const dir = `${path.posix.dirname(p)}/`;
+      if (here !== null && pushed !== here && had.includes(pushed) && (e || list.some(x => posix(x).startsWith(dir)))) {
+        const keep = { rel: path.join(...p.split('/')), keep: true };
+        if (e) out[i] = keep;
+        else out.push(keep);
+        continue;
+      }
+      delete edited[p][machine];  // it has the file as it is here, or changed it there: what is there wins
+      if (!Object.keys(edited[p]).length) delete edited[p];
+    }
+    return { list: out, edited: Object.keys(edited).length ? edited : null };
+  }
+
   app.put('/api/sync/space', json, (req, res) => {
     const { origin = '', work, repository = '', machine, entries, merged } = req.body || {};
     if (typeof origin !== 'string' || typeof repository !== 'string') throw new SyncError(400, 'origin and repository must be strings.');
@@ -729,12 +829,15 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     claim(readState(), key, machineName(machine), label({ origin, work, repository }));  // refused before anything is written
     if (merged !== true) pullFirst(key, machineName(machine), target, list, label({ origin, work, repository }));
     const kept = withoutDeleted(key, machineName(machine), list);
-    const { files, dirs } = writeSnapshot(dataDir, target, kept.list);
+    const stay = withoutEdited(key, machineName(machine), target, kept.list);
+    const { files, dirs } = writeSnapshot(dataDir, target, stay.list);
     const state = readState();
     if (kept.deleted) state.deleted[key] = kept.deleted;
     else delete state.deleted[key];
+    if (stay.edited) state.edited[key] = stay.edited;
+    else delete state.edited[key];
     state.spaces[key] = sha1(JSON.stringify(entries));
-    state.blobs[key] = [...new Set(kept.list.filter(e => e.blob).map(e => e.blob))];
+    state.blobs[key] = [...new Set(stay.list.filter(e => e.blob).map(e => e.blob))];
     claim(state, key, machineName(machine), label({ origin, work, repository }));
     writeState(state);
     pruneBlobs(state);
@@ -846,7 +949,12 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     // What was deleted here and the pulling machine has not deleted yet (see app.deletion): { path: hash }.
     const deleted = {};
     const remembered = readState().deleted[spaceKey(spaceOf(req.query))] || {};
-    for (const p of Object.keys(remembered)) if (remembered[p].machines.includes(req.machine)) deleted[p] = remembered[p].hash;
+    // A file edited here before it was deleted: the machine may still have an older version of it.
+    for (const p of Object.keys(remembered)) {
+      if (!remembered[p].machines.includes(req.machine)) continue;
+      const had = ((remembered[p].had && remembered[p].had[req.machine]) || []).filter(h => typeof h === 'string');
+      deleted[p] = had.length ? [remembered[p].hash, ...had] : remembered[p].hash;
+    }
     res.json({ ok: true, entries, deleted });
   });
 
