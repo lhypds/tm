@@ -74,7 +74,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
-const { parseConfig, upgradeRaw, shortPath } = require('./config');
+const { parseConfig, upgradeRaw, shortPath, normalizeFilters } = require('./config');
 const { appendLog } = require('../utils/logfile');
 const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/task');
 
@@ -358,10 +358,11 @@ function toMirror(dataDir, pushed) {
 // (origin, work) says the common tasks here are this server's own, synced by no machine (a work
 // added here in the web UI): those are not the pushing machine's to remove, and stay. A work pushed
 // under another origin than here moves there, as work names are unique across origins. Returns the
-// merged raw config.
-function mergeConfigs(here, pushed, ownTasks = () => false) {
+// merged raw config. The web UI's list bar filters are merged by mergeFilters, with `baseFilters`,
+// what the pushing machine pushed last (undefined the first time).
+function mergeConfigs(here, pushed, ownTasks = () => false, baseFilters) {
   const name = (v, key) => (v && typeof v[key] === 'string' ? v[key].trim() : '');
-  const merged = { ...here, ...pushed, origins: (here.origins || []).map(g => ({ ...g, works: [...(g.works || [])] })) };
+  const merged = { ...here, ...pushed, filters: mergeFilters(here.filters, pushed.filters, baseFilters), origins: (here.origins || []).map(g => ({ ...g, works: [...(g.works || [])] })) };
   for (const g of pushed.origins) {
     const origin = name(g, 'origin');
     let target = merged.origins.find(o => name(o, 'origin') === origin);
@@ -390,6 +391,28 @@ function mergeConfigs(here, pushed, ownTasks = () => false) {
     }
   }
   return merged;
+}
+
+// The web UI's list bar filters ({ [space path]: filter }, see server/config.js) of a pushed config
+// merged into the ones here. A push sends the machine's whole taskmgr.json whenever anything in it
+// changes, so its filters are mostly the ones it had already, and must not put back a filter set
+// here in the web UI since: only what the machine changed since its last push (`base`, the filters
+// it pushed then) is taken, a filter it reset since being removed here. Without a base (its first
+// push) the filters here stay, and the pushed ones are only added for the spaces with none here.
+// A config pushed without "filters" changes nothing.
+function mergeFilters(here, pushed, base) {
+  const mine = normalizeFilters(here);
+  if (pushed === undefined) return mine;
+  const theirs = normalizeFilters(pushed);
+  if (!base) return { ...theirs, ...mine };
+  const before = normalizeFilters(base);
+  const same = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
+  for (const k of new Set([...Object.keys(before), ...Object.keys(theirs)])) {
+    if (same(theirs[k], before[k])) continue;
+    if (theirs[k]) mine[k] = theirs[k];
+    else delete mine[k];
+  }
+  return mine;
 }
 
 // The MACHINE_ID of a push as kept: one line, trimmed, at most MACHINE_MAX characters; "" for none.
@@ -438,10 +461,11 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
         spaces: s.spaces && typeof s.spaces === 'object' ? s.spaces : {},
         blobs: s.blobs && typeof s.blobs === 'object' ? s.blobs : {},  // space key -> the blobs of its snapshot
         machines: machinesOf(s.machines),  // space key -> the MACHINE_IDs that sync it, the first to first
-        deleted: s.deleted && typeof s.deleted === 'object' ? s.deleted : {}  // space key -> what was deleted here (see app.deletion)
+        deleted: s.deleted && typeof s.deleted === 'object' ? s.deleted : {},  // space key -> what was deleted here (see app.deletion)
+        filters: s.filters && typeof s.filters === 'object' ? s.filters : {}  // MACHINE_ID -> the list bar filters it pushed last (see mergeFilters)
       };
     } catch (e) {
-      return { config: null, spaces: {}, blobs: {}, machines: {}, deleted: {} };
+      return { config: null, spaces: {}, blobs: {}, machines: {}, deleted: {}, filters: {} };
     }
   }
 
@@ -557,9 +581,11 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       throw new SyncError(400, e.message);
     }
     const pushed = toMirror(dataDir, upgradeRaw(JSON.parse(text)));
-    const machinesNow = readState().machines;
+    const before = readState();
+    const machinesNow = before.machines;
     const ownTasks = (origin, work) => !(machinesNow[spaceKey({ origin, work, repository: '' })] || []).length;
-    const mergedText = JSON.stringify(mergeConfigs(upgradeRaw(JSON.parse(readConfig())), pushed, ownTasks), null, 2) + '\n';
+    const filtersKey = req.machine || '';
+    const mergedText = JSON.stringify(mergeConfigs(upgradeRaw(JSON.parse(readConfig())), pushed, ownTasks, before.filters[filtersKey]), null, 2) + '\n';
     let parsed;
     try {
       parsed = parseConfig(mergedText, 'taskmgr.json');
@@ -570,6 +596,7 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     const pruned = pruneOrigins(dataDir, parsed.works);
     const state = readState();
     state.config = sha1(text);
+    if (pushed.filters !== undefined) state.filters[filtersKey] = normalizeFilters(pushed.filters);
     const keys = spaceKeys(parsed.works);
     for (const k of Object.keys(state.spaces)) if (!keys.has(k)) { delete state.spaces[k]; delete state.blobs[k]; }
     for (const k of Object.keys(state.machines)) if (!keys.has(k)) delete state.machines[k];

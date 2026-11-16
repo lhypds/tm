@@ -752,7 +752,8 @@ function resolveConfig() {
   }
 
   // Set the list bar filters of one space (its path in the web UI); null takes it out, back to the
-  // defaults. "filters" stays in the file, even empty, so that a push of it clears the server's.
+  // defaults. "filters" stays in the file, even empty, so that a push of it takes the reset filter
+  // out on the server too (see mergeFilters in server/sync.js).
   function setFilter(space, filter) {
     const raw = readRaw();
     const filters = normalizeFilters(raw.filters);
@@ -770,4 +771,4 @@ function resolveConfig() {
   };
 }
 
-module.exports = { resolveConfig, loadDotenv, parseConfig, upgradeRaw, shortPath, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, DEFAULT_DATA_DIR, POLL_STATE_PATH };
+module.exports = { resolveConfig, loadDotenv, parseConfig, upgradeRaw, shortPath, normalizeFilters, DEFAULT_CONFIG_PATH, EXAMPLE_CONFIG_PATH, DEFAULT_DATA_DIR, POLL_STATE_PATH };
