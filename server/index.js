@@ -33,7 +33,6 @@ const {
   openTask,
   openFolder,
   readTasks,
-  folderId,
   compareIdsDesc
 } = require('../utils/task');
 const { getEditor } = require('../utils/editor');
@@ -438,18 +437,6 @@ app.use(createSchedulerApp({
       dir = path.dirname(task.path);
     }
     return task && { rel: toRel(space.root, dir), title: firstDetailLine(task.details), status: normalizeStatus(task.status) };
-  },
-  idsOf: (params) => {
-    const { root } = spaceFrom(params);
-    const rel = String(params.rel || '');
-    resolveTaskDir(root, rel);
-    const ids = [];
-    let abs = root;
-    for (const name of rel.split('/')) {
-      abs = path.join(abs, name);
-      if (isTaskFolder(abs)) ids.push(folderId(name));
-    }
-    return ids;
   }
 }));
 

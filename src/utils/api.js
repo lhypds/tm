@@ -174,10 +174,6 @@ export const getSchedulerDay = (date) => request(`/api/scheduler?${q({ date })}`
 // Write the page: its text. Resolves to the day after it.
 export const saveSchedulerPage = (date, text) => request("/api/scheduler", json("PUT", { date, text }));
 
-// The tasks given by their space and rel, as a page keeps them (see getSchedulerDay's tasks).
-export const scheduledTasks = (tasks) =>
-  request("/api/scheduler/tasks", json("POST", { tasks: tasks.map((t) => ({ ...sp(t.space), rel: t.rel })) }));
-
 // Route to the tasks of every origin: the root, which is also what the title links to.
 export const allPath = "/";
 

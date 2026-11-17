@@ -541,7 +541,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   const isOurs = (e) => e.dataTransfer.types.includes(TASKS_DRAG_TYPE) || e.dataTransfer.types.includes(CARD_DRAG_TYPE);
 
-  const drop = async (e) => {
+  const drop = (e) => {
     if (!isOurs(e)) return;
     e.preventDefault(); // the text takes no dropped title
     const slot = slotAt(e);
@@ -563,18 +563,28 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     } catch {
       /* not ours after all */
     }
-    const dropped = tasks.filter((task) => keys.includes(task.key));
-    if (!dropped.length) return;
-    try {
-      const added = (await api.scheduledTasks(dropped)).filter((x) => !cards.some((c) => cardKey(c) === cardKey(x)));
-      if (!added.length) return; // on the day already
-      record();
-      const next = [...cards];
-      next.splice(slot.index, 0, ...added.map((x) => ({ ...x, line: slot.line })));
-      change(text, next, true);
-    } catch (err) {
-      showToast(err.message, 4000);
+    // each as the page keeps it: its space and its ids, its own after those of the tasks it is
+    // under, which are the rows before it in the list, one level up each (see flattenTasks)
+    const dropped = tasks.flatMap((task, i) => {
+      if (!keys.includes(task.key)) return [];
+      const ids = [task.id];
+      for (let j = i - 1, depth = task.depth; j >= 0 && depth > 0; j--) {
+        if (tasks[j].depth !== depth - 1) continue;
+        ids.unshift(tasks[j].id);
+        depth -= 1;
+      }
+      return [{ work: task.space.work, repository: task.space.repository || "", ids, title: task.title, rel: task.rel, status: task.status, missing: false, line: slot.line }];
+    });
+    const added = dropped.filter((x) => !cards.some((c) => cardKey(c) === cardKey(x)));
+    if (!added.length) {
+      // on the day already: its card is shown as the one meant
+      if (dropped.length) setChosen(cardKey(dropped[0]));
+      return;
     }
+    record();
+    const next = [...cards];
+    next.splice(slot.index, 0, ...added);
+    change(text, next, true);
   };
 
   const remove = (entry) => {

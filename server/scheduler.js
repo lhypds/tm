@@ -22,9 +22,8 @@ const express = require('express');
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // `find({ work, repository, ids })` answers the task as it is now ({ rel, title, status }) or null
-// when it is gone; `idsOf({ work, repository, rel })` the ids of the task at `rel` (throws when
-// there is none).
-function createSchedulerApp({ dataDir, find, idsOf }) {
+// when it is gone.
+function createSchedulerApp({ dataDir, find }) {
   const app = express.Router();
   const dir = path.join(dataDir, 'scheduler');
 
@@ -111,17 +110,6 @@ function createSchedulerApp({ dataDir, find, idsOf }) {
     const day = { date: dateOf(body.date), text: String(body.text ?? '') };
     writeDay(day);
     res.json(shown(day));
-  });
-
-  // The tasks at { work, repository, rel } each, as a page keeps them: [{ work, repository, ids,
-  // title, rel, status, missing }] (nothing is written: the page puts their lines in its text).
-  app.post('/api/scheduler/tasks', (req, res) => {
-    const body = req.body || {};
-    res.json((Array.isArray(body.tasks) ? body.tasks : []).map((t) => {
-      const entry = live({ work: String(t.work || ''), repository: String(t.repository || ''), ids: idsOf(t), title: '' });
-      if (entry.missing) throw fail(404, 'Task not found.');
-      return entry;
-    }));
   });
 
   return app;
