@@ -20,6 +20,8 @@
 // repository here keeps its own tasks_path and source_path (the server's are folders on the server)
 // and takes the server's other fields; one only on the server is not pulled, nor its files; one only
 // here stays. Then the tasks folder of every work and repository here that the server also has is filled.
+// The scheduler's days come too, a day at a time (see pullScheduler): one changed here and not
+// pushed yet is left as it is, and does not stop the pull.
 // More threads for the file system calls, which go out side by side (see pullSpace), as in push.js.
 process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '32';
 const fs = require('fs');
@@ -54,7 +56,7 @@ if (!TOKEN) die('SYNC_SERVER_TOKEN is not set in .env (the same value as in the 
 // attachment is only read again once it is modified. Required after the checks above: push.js has its own.
 // syncLog is the sync log of a run by hand, logs/taskmgr.log: the start and the end of the pull go there,
 // and each file that could not be pulled.
-const { fileHash, saveHashCache, syncLog, snapshot, isDir } = require('./push');
+const { fileHash, saveHashCache, syncLog, snapshot, isDir, scheduler } = require('./push');
 
 // Exit with an error, logged as the end of the run.
 function fail(message) {
@@ -69,11 +71,11 @@ function report(message) {
 }
 
 // One GET; `raw` answers the body as a Buffer, otherwise the JSON.
-async function get(route, query, { raw = false, timeout = REQUEST_TIMEOUT_MS } = {}) {
+async function get(route, query, { raw = false, timeout = REQUEST_TIMEOUT_MS, route: whole = null } = {}) {
   const qs = query ? `?${new URLSearchParams(query)}` : '';
   let res;
   try {
-    res = await fetch(`${SERVER}/api/sync/pull/${route}${qs}`, {
+    res = await fetch(`${SERVER}${whole || `/api/sync/pull/${route}`}${qs}`, {
       headers: { Authorization: `Bearer ${TOKEN}`, 'X-Machine-Id': encodeURIComponent(MACHINE_ID) },
       signal: AbortSignal.timeout(timeout)
     });
@@ -83,7 +85,7 @@ async function get(route, query, { raw = false, timeout = REQUEST_TIMEOUT_MS } =
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(`${SERVER} answered ${res.status}${data.error ? `: ${data.error}` : ''}`);
+    throw Object.assign(new Error(`${SERVER} answered ${res.status}${data.error ? `: ${data.error}` : ''}`), { status: res.status });
   }
   return raw ? Buffer.from(await res.arrayBuffer()) : res.json();
 }
@@ -110,6 +112,50 @@ async function post(route, body) {
 }
 
 const sha1 = (data) => crypto.createHash('sha1').update(data).digest('hex');
+
+// The scheduler's days (see server/scheduler.js) the server has another way than here, brought
+// here: resolves to { pulled, removed }. What is here wins, a day at a time: a day changed here
+// since the last sync (see server/syncstate.js) and not pushed yet is left as it is, and told; the
+// push sends it. A day the server no longer has is removed here while it is still the day last
+// synced. A server that does not sync the scheduler yet (an older one, 404) has none to pull.
+async function pullScheduler() {
+  let there;
+  try {
+    there = (await get('scheduler', null, { route: '/api/sync/scheduler' })).days || {};
+  } catch (e) {
+    if (e.status === 404) return { pulled: 0, removed: 0 };
+    throw e;
+  }
+  const here = scheduler.list();
+  const known = syncState.getScheduler();
+  const differs = Object.keys({ ...here, ...there }).filter(d => here[d] !== there[d]);
+  const same = (d) => here[d] === known[d];  // not changed here since the last sync (or on neither side then)
+  const wanted = differs.filter(d => there[d] && same(d));
+  const gone = differs.filter(d => !there[d] && known[d] && same(d));
+  const kept = differs.filter(d => !wanted.includes(d) && !gone.includes(d) && (there[d] || known[d]));
+  if (kept.length) {
+    const line = `scheduler: ${kept.join(', ')} changed here and not pushed yet, left as ${kept.length === 1 ? 'it is' : 'they are'} (tm push, or taskmgrd, sends ${kept.length === 1 ? 'it' : 'them'})`;
+    console.log(line);
+    syncLog('warning', line);
+  }
+  const got = wanted.length ? (await post('scheduler', { dates: wanted })).days || [] : [];
+  const next = { ...known };
+  for (const d of Object.keys(here)) if (here[d] === there[d]) next[d] = here[d];
+  let pulled = 0;
+  for (const day of got) {
+    if (!wanted.includes(day.date) || typeof day.text !== 'string') continue;
+    scheduler.write({ date: day.date, text: day.text, ...(typeof day.carried === 'string' ? { carried: day.carried } : {}) });
+    next[day.date] = there[day.date];
+    pulled++;
+  }
+  for (const d of gone) {
+    scheduler.remove(d);
+    delete next[d];
+  }
+  for (const d of Object.keys(next)) if (!here[d] && !there[d]) delete next[d];
+  syncState.setScheduler(next);
+  return { pulled, removed: gone.length };
+}
 const name = (v, key) => (v && typeof v[key] === 'string' ? v[key].trim() : '');
 const label = (s) => `${s.origin ? `${s.origin} / ` : ''}${s.work}${s.repository ? ` / ${s.repository}` : ''}`;
 
@@ -418,6 +464,19 @@ function changesHere(root, known, entries) {
     syncLog(true, 'pulled taskmgr.json');
   }
 
+  // The scheduler's days, before the tasks (which may stop the pull, see below).
+  let days = { pulled: 0, removed: 0 };
+  try {
+    days = await pullScheduler();
+    if (days.pulled || days.removed) {
+      const line = `pulled scheduler (${days.pulled} day${days.pulled === 1 ? '' : 's'}${days.removed ? `, ${days.removed} removed` : ''})`;
+      console.log(line);
+      syncLog(true, line);
+    }
+  } catch (e) {
+    report(`scheduler: ${e.message}`);
+  }
+
   // The tasks folders are pulled side by side, those that share one folder one after the other.
   const byRoot = new Map();
   for (const w of merged.works) {
@@ -473,8 +532,9 @@ function changesHere(root, known, entries) {
     }
   }));
   saveHashCache();
-  const summary = stats.added || stats.updated || changed ? `${stats.added} added, ${stats.updated} updated${changed ? ', taskmgr.json merged' : ''}` : 'nothing to pull, everything is up to date';
-  console.log(stats.added || stats.updated || changed ? `done: ${summary}` : summary);
+  const any = stats.added || stats.updated || changed || days.pulled || days.removed;
+  const summary = any ? `${stats.added} added, ${stats.updated} updated${changed ? ', taskmgr.json merged' : ''}${days.pulled || days.removed ? ', scheduler pulled' : ''}` : 'nothing to pull, everything is up to date';
+  console.log(any ? `done: ${summary}` : summary);
   if (stats.failed) fail(`${stats.failed} file${stats.failed === 1 ? '' : 's'} could not be pulled (see above)`);
   syncLog('info', `tm pull finished (${summary})`);
 })().catch((e) => fail(e.message));

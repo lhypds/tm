@@ -348,7 +348,7 @@
     "next": "Next day",
     "notes": "Notes of the day",
     "remove": "Remove from this day",
-    "missing": "This task no longer exists"
+    "missing": "This task is not on this machine"
   },
   "analysis": {
     "title": "Income analysis",

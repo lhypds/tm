@@ -47,6 +47,8 @@ go out 10 seconds after the last of them; at startup the daemon pushes `taskmgr.
 at startup and every 5 minutes it asks the server what it has and pushes what differs, and a push  
 that fails (the server is down) is retried, with growing waits, until it goes through.  
 
+The scheduler's days (`data/scheduler/`, see [Server.md](Server.md)) are synced as well, a day at a time: the daemon watches them and pushes a day changed here 10 seconds after its last change (and looks again at every rescan), and the pull brings the days the server, or another machine through it, changed. What is here wins: a day changed here and not pushed yet is not pulled over. The server's days are those of its own web UI, so every machine and the server share one scheduler; a task on a page that this machine does not have (its work or repository is not here) is shown by its title, without a status box.  
+
 `.env` says what the daemon does: `PUSHING` and `POLLING`. `PUSHING=1` (on when it is not set) is all of  
 the above; `PUSHING=0` turns it off: nothing is watched, nothing pushed, and `tm push` is the way to push.  
 With both off, and `AI_RUNNER` off too (below), the daemon has nothing to do and does not start.  

@@ -78,6 +78,7 @@ const express = require('express');
 const { parseConfig, upgradeRaw, shortPath, normalizeFilters } = require('./config');
 const { appendLog } = require('../utils/logfile');
 const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/task');
+const { schedulerStore, isDate } = require('./scheduler');
 
 const ORIGINS_DIR = 'origins';
 const NO_ORIGIN_DIR = '_';
@@ -1022,6 +1023,43 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
       return { name, seenAt, online: !!seenAt && Date.now() - seenAt < ONLINE_MS };
     });
   };
+
+  // ---------- the scheduler ----------
+
+  // The scheduler's days (see server/scheduler.js), which every machine shares: they are this
+  // server's own days, the ones its web UI shows and writes, so a day pushed by one machine is
+  // pulled by the others. A machine tells by the hashes which days differ, and by what it last
+  // synced which side changed (see pushScheduler in push.js and pullScheduler in pull.js).
+  const scheduler = schedulerStore(dataDir);
+
+  // { days: { date: hash } } of every day that has a file here.
+  app.get('/api/sync/scheduler', (req, res) => {
+    res.json({ ok: true, days: scheduler.list() });
+  });
+
+  // Write the days of `days` ({ date, text, carried? } each) and remove those of `deleted` (dates).
+  // Answers the days as they are after it, as GET does.
+  app.put('/api/sync/scheduler', json, (req, res) => {
+    const body = req.body || {};
+    const days = Array.isArray(body.days) ? body.days : [];
+    const deleted = Array.isArray(body.deleted) ? body.deleted : [];
+    if (days.some(d => !d || !isDate(d.date) || typeof d.text !== 'string' || (d.carried != null && !isDate(d.carried))) || deleted.some(d => !isDate(d))) {
+      machineLog(req, 'failed', 'scheduler: invalid days');
+      return res.status(400).json({ error: 'Invalid scheduler days.' });
+    }
+    for (const d of days) scheduler.write({ date: d.date, text: d.text, ...(d.carried ? { carried: d.carried } : {}) });
+    for (const date of deleted) scheduler.remove(date);
+    if (days.length || deleted.length) machineLog(req, 'success', `pushed scheduler (${days.length} written, ${deleted.length} removed)`);
+    res.json({ ok: true, days: scheduler.list() });
+  });
+
+  // The days of `dates` as they are here, { date, text, carried? } each; one without a file is left out.
+  app.post('/api/sync/pull/scheduler', json, (req, res) => {
+    const dates = (Array.isArray((req.body || {}).dates) ? req.body.dates : []).filter(isDate);
+    const days = dates.filter(scheduler.has).map(scheduler.read);
+    if (days.length) machineLog(req, 'info', `pulled scheduler (${days.length} day${days.length === 1 ? '' : 's'})`);
+    res.json({ ok: true, days });
+  });
 
   // Forget the hashes of the pushed snapshots, so the next push sends every space whole: to be called
   // when the tasks are changed here (the web UI), which leaves the copies no longer what was pushed.

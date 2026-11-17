@@ -74,6 +74,9 @@ const withLive = (cards, tasks) =>
     return now ? { ...c, title: now.title, details: now.details, rel: now.rel, status: now.status, missing: now.missing } : c;
   });
 
+// What `cards` show of their tasks, as one text: two of them are the same when nothing shown differs.
+const liveOf = (cards) => JSON.stringify(cards.map((c) => [cardKey(c), c.title, c.details || "", c.rel ?? null, c.status ?? null, !!c.missing]));
+
 // The cards in the page's order: by line (none past the last line of the text), those on one line
 // as they were.
 const arrange = (cards, lineCount) =>
@@ -201,6 +204,7 @@ function Lines({ value, fill, ...props }) {
 // `normalKey`), the cards being stops on the way: j / k (the arrows, while typing) walk the cursor
 // from the text onto a card and off it again, and backspace, delete and x take a card off the day
 // (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere); while `loading` (the page's refresh) the pane under its bar is covered and says "Loading...", as the task list does.
+// The days are synced between the machines (see server/scheduler.js), so a page may have a task that is not on this one: its card is as any other, with the title of its line, but has no box and opens nothing.
 // See server/scheduler.js for what is kept.
 export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus }) {
   const { t, i18n } = useTranslation();
@@ -266,6 +270,33 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
       stale = true;
     };
   }, [date, reloadKey, flush]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The day is read again every ten seconds while the tab is visible, as the page reads its tasks
+  // again: a pull (tm pull, or taskmgrd) may have brought the day as another machine left it. It
+  // is shown only when it is not the page as it is here, and nothing here waits to be written.
+  const pageNow = useRef("");
+  pageNow.current = compose(text, cards);
+  const liveNow = useRef("");
+  liveNow.current = liveOf(cards);
+  useEffect(() => {
+    if (!loaded) return undefined;
+    const id = setInterval(async () => {
+      if (document.visibilityState !== "visible" || pending.current) return;
+      const was = changes.current;
+      try {
+        const day = await api.getSchedulerDay(date);
+        if (day.date !== dateRef.current || changes.current !== was || pending.current) return;
+        await saving.current; // a write under way answers the day itself
+        if (changes.current !== was || pending.current) return;
+        const page = parse(day.text);
+        const next = arrange(withLive(page.cards, day.tasks), page.text.split("\n").length);
+        if (compose(page.text, next) !== pageNow.current || liveOf(next) !== liveNow.current) show(day);
+      } catch {
+        /* the next one may go through */
+      }
+    }, 10 * 1000);
+    return () => clearInterval(id);
+  }, [date, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // What was changed last is written when the scheduler goes away too.
   useEffect(() => () => void flush(), [flush]);
@@ -933,6 +964,8 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
               }}
               onDragEnd={endDrag}
             >
+              {/* a task that is not on this machine (the days are synced, see server/scheduler.js) is
+                  shown as any other, by the title of its line, without the box: there is nothing here to mark */}
               {!block.card.missing && block.card.rel && (
                 <DoneBox
                   checked={block.card.status === "done"}
@@ -945,14 +978,13 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
               <button
                 type="button"
                 className={styles.cardTitle}
-                disabled={block.card.missing || !block.card.rel}
                 title={block.card.missing ? t("scheduler.missing") : undefined}
                 // a click chooses the card, as it selects a row of the list; a double click opens it
                 onClick={(e) => {
                   setChosen(cardKey(block.card));
                   e.currentTarget.blur(); // the keys go on from the card (space opens it), not from the button
                 }}
-                onDoubleClick={() => onOpen(block.card)}
+                onDoubleClick={() => !block.card.missing && block.card.rel && onOpen(block.card)}
               >
                 {block.card.title || t("common.untitled")}
                 {/* its description, as the list has it after the title */}

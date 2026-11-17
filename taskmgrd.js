@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// taskmgrd: the sync daemon. It watches taskmgr.json and the tasks folder of every work and
-// repository listed there, and pushes what changes to a remote tm server with push.js (what `tm push`
+// taskmgrd: the sync daemon. It watches taskmgr.json, the tasks folder of every work and
+// repository listed there and the scheduler's days, and pushes what changes to a remote tm server with push.js (what `tm push`
 // runs once by hand; it has the .env settings and what a push sends).
 //
 //   node taskmgrd.js          ./start.sh runs it under pm2 with the web UI (ecosystem.config.cjs),
@@ -54,7 +54,7 @@ function notRunning(why) {
 if (!String(process.env.SYNC_SERVER || '').trim()) notRunning('SYNC_SERVER is not set in .env, no server to sync with');
 if (!PUSHING && !POLLING && !AI_RUNNER) notRunning('PUSHING=0, POLLING=0 and no AI_RUNNER=1 in .env, nothing to do');
 
-const { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace } = require('./push');
+const { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace, scheduler, schedulerChanged, pushScheduler } = require('./push');
 const { startRunner } = require('./ai/runner');
 
 // The daemon's pushes (and the pulls it runs) are logged apart from those made by hand (`tm push`,
@@ -103,6 +103,7 @@ async function pushJob(job) {
     onServer.config = job.hash;
     return done;
   }
+  if (job.key === 'scheduler') return pushScheduler();
   const done = await pushSpace(job.space, job);
   onServer.spaces[job.key] = job.hash;
   return done;
@@ -118,7 +119,7 @@ function drain() {
 
 async function drainQueue() {
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
-  const name = (job) => (job.key === 'config' ? 'taskmgr.json' : label(job.space));
+  const name = (job) => (job.key === 'config' ? 'taskmgr.json' : job.key === 'scheduler' ? 'scheduler' : label(job.space));
   let pushed = 0;
   if (queue.size) syncLog('info', `pushing ${[...queue.values()].map(name).join(', ')}`);
   while (queue.size) {
@@ -271,7 +272,33 @@ function reconcile() {
   const keys = new Set([...byRoot.values()].flat().map(spaceKey));
   for (const k of Object.keys(onServer.spaces)) if (!keys.has(k)) delete onServer.spaces[k];
   for (const root of byRoot.keys()) scanRoot(root, 'rescan');
+  scanScheduler();
   drain();
+}
+
+// The scheduler's days (see server/scheduler.js) are pushed like a tasks folder: when one changes
+// here (its folder is watched, a change waiting DEBOUNCE_MS as any other), and looked at again at
+// every rescan. Only what was changed here since the last sync goes (see pushScheduler in push.js);
+// what the server changed comes with the pull.
+let schedulerTimer = null;
+function scanScheduler() {
+  if (schedulerTimer) { clearTimeout(schedulerTimer); schedulerTimer = null; }
+  if (pulling) return;  // the pull is writing the days; they are looked at again once it is through
+  let changed = false;
+  try { changed = schedulerChanged(); } catch (e) { warn(`scheduler: ${e.message}`); }
+  if (changed) enqueue({ key: 'scheduler' });
+  else queue.delete('scheduler');
+}
+function watchScheduler() {
+  try {
+    fs.mkdirSync(scheduler.dir, { recursive: true });
+    fs.watch(scheduler.dir, () => {
+      if (schedulerTimer) clearTimeout(schedulerTimer);
+      schedulerTimer = setTimeout(() => { scanScheduler(); drain(); }, DEBOUNCE_MS);
+    });
+  } catch (e) {
+    warn(`cannot watch ${scheduler.dir}: ${e.message}; the scheduler is pushed at each rescan only`);
+  }
 }
 
 let configTimer = null;
@@ -378,6 +405,7 @@ async function flushChanges() {
       if (r.timer) { clearTimeout(r.timer); r.timer = null; scanRoot(r.root); }
     }
   }
+  if (schedulerTimer) scanScheduler();
   await Promise.all([...roots.values()].map(r => r.scanning).filter(Boolean));
 }
 
@@ -434,6 +462,7 @@ for (const s of spacesOf(first.works)) log(`  ${s.repository ? 'repository' : 'w
 // polls. With polling on, the first pull comes before the first push: what the server has (another
 // machine's changes, say) is taken in first, and the push that follows sends the folders as merged.
 if (PUSHING) watchConfig();
+if (PUSHING) watchScheduler();
 if (POLLING) poll();
 else if (PUSHING) rescan();
 if (PUSHING) setInterval(rescan, RESCAN_MS);

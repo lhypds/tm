@@ -348,7 +348,7 @@
     "next": "后一天",
     "notes": "当天的笔记",
     "remove": "从这一天移除",
-    "missing": "该任务已不存在"
+    "missing": "该任务不在这台机器上"
   },
   "analysis": {
     "title": "收入分析",

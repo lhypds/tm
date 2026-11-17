@@ -32,9 +32,7 @@ function get(key) {
   return load().spaces[key] || null;
 }
 
-function set(key, manifest) {
-  const state = load();
-  state.spaces[key] = manifest;
+function save(state) {
   const tmp = `${STATE_PATH}.${crypto.randomBytes(4).toString('hex')}.tmp`;
   try {
     fs.writeFileSync(tmp, JSON.stringify(state));
@@ -44,4 +42,22 @@ function set(key, manifest) {
   }
 }
 
-module.exports = { manifestOf, get, set };
+function set(key, manifest) {
+  const state = load();
+  state.spaces[key] = manifest;
+  save(state);
+}
+
+// The scheduler's days both sides last agreed on, { date: hash } (see schedulerStore in
+// server/scheduler.js), kept beside the spaces: a day whose hash here is still that one was not
+// changed here since, and one that is in it but gone on a side was deleted there.
+function getScheduler() {
+  const days = load().scheduler;
+  return days && typeof days === 'object' ? days : {};
+}
+
+function setScheduler(days) {
+  save({ ...load(), scheduler: days });
+}
+
+module.exports = { manifestOf, get, set, getScheduler, setScheduler };

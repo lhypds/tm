@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// tm push: send taskmgr.json and the tasks folder of every work and repository listed there to a
+// tm push: send taskmgr.json, the tasks folder of every work and repository listed there and the
+// scheduler's days changed here (see pushScheduler) to a
 // remote tm server, which keeps a copy under its data/ folder laid out like the origins tree
 // (server/sync.js has the layout and the API). Run by hand it pushes what differs once and exits;
 // taskmgrd.js, the sync daemon, uses the same functions to push whenever something changes.
@@ -34,7 +35,8 @@ const fsp = require('fs/promises');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { loadDotenv, parseConfig, DEFAULT_CONFIG_PATH } = require('./server/config');
+const { loadDotenv, parseConfig, DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR } = require('./server/config');
+const { schedulerStore } = require('./server/scheduler');
 const { spaceKey } = require('./server/sync');
 const syncState = require('./server/syncstate');
 const {
@@ -329,6 +331,7 @@ async function request(method, route, body, { timeout = REQUEST_TIMEOUT_MS, raw:
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(`${SERVER} answered ${res.status}${data.error ? `: ${data.error}` : ''}`);
+    err.status = res.status;
     err.code = data.code;
     err.missing = data.missing;
     throw err;
@@ -446,7 +449,53 @@ async function pushSpace(space, { entries, blobs }, merged = null) {
   return `${merged === null ? '' : `merged ${label(space)} with the server's (${n(merged, 'task')} brought here); `}pushed ${label(space)} (${n(files, 'file')}${dirs ? `, ${n(dirs, 'empty folder')}` : ''}${uploaded ? `, ${n(uploaded, 'attachment')} uploaded` : ''})`;
 }
 
-module.exports = { SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace, fileHash, saveHashCache };
+// ---------- the scheduler ----------
+
+// The scheduler's days here (see server/scheduler.js), which are synced with the server's, a day
+// at a time: the server's are its own web UI's, and what every other machine pulls.
+const scheduler = schedulerStore(DEFAULT_DATA_DIR);
+
+// Whether a day here is not what was last synced (see server/syncstate.js): changed, added or
+// deleted here since, and so to be pushed.
+function schedulerChanged() {
+  const here = scheduler.list();
+  const known = syncState.getScheduler();
+  return Object.keys({ ...here, ...known }).some(d => here[d] !== known[d]);
+}
+
+// Push the scheduler's days changed here since the last sync; resolves to the line to log about
+// it. What is here wins: a day changed here is written over the server's, whatever that has become.
+// A day deleted here (its page emptied) is deleted on the server while that one is still the day
+// last synced; a day only the server changed is left as it is there, for the pull. A server that
+// does not sync the scheduler yet (an older one, 404) is left alone.
+async function pushScheduler() {
+  const here = scheduler.list();
+  const known = syncState.getScheduler();
+  let there;
+  try {
+    there = (await request('GET', '/api/sync/scheduler')).days || {};
+  } catch (e) {
+    if (e.status === 404) return 'scheduler not pushed: the server does not sync it (an older tm)';
+    throw e;
+  }
+  const changed = Object.keys(here).filter(d => here[d] !== known[d] && here[d] !== there[d]);
+  const deleted = Object.keys(known).filter(d => !here[d] && there[d] && there[d] === known[d]);
+  if (changed.length || deleted.length) {
+    there = (await request('PUT', '/api/sync/scheduler', { days: changed.map(scheduler.read), deleted })).days || {};
+  }
+  // agreed on from here on: every day both sides have the same, and none that both lack; a day
+  // that still differs keeps what was known of it
+  const next = {};
+  for (const d of Object.keys({ ...here, ...known, ...there })) {
+    if (here[d] && here[d] === there[d]) next[d] = here[d];
+    else if ((here[d] || there[d]) && known[d]) next[d] = known[d];
+  }
+  try { syncState.setScheduler(next); } catch (e) { warn(`could not record the sync state: ${e.message}`); }
+  const n = (count) => `${count} day${count === 1 ? '' : 's'}`;
+  return changed.length || deleted.length ? `pushed scheduler (${n(changed.length)}${deleted.length ? `, ${n(deleted.length)} removed` : ''})` : 'scheduler: nothing to push';
+}
+
+module.exports = { scheduler, schedulerChanged, pushScheduler, SERVER, TOKEN, MACHINE_ID, CONFIG_PATH, log, warn, die, syncLog, logTo, readConfig, spacesOf, label, snapshot, isDir, serverState, pushConfig, pushSpace, fileHash, saveHashCache };
 
 // ---------- tm push ----------
 
@@ -492,6 +541,7 @@ async function main() {
     const snap = await snapshot(root);
     for (const s of spaces) await push(label(s), () => pushSpace(s, snap));
   }
+  await push('scheduler', () => pushScheduler());
   if (refused.length) fail(`not pushed, synced by other machines already: ${refused.join(', ')}`);
   log('done');
   syncLog('info', 'tm push finished');

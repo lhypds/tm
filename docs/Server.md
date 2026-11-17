@@ -301,13 +301,13 @@ whenever the machine connects, then `run`, `item`, `delta`, `remove`), and `ack`
 Scheduler
 ---------
 
-Defined in `server/scheduler.js`. One page a day, kept as `data/scheduler/<YYYY-MM-DD>.json` (git-ignored, not synced):  
+Defined in `server/scheduler.js`. One page a day, kept as `data/scheduler/<YYYY-MM-DD>.json` (git-ignored; synced between the machines through the server, see the scheduler routes under Sync below):  
 `{ date, text }`, `text` the page. A task put on the page is a line of the text, shown as a card: `[title](tm://<work>/<repository>#<id>/<id>)`,  
 the ids being the task's id after those of the tasks it is under (its path changes with its title and status, its ids do not), the title the one it had when the line was written.  
 A day has no file until its page has something on it, and the file is removed when the page is empty again.  
 A file of the older shape (`tasks: [{ work, repository, ids, title, line }]` beside the text) is read as the page it was.
 
-`GET /api/scheduler?date=&carry=1` the day (empty when it has no file; with `carry`, sent for today, a day that has no file yet is first given the tasks of the last day before it that are neither done, aborted nor gone, and keeps that day as `carried`, so it happens once): `{ date, text, tasks }`, `tasks` those of the text's lines, each `{ work, repository, ids, title, rel, status, missing }` as it is now (`missing: true` when it is gone). 400 for a date that is not `YYYY-MM-DD`.  
+`GET /api/scheduler?date=&carry=1` the day (empty when it has no file; with `carry`, sent for today, a day that has no file yet is first given the tasks of the last day before it that are neither done, aborted nor gone, and keeps that day as `carried`, so it happens once): `{ date, text, tasks }`, `tasks` those of the text's lines, each `{ work, repository, ids, title, rel, status, missing }` as it is now (`missing: true` when it is not here: gone, or a task of another machine, the days being synced and a work's tasks only to the machines that have that work; the page shows it by the title of its line, as any other task but without its status box). With `carry`, a missing task of a work or repository this machine does not have is brought over too, as its line is. 400 for a date that is not `YYYY-MM-DD`.  
 `PUT /api/scheduler` `{ date, text }` writes the page. Answers the day.
 
 
@@ -347,6 +347,15 @@ Which of these files (sha1 hashes of their content) the server does not have yet
 
 `PUT /api/sync/blob/<sha1>` (the raw file as the body, up to 1 GB)  
 Store one file in the blob store, `data/.sync-blobs/<sha1>`. 400 when the content does not hash to `<sha1>`. `{ ok }`.  
+
+`GET /api/sync/scheduler`  
+The scheduler's days here (the server's own, which its web UI shows and writes, and every machine shares): `{ ok, days }`, `days` being `{ date: hash }` of every day that has a file, the hash of its page and its `carried` (see `schedulerStore` in `server/scheduler.js`). A machine compares it with its own days and with the hashes it last synced (`scheduler` in its `.tm-sync-state.json`), which say which side changed a day.  
+
+`PUT /api/sync/scheduler` `{ days, deleted }`  
+Writes each of `days` (`{ date, text, carried? }`) and removes the days of `deleted` (dates). `tm push` and taskmgrd send the days changed on the machine since its last sync, whatever the server's have become (what is on the machine wins), and as `deleted` those deleted there that the server still has as last synced. `{ ok, days }` as `GET` answers after it. 400 for an invalid day.  
+
+`POST /api/sync/pull/scheduler` `{ dates }`  
+Those days as they are here: `{ ok, days }`, each `{ date, text, carried? }`. `tm pull` asks for the days the server has another way than the machine and that were not changed there since its last sync; a day changed there and not pushed yet is left as it is and told, and a day the server no longer has is removed there while it is still the day last synced.  
 
 `GET /api/sync/pull/config`  
 The server's `taskmgr.json` as it is: `{ ok, text }`. Used by `tm pull`.  

@@ -437,6 +437,11 @@ app.use(createSchedulerApp({
       dir = path.dirname(task.path);
     }
     return task && { rel: toRel(space.root, dir), title: firstDetailLine(task.details), details: task.details, status: normalizeStatus(task.status) };
+  },
+  // a task of a work or repository that is not here is another machine's (the days are synced)
+  here: ({ work, repository }) => {
+    const space = findSpace(work, repository);
+    return !!(space && space.root);
   }
 }));
 

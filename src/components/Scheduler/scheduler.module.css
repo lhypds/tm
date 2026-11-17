@@ -173,9 +173,8 @@
   color: var(--muted);
 }
 
-
+/* A task that is not on this machine: shown as any other, but it opens nothing. */
 .card[data-missing="true"] .cardTitle {
-  color: var(--faint);
   cursor: default;
 }
 
