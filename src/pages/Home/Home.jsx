@@ -176,7 +176,7 @@ export default function Home({ all = false }) {
   const [worksError, setWorksError] = useState("");
   const [treeOpen, setTreeOpen] = useState(() => !isNarrow() && readFlag("panel.tree", true));
   const [detailOpen, setDetailOpen] = useState(() => !isNarrow() && readFlag("panel.detail", true));
-  const [scheduler, setScheduler] = useState(() => readFlag("panel.scheduler", false)); // the right pane shows the scheduler, not the task
+  const [wantScheduler, setScheduler] = useState(() => readFlag("panel.scheduler", false)); // the right pane shows the scheduler, not the task (see `scheduler`)
   const schedulerKeys = useRef(null); // the scheduler's keys while the keyboard is on it (see Scheduler)
   const [pane, setPane] = useState("tasks"); // where j / k and friends go: "tree" or "tasks"
   // The list last loaded and the path it is for. On any other path `data` is empty and `loading`
@@ -187,8 +187,10 @@ export default function Home({ all = false }) {
   // list that arrives differs (see `load`), so nothing flickers while nothing changed.
   const [loaded, setLoaded] = useState({ key: null, dir: EMPTY_DIR });
   const loadKey = JSON.stringify([scope, space, dir]);
-  const data = loaded.key === loadKey ? loaded.dir : EMPTY_DIR;
-  const loading = loaded.key !== loadKey;
+  // A refresh asked for (the button, r) is "loading" too, so that it shows: see `refresh`.
+  const [refreshing, setRefreshing] = useState(false);
+  const loading = refreshing || loaded.key !== loadKey;
+  const data = loading ? EMPTY_DIR : loaded.dir;
   const [loadError, setLoadError] = useState("");
   // How many lists arrived, changed or not: the selected task's attachments re-read themselves on
   // it (see useTaskFiles), since a file pushed from another machine changes no list.
@@ -286,7 +288,7 @@ export default function Home({ all = false }) {
   useEffect(() => {
     if (!isNarrow()) writeFlag("panel.detail", detailOpen);
   }, [detailOpen]);
-  useEffect(() => writeFlag("panel.scheduler", scheduler), [scheduler]);
+  useEffect(() => writeFlag("panel.scheduler", wantScheduler), [wantScheduler]);
   useEffect(() => writeFlag("panel.prompt", promptOpen), [promptOpen]);
   useEffect(() => writeFlag("preview.prompt", peekPromptOpen), [peekPromptOpen]);
   useEffect(() => {
@@ -395,6 +397,18 @@ export default function Home({ all = false }) {
   // Re-read the works as well: a task folder may have been created or removed. And the polling
   // state, which the periodic reload and the refresh button keep current this way.
   const reload = useCallback(() => Promise.all([load(), loadSpaces(), loadPolling()]), [load, loadSpaces, loadPolling]);
+
+  // The refresh button and r: the list is emptied and says "Loading..." while the page is read
+  // again, for a moment at least, so a quick read still shows it. So do the tree on the left and
+  // the pane on the right (the task panel or the scheduler), which are read again with it.
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([reload(), new Promise((done) => setTimeout(done, 300))]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload]);
 
   useEffect(() => {
     loadSpaces();
@@ -544,6 +558,15 @@ export default function Home({ all = false }) {
   // folder, a filter, a deleted task); j (or a wheel notch down) then starts from the first row.
   const selectedIndex = visible.findIndex((t) => t.key === selectedKey);
   const selected = visible[selectedIndex] || null;
+  // The right pane shows the scheduler: asked for (the sundial, t) while a task is selected; with
+  // none, it is what the pane shows until the task panel is asked for (`emptyTask`: the sundial
+  // or t again, for "No task selected"), which lasts until a task is selected.
+  const [emptyTask, setEmptyTask] = useState(false);
+  const scheduler = selected ? wantScheduler : !emptyTask;
+  const hasSelected = !!selected;
+  useEffect(() => {
+    if (hasSelected) setEmptyTask(false);
+  }, [hasSelected]);
 
   // The works and repositories the search box's text names, listed under the box: those of the
   // tree (so a hidden work only while those are shown), a work by its name, a repository by its
@@ -616,6 +639,9 @@ export default function Home({ all = false }) {
   // on one of several chosen (to drag them) keeps them.
   function selectTask(task, e) {
     if (!e) {
+      // the scheduler shown for want of a selected task stays as this one is picked up (to be
+      // dragged onto it); a click, which comes after, shows the task
+      if (!selected && scheduler) setScheduler(true);
       if (!chosenKeys.has(task.key)) selectTask(task, {});
       return;
     }
@@ -843,11 +869,27 @@ export default function Home({ all = false }) {
       setLoads((n) => n + 1); // the day is read again: the task has moved, or is gone
     }
   }
+  // A task on a scheduler day marked (its box, or x / p / w on it): done, pending or aborted, or
+  // back to todo when it is that already, as in the list.
+  async function markScheduled(entry, status) {
+    const s = { origin: (works || []).find((w) => w.work === entry.work)?.origin || "", work: entry.work, repository: entry.repository };
+    try {
+      await api.setStatus(s, entry.rel, entry.status === status ? "todo" : status);
+    } catch (e) {
+      showToast(e.message, 4000);
+    }
+    try {
+      await reload(); // the list, and with it the day (the task's folder is renamed with its status)
+    } catch (e) {
+      showToast(e.message);
+    }
+  }
   // The sundial in the header: the scheduler takes the right pane (opened when it was folded), and
   // gives it back to the task on the next click.
   function toggleScheduler() {
     const next = !(scheduler && detailOpen);
-    setScheduler(next);
+    if (selected) setScheduler(next);
+    else setEmptyTask(!next);
     setDetailOpen(true);
   }
   const closePeek = () => {
@@ -1555,14 +1597,17 @@ export default function Home({ all = false }) {
       searchRef.current?.focus();
       return true;
     }
-    // r opens the Machines Run dialog, as the header's button does (the list refreshes by itself, and
-    // with the button beside it)
+    // r reads the page again and m opens the Machines Run dialog, as the header's buttons do
     if (name === "r") {
+      refresh();
+      return true;
+    }
+    if (name === "m") {
       setMachinesOpen(true);
       return true;
     }
     // g shows the selected task's prompt in the panel and puts the caret in it, and hides it again (cmd/ctrl+enter
-    // in the prompt saves and runs it, see TaskPanel; r opens Machines Run here)
+    // in the prompt saves and runs it, see TaskPanel; m opens Machines Run here)
     if (name === "g" || name === "G") {
       if (promptOpen) showPrompt(false); // again (once esc left the prompt): hidden
       else if (selected) {
@@ -1792,6 +1837,8 @@ export default function Home({ all = false }) {
         className={styles.scroll}
         ref={setScrollEl}
         onClick={(e) => !e.target.closest('[role="button"], button, a') && unselectAll()}
+        // the wheel over the list is on to the tasks: the task is back in place of the scheduler
+        onWheel={() => wantScheduler && setScheduler(false)}
       >
         <TaskList
           tasks={visible}
@@ -1959,7 +2006,7 @@ export default function Home({ all = false }) {
           >
             {view === "board" ? <ListIcon /> : <BoardIcon />}
           </button>
-          <button type="button" className="btn" onClick={reload} title={t("header.refresh")} aria-label={t("header.refresh")}>
+          <button type="button" className="btn" onClick={refresh} title={withKey(t("header.refresh"), "r")} aria-label={t("header.refresh")}>
             <RefreshIcon />
           </button>
           <button
@@ -1979,7 +2026,7 @@ export default function Home({ all = false }) {
               e.currentTarget.blur();
               setMachinesOpen(true);
             }}
-            title={withKey(t("machines.runTitle"), "r")}
+            title={withKey(t("machines.runTitle"), "m")}
             aria-label={t("machines.runTitle")}
           >
             <MonitorIcon />
@@ -1994,7 +2041,7 @@ export default function Home({ all = false }) {
       <div className={styles.body}>
         <aside className={styles.drawer} data-open={treeOpen} onMouseDown={() => setPane("tree")}>
           <SpaceTree
-            works={treeWorks}
+            works={refreshing ? null : treeWorks} // "Loading..." during a refresh, as before the first read
             origins={origins}
             error={worksError}
             activeTo={spaceTo}
@@ -2082,15 +2129,15 @@ export default function Home({ all = false }) {
               <MonthPicker months={months} index={monthIndex} label={(m) => monthLabel(m.key, t)} onChange={setMonth} />
               {view !== "board" && (
                 <>
-                  <Checkbox className={styles.showDone} checked={showDone} onChange={setShowDone}>
+                  <Checkbox className={styles.showDone} checked={showDone} onChange={setShowDone} title={withKey(t("header.showDoneTip"), "x")}>
                     {t("header.showDone")}
                   </Checkbox>
-                  <Checkbox className={styles.showDone} checked={showPending} onChange={setShowPending}>
+                  <Checkbox className={styles.showDone} checked={showPending} onChange={setShowPending} title={withKey(t("header.showPendingTip"), "p")}>
                     {t("header.showPending")}
                   </Checkbox>
                 </>
               )}
-              <Checkbox className={styles.showDone} checked={showAbort} onChange={setShowAbort}>
+              <Checkbox className={styles.showDone} checked={showAbort} onChange={setShowAbort} title={withKey(t("header.showAbortTip"), "w")}>
                 {t("header.showAbort")}
               </Checkbox>
               <button
@@ -2122,10 +2169,11 @@ export default function Home({ all = false }) {
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
         <aside className={styles.detail} data-open={detailOpen} onMouseDown={() => setPane("detail")} onFocus={() => setPane("detail")}>
-          {scheduler && <Scheduler tasks={tasks} works={works} origins={origins} reloadKey={loads} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} />}
+          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} />}
           {!scheduler && spaceTo && (
             <TaskPanel
               task={selected}
+              loading={loading}
               focused={pane === "detail"}
               focusKey={focusing?.key}
               focusArea={focusing?.area}

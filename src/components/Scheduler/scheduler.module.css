@@ -1,5 +1,6 @@
 /* The scheduler fills the right pane: its title bar, the day's buttons, then the day's page. */
 .scheduler {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -92,6 +93,18 @@
 
 /* The page: squared paper, a square two characters wide and a line high, scrolling with what is
    on it. A card takes two lines (36px), so the text under it stays on the squares. */
+/* During a refresh, covers the pane under its bar (the bar's 32px): the page stays under it as it
+   is (its text, its caret), so nothing typed is lost. */
+.loading {
+  position: absolute;
+  inset: 32px 0 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
 .page {
   position: relative;
   flex: 1;
@@ -131,8 +144,10 @@
   background: var(--bg-hover);
 }
 
-.card > :global(.tag) {
+/* The status box, as in the list. */
+.card > label {
   flex: none;
+  margin-right: 6px;
 }
 
 .cardTitle {
@@ -151,11 +166,13 @@
   cursor: pointer;
 }
 
-.card[data-status="done"] .cardTitle,
-.card[data-status="aborted"] .cardTitle {
+/* The task's description after its title, as in the list. */
+.cardDetail {
+  margin-left: 8px;
+  font-size: 11px;
   color: var(--muted);
-  text-decoration: line-through;
 }
+
 
 .card[data-missing="true"] .cardTitle {
   color: var(--faint);

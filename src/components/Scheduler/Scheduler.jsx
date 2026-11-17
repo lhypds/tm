@@ -1,12 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "@components/icons";
-import { FromTag } from "@components/TaskList";
+import { DoneBox } from "@components/TaskList";
+import { withKey } from "@utils/keys";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { copyText } from "@utils/clipboard";
 import { dragTitle } from "@utils/drag";
-import { TASKS_DRAG_TYPE } from "@utils/task";
+import { TASKS_DRAG_TYPE, describe } from "@utils/task";
 import styles from "./scheduler.module.css";
 
 // A day as its file is named: "2026-11-17", in local time.
@@ -70,7 +71,7 @@ function parse(page) {
 const withLive = (cards, tasks) =>
   cards.map((c) => {
     const now = tasks.find((x) => cardKey(x) === cardKey(c));
-    return now ? { ...c, title: now.title, rel: now.rel, status: now.status, missing: now.missing } : c;
+    return now ? { ...c, title: now.title, details: now.details, rel: now.rel, status: now.status, missing: now.missing } : c;
   });
 
 // The cards in the page's order: by line (none past the last line of the text), those on one line
@@ -168,6 +169,14 @@ function caretBox(el, p) {
   return box;
 }
 
+// How wide a character of the text box `el` is (the page is written in a fixed-width font).
+function charWidth(el) {
+  const cs = getComputedStyle(el);
+  const ctx = document.createElement("canvas").getContext("2d");
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return ctx.measureText("0").width;
+}
+
 // A run of the page's text, between two cards (or an end of the page): as tall as what is in it,
 // so the page scrolls, not the text. `fill` is the last one, which takes what is left of the page.
 function Lines({ value, fill, ...props }) {
@@ -183,17 +192,17 @@ function Lines({ value, fill, ...props }) {
 // The scheduler, in place of the task panel: one page a day. Under its title, a row steps a day back, goes to
 // today, steps a day forward, and says which day is shown. The page is squared paper to write on
 // (saved as it is typed; kept as one text, a task a line of it, see compose) with the tasks dragged onto it from the list or the board (`tasks` are
-// those, found by the keys the drag carries), each a card of one line: where it is from (the tag
-// the list has, in its origin's color, from `works` and `origins`) and its title. A card sits on
+// those, found by the keys the drag carries), each a card of one line: the status box the list has (a click
+// marks the task done, or todo again: `onStatus(entry, status)`) and its title. A card sits on
 // the line it was dropped on, the text flowing around it: the lines above it stay above, the rest
 // go under it, and close up again when it is dragged to another line (a line across the page shows
-// where it would go). A click on a card opens the task (`onOpen(entry)`), its × takes it off the
+// where it would go). A click on a card chooses it, a double click (or space) opens the task (`onOpen(entry)`), its × takes it off the
 // day. The text is edited as in vim, in a NORMAL and an INSERT mode (see
 // `normalKey`), the cards being stops on the way: j / k (the arrows, while typing) walk the cursor
 // from the text onto a card and off it again, and backspace, delete and x take a card off the day
-// (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere).
+// (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere); while `loading` (the page's refresh) the pane under its bar is covered and says "Loading...", as the task list does.
 // See server/scheduler.js for what is kept.
-export default function Scheduler({ tasks, works, origins, reloadKey, focused, keysRef, onOpen }) {
+export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus }) {
   const { t, i18n } = useTranslation();
   const [date, setDate] = useState(today);
   const [loaded, setLoaded] = useState(false); // the day shown has been read
@@ -243,7 +252,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       await flush();
       try {
         const was = changes.current;
-        const day = await api.getSchedulerDay(date);
+        const day = await api.getSchedulerDay(date, date === today()); // today starts with what yesterday left
         if (stale) return;
         setLoaded(true);
         // what was changed here meanwhile (typed, or a task dropped on the page) is not written
@@ -343,7 +352,8 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   // one to the start of the run under it.
   // The text is edited as in vim, in two modes. NORMAL: the
   // keys move the cursor (the caret, before its character) and nothing is typed: h and
-  // l along the line, j and k to the line under and above (off the run onto the card beside it,
+  // l along the line and on past its end, j and k to the line under and above, and under the last
+  // one (the paper is written anywhere: see `virt`), backspace back as h and up to the end of the line above, enter to the start of the line under (off the run onto the card beside it,
   // see below), 0 and $ to the ends of the line; i and a start typing before and after the cursor,
   // I and A at the ends of the line, o and O on a new line under and above; x deletes the
   // character, u undoes; esc leaves the text (h / l are then the page's again). INSERT: the keys
@@ -359,14 +369,40 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   // caretBox), following whatever moves the text (see below).
   const [cursorBox, setCursorBox] = useState(null);
   const [inText, setInText] = useState(false); // the keyboard is in the text
-  const block1 = (el, p) => {
+  // The cursor goes anywhere on the paper, not only where there is text: `virt` is how far it is
+  // past the text, `cols` columns after the end of its line and `rows` rows under the last line
+  // of the page (the caret is then at the end of the text). Typing there first fills the way with
+  // spaces and new lines (see normalKey).
+  const virt = useRef({ cols: 0, rows: 0 });
+  const boxAt = (el) => {
+    const { cols, rows } = virt.current;
+    const base = caretBox(el, rows ? el.value.length : Math.min(el.selectionStart, el.value.length));
+    if (!cols && !rows) return base;
+    const row = parseFloat(getComputedStyle(el).lineHeight) || base.height;
+    return {
+      left: (rows ? el.offsetLeft : base.left) + cols * charWidth(el),
+      top: base.top + rows * row,
+      height: base.height,
+    };
+  };
+  const block1 = (el, p, cols = 0, rows = 0) => {
     const at = Math.max(0, Math.min(p, el.value.length));
+    const was = virt.current;
+    virt.current = { cols, rows };
+    if (cols || rows) {
+      // not off the paper: the box's right and bottom edges are where it ends
+      const box = boxAt(el);
+      if (box.left + charWidth(el) > el.offsetLeft + el.clientWidth || box.top + box.height > el.offsetTop + el.offsetHeight) {
+        virt.current = was;
+        return;
+      }
+    }
     el.setSelectionRange(at, at);
-    setCursorBox(caretBox(el, at));
+    setCursorBox(boxAt(el));
   };
   useLayoutEffect(() => {
     const el = document.activeElement;
-    const box = modeRef.current === "normal" && el?.tagName === "TEXTAREA" && pageRef.current?.contains(el) ? caretBox(el, el.selectionStart) : null;
+    const box = modeRef.current === "normal" && el?.tagName === "TEXTAREA" && pageRef.current?.contains(el) ? boxAt(el) : null;
     setCursorBox((was) => (JSON.stringify(was) === JSON.stringify(box) ? was : box));
   });
   // Where the cursor goes once an edit made in NORMAL mode is on the page: { block, pos, insert }.
@@ -396,47 +432,80 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     const p = Math.min(el.selectionStart, v.length);
     const start = v.lastIndexOf("\n", p - 1) + 1; // of the cursor's line
     const end = v.indexOf("\n", p) < 0 ? v.length : v.indexOf("\n", p); // its line break, or the end
-    const col = p - start;
-    const last = (from, to) => Math.max(from, to - 1); // the last character of a line
+    const { cols: vcols, rows: vrows } = virt.current; // how far the cursor is past the text
+    const col = (vrows ? 0 : p - start) + vcols; // its column on the paper
     const block = blocks[at];
     const above = blocks[at - 1]?.card;
     const under = blocks[at + 1]?.card;
     const choose = (card) => {
+      virt.current = { cols: 0, rows: 0 };
       setChosen(cardKey(card));
       el.blur();
     };
     const insert = (pos) => {
+      virt.current = { cols: 0, rows: 0 };
       setMode("insert");
       el.setSelectionRange(pos, pos);
     };
     const edit = (value, pos, typing) => {
       record();
+      virt.current = { cols: 0, rows: 0 };
       cursorTo.current = { block: at, pos, insert: typing };
       if (typing) setMode("insert");
       type(block, value, true);
     };
-    if (k === "h") block1(el, Math.max(start, p - 1));
-    else if (k === "l") block1(el, Math.min(last(start, end), p + 1));
-    else if (k === "0") block1(el, start);
-    else if (k === "$") block1(el, last(start, end));
+    // onto the line from..to at the paper's column `c`: in its text, or past its end
+    const place = (from, to, c) => (c <= to - from ? block1(el, from + c) : block1(el, to, c - (to - from), 0));
+    // typing where there is no text: the way there is filled first, with new lines down to the
+    // row and spaces along it (`c` columns)
+    const typeAt = (c) => {
+      const value = vrows ? `${v}${"\n".repeat(vrows)}${" ".repeat(c)}` : `${v.slice(0, end)}${" ".repeat(c)}${v.slice(end)}`;
+      edit(value, vrows ? value.length : end + c, true);
+    };
+    if (k === "h") {
+      if (vcols > 0) block1(el, p, vcols - 1, vrows);
+      else if (!vrows) block1(el, Math.max(start, p - 1));
+    } else if (k === "Backspace") {
+      // back one place, as h, and from the start of a line up to the end of the one above it (the
+      // card above, from the first line)
+      if (vcols > 0) block1(el, p, vcols - 1, vrows);
+      else if (vrows > 1) block1(el, v.length, 0, vrows - 1);
+      else if (vrows === 1) block1(el, v.length);
+      else if (p > start) block1(el, p - 1);
+      else if (start > 0) block1(el, start - 1);
+      else if (above) choose(above);
+    } else if (k === "Enter") {
+      // to the start of the next line (the card under the last one of a run, or the blank under the page's)
+      if (vrows) block1(el, v.length, 0, vrows + 1);
+      else if (end < v.length) block1(el, end + 1);
+      else if (under) choose(under);
+      else if (block.last) block1(el, v.length, 0, 1);
+    } else if (k === "l") {
+      if (!vrows && p < end) block1(el, p + 1);
+      else block1(el, vrows ? v.length : end, vcols + 1, vrows);
+    } else if (k === "0") block1(el, vrows ? v.length : start, 0, vrows);
+    else if (k === "$") block1(el, vrows ? v.length : end, 0, vrows);
     else if (k === "j") {
-      if (end < v.length) {
-        const to = v.indexOf("\n", end + 1) < 0 ? v.length : v.indexOf("\n", end + 1);
-        block1(el, Math.min(end + 1 + col, last(end + 1, to)));
-      } else if (under) choose(under);
+      if (vrows) block1(el, v.length, col, vrows + 1);
+      else if (end < v.length) place(end + 1, v.indexOf("\n", end + 1) < 0 ? v.length : v.indexOf("\n", end + 1), col);
+      else if (under) choose(under);
+      else if (block.last) block1(el, v.length, col, 1); // under the last line: the blank of the page
     } else if (k === "k") {
-      if (start > 0) {
-        const from = v.lastIndexOf("\n", start - 2) + 1;
-        block1(el, Math.min(from + col, last(from, start - 1)));
-      } else if (above) choose(above);
-    } else if (k === "i") insert(p);
-    else if (k === "a") insert(end > start ? p + 1 : p);
-    else if (k === "I") insert(start);
-    else if (k === "A") insert(end);
-    else if (k === "o") edit(`${v.slice(0, end)}\n${v.slice(end)}`, end + 1, true);
-    else if (k === "O") edit(`${v.slice(0, start)}\n${v.slice(start)}`, start, true);
-    else if (k === "x") {
-      if (p < end) edit(v.slice(0, p) + v.slice(p + 1), Math.min(p, last(start, end - 1)), false);
+      if (vrows > 1) block1(el, v.length, col, vrows - 1);
+      else if (vrows === 1) place(v.lastIndexOf("\n") + 1, v.length, col);
+      else if (start > 0) place(v.lastIndexOf("\n", start - 2) + 1, start - 1, col);
+      else if (above) choose(above);
+    } else if (k === "i" || k === "a") {
+      if (vrows || vcols) typeAt(vcols);
+      else insert(k === "a" ? Math.min(end, p + 1) : p);
+    } else if (k === "I" || k === "A" || k === "o" || k === "O") {
+      if (vrows) typeAt(0);
+      else if (k === "I") insert(start);
+      else if (k === "A") insert(end);
+      else if (k === "o") edit(`${v.slice(0, end)}\n${v.slice(end)}`, end + 1, true);
+      else edit(`${v.slice(0, start)}\n${v.slice(start)}`, start, true);
+    } else if (k === "x") {
+      if (!vrows && !vcols && p < end) edit(v.slice(0, p) + v.slice(p + 1), p, false);
     } else if (k === "u") {
       cursorTo.current = { block: at, pos: p, insert: false }; // the cursor stays about where it was
       travel(history, undone);
@@ -541,25 +610,17 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   const isOurs = (e) => e.dataTransfer.types.includes(TASKS_DRAG_TYPE) || e.dataTransfer.types.includes(CARD_DRAG_TYPE);
 
-  // TEMP: says why a drop put nothing on the page, until the drop that does nothing is found.
-  const why = (message) => showToast(`drop: ${message}`, 8000, "bottom", "error");
   const drop = (e) => {
-    try {
-      dropped1(e);
-    } catch (err) {
-      why(`error: ${err.message}`);
-    }
-  };
-  const dropped1 = (e) => {
-    if (!isOurs(e)) return why(`not a task (${[...e.dataTransfer.types].join(", ")})`);
+    if (!isOurs(e)) return;
     e.preventDefault(); // the text takes no dropped title
+    e.stopPropagation(); // see the page's dragover
     const slot = slotAt(e);
     endDrag();
     const moved = e.dataTransfer.getData(CARD_DRAG_TYPE);
     if (moved) {
       // a card of the page, to another line
       const from = cards.findIndex((c) => cardKey(c) === moved);
-      if (from < 0) return why(`card not on the page: ${moved}`);
+      if (from < 0) return;
       record();
       const rest = cards.filter((_, i) => i !== from);
       rest.splice(slot.index > from ? slot.index - 1 : slot.index, 0, { ...cards[from], line: slot.line });
@@ -582,20 +643,18 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         ids.unshift(tasks[j].id);
         depth -= 1;
       }
-      return [{ work: task.space.work, repository: task.space.repository || "", ids, title: task.title, rel: task.rel, status: task.status, missing: false, line: slot.line }];
+      return [{ work: task.space.work, repository: task.space.repository || "", ids, title: task.title, details: task.details, rel: task.rel, status: task.status, missing: false, line: slot.line }];
     });
     const added = dropped.filter((x) => !cards.some((c) => cardKey(c) === cardKey(x)));
     if (!added.length) {
       // on the day already: its card is shown as the one meant
       if (dropped.length) setChosen(cardKey(dropped[0]));
-      why(dropped.length ? `already on the day: ${dropped[0].title}` : `no task found for ${JSON.stringify(keys)} (data ${JSON.stringify(e.dataTransfer.getData(TASKS_DRAG_TYPE))}, ${tasks.length} tasks)`);
       return;
     }
     record();
     const next = [...cards];
     next.splice(slot.index, 0, ...added);
     change(text, next, true);
-    showToast(`drop: added ${added.length} at line ${slot.line} (TEMP)`, 3000);
   };
 
   const remove = (entry) => {
@@ -605,19 +664,6 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       cards.filter((c) => cardKey(c) !== cardKey(entry)),
       true,
     );
-  };
-
-  // Where a card is from, as the list's tag says it: its repository, or its work, on a tint of
-  // its origin's color; the whole path on hover.
-  const fromOf = (entry) => {
-    const origin = (works || []).find((w) => w.work === entry.work)?.origin || "";
-    const path = [entry.work, entry.repository].filter(Boolean);
-    return {
-      space: { origin, work: entry.work, repository: entry.repository },
-      from: path.join(" / "),
-      fromParts: path.slice(-1),
-      fromColor: (origins || []).find((o) => o.origin === origin)?.color || "",
-    };
   };
 
   // The card the keyboard is on, by its key: none once it is off the day. `backTo` is the card a
@@ -643,6 +689,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   const leave = (e, block) => {
     const before = e.currentTarget.value.slice(0, e.currentTarget.selectionStart).split("\n");
     spot.current = { line: block.from + before.length - 1, col: before[before.length - 1].length };
+    virt.current = { cols: 0, rows: 0 };
     flush();
   };
   // Into the text where the cursor was, in mode `m` (`after`: one character on, as vim's a).
@@ -672,24 +719,25 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   // The page's keys, as Home names them, while the keyboard is on the pane and not in the text;
   // true when the key was one of them. With no card chosen (the keyboard just came onto the pane,
-  // or esc left the text; no cursor is shown): j, k and enter go
-  // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; h and l are
-  // the page's (to the pane beside). On a card (j / k and the arrows get there from the text): k,
-  // up and left go into the text above it, j, down and right into the text under it, or on to the
-  // next card when there is no text between, in the mode the text was left in; backspace, delete
-  // and x take the card off the day, space and enter open its task, esc lets it go.
+  // or esc left the text; no cursor is shown): j, k, l and enter go
+  // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; h is
+  // the page's (back to the list). On a card (j / k and the arrows get there from the text): k, h,
+  // up and left go into the text above it, j, l, down and right into the text under it, or on to the
+  // next card when there is no text between, in the mode the text was left in; backspace, delete and d
+  // take the card off the day, x, p and w mark its task, space opens its task, enter starts a new
+  // line under it, esc lets it go.
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
       const card = cards[chosenIndex];
       if (!card) {
-        if (["j", "k", "enter", "down", "up"].includes(name)) enter("normal");
+        if (["j", "k", "l", "enter", "down", "up", "right"].includes(name)) enter("normal");
         else if (["i", "e"].includes(name)) enter("insert");
         else if (name === "a") enter("insert", 1);
         else return false;
         return true;
       }
-      const step = ["j", "down", "right"].includes(name) ? 1 : ["k", "up", "left"].includes(name) ? -1 : 0;
+      const step = ["j", "l", "down", "right"].includes(name) ? 1 : ["k", "h", "up", "left"].includes(name) ? -1 : 0;
       if (step) {
         const at = blocks.findIndex((b) => b.card === card);
         const beside = blocks[at + step];
@@ -705,7 +753,20 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         }
         return true;
       }
-      if (["space", "enter"].includes(name)) {
+      if (name === "enter") {
+        // a new line under the card, as enter after a picture in a document, and typing goes on there
+        const at = blocks.findIndex((b) => b.card === card);
+        record();
+        setChosen(null);
+        setMode("insert");
+        cursorTo.current = { block: at + 1, pos: 0, insert: true };
+        change(
+          [...lines.slice(0, card.line), "", ...lines.slice(card.line)].join("\n"),
+          cards.map((c, i) => (i > chosenIndex ? { ...c, line: c.line + 1 } : c)),
+        );
+        return true;
+      }
+      if (name === "space") {
         if (!card.missing && card.rel) onOpen(card);
         return true;
       }
@@ -713,7 +774,13 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         setChosen(null);
         return true;
       }
-      if (["backspace", "Delete", "x"].includes(name)) {
+      // x, p and w mark the task as they do in the list: done, pending, aborted, or back to todo
+      const status = { x: "done", p: "pending", w: "aborted" }[name];
+      if (status) {
+        if (!card.missing && card.rel) onStatus(card, status);
+        return true;
+      }
+      if (["backspace", "Delete", "d"].includes(name)) {
         backTo.current = { key: cardKey(card), line: card.line };
         remove(card);
         return true;
@@ -830,11 +897,17 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         className={styles.page}
         data-mode={mode}
         data-all={all}
+        // a press anywhere but on a card (the text, the blank of the page) lets the chosen card go
+        onMouseDown={(e) => !e.target.closest("[data-card]") && setChosen(null)}
         onFocus={(e) => e.target.tagName === "TEXTAREA" && setInText(true)}
         onBlur={(e) => e.target.tagName === "TEXTAREA" && setInText(false)}
         onDragOver={(e) => {
           if (!isOurs(e)) return;
           e.preventDefault();
+          // The drag is the page's alone, here and in the drop: a browser extension that takes
+          // every drag of a text left to the document (drag to search) makes it a copy, which the
+          // list and the board do not allow their drags, and the drop then never comes.
+          e.stopPropagation();
           e.dataTransfer.dropEffect = "move"; // the only effect the list and the board allow their drags
           const slot = slotAt(e);
           setMark((v) => (v === slot.y ? v : slot.y));
@@ -847,6 +920,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
             <div
               key={cardKey(block.card)}
               className={styles.card}
+              data-card
               data-block={i}
               data-status={block.card.status}
               data-missing={block.card.missing}
@@ -859,15 +933,30 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
               }}
               onDragEnd={endDrag}
             >
-              <FromTag task={fromOf(block.card)} />
+              {!block.card.missing && block.card.rel && (
+                <DoneBox
+                  checked={block.card.status === "done"}
+                  pending={block.card.status === "pending"}
+                  aborted={block.card.status === "aborted"}
+                  onChange={() => onStatus(block.card, "done")}
+                  title={withKey(t(block.card.status === "done" ? "list.markTodo" : "list.markDone"), "x")}
+                />
+              )}
               <button
                 type="button"
                 className={styles.cardTitle}
                 disabled={block.card.missing || !block.card.rel}
                 title={block.card.missing ? t("scheduler.missing") : undefined}
-                onClick={() => onOpen(block.card)}
+                // a click chooses the card, as it selects a row of the list; a double click opens it
+                onClick={(e) => {
+                  setChosen(cardKey(block.card));
+                  e.currentTarget.blur(); // the keys go on from the card (space opens it), not from the button
+                }}
+                onDoubleClick={() => onOpen(block.card)}
               >
                 {block.card.title || t("common.untitled")}
+                {/* its description, as the list has it after the title */}
+                {describe(block.card.details) && <span className={styles.cardDetail}>{describe(block.card.details)}</span>}
               </button>
               <button
                 type="button"
@@ -885,7 +974,9 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
               data-block={i}
               fill={!!block.last}
               value={lines.slice(block.from, block.to).join("\n")}
-              readOnly={!loaded}
+              // NORMAL mode only reads: an input method (Chinese, Japanese) then leaves the keys
+              // alone, so h j k l come as themselves, not as the start of a composition
+              readOnly={!loaded || mode === "normal"}
               aria-label={t("scheduler.notes")}
               // nothing is typed in NORMAL mode, by an input method or a paste either
               onBeforeInput={(e) => modeRef.current === "normal" && e.preventDefault()}
@@ -899,6 +990,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
         {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
+      {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
     </section>
   );
 }

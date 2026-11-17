@@ -29,6 +29,9 @@
     "showDone": "已完成",
     "showPending": "搁置",
     "showAbort": "中止",
+    "showDoneTip": "显示已完成的任务",
+    "showPendingTip": "显示搁置的任务",
+    "showAbortTip": "显示中止的任务",
     "filter": "搜索...",
     "filterLabel": "筛选任务",
     "clearFilter": "清除筛选",
@@ -232,10 +235,14 @@
     },
     "scheduler": {
       "keys": "t",
-      "desc": "在任务和日程之间切换右侧面板（日程的文字按 vim 的方式编辑：h j k l 移动，i / a 输入，esc 返回；在任务上 space / enter 打开，x 移除）"
+      "desc": "在任务和日程之间切换右侧面板（日程的文字按 vim 的方式编辑：h j k l 移动，i / a 输入，esc 返回；在任务上 space 打开，enter 在其下换行，x / p / w 标记状态，backspace / d 移除）"
+    },
+    "refresh": {
+      "keys": "r",
+      "desc": "刷新页面数据"
     },
     "machines": {
-      "keys": "r",
+      "keys": "m",
       "desc": "打开机器运行（在机器上执行 prompt 或 /命令）"
     },
     "command": {

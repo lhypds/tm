@@ -29,6 +29,9 @@
     "showDone": "done",
     "showPending": "pending",
     "showAbort": "aborted",
+    "showDoneTip": "Show done tasks",
+    "showPendingTip": "Show pending tasks",
+    "showAbortTip": "Show aborted tasks",
     "filter": "Search...",
     "filterLabel": "Filter tasks",
     "clearFilter": "Clear filter",
@@ -232,10 +235,14 @@
     },
     "scheduler": {
       "keys": "t",
-      "desc": "swap the right pane between the task and the scheduler (its text is edited as in vim: h j k l move, i / a type, esc goes back; on a task, space / enter open it and x removes it)"
+      "desc": "swap the right pane between the task and the scheduler (its text is edited as in vim: h j k l move, i / a type, esc goes back; on a task, space opens it, enter starts a new line under it, x / p / w mark it and backspace / d removes it)"
+    },
+    "refresh": {
+      "keys": "r",
+      "desc": "refresh the page's data"
     },
     "machines": {
-      "keys": "r",
+      "keys": "m",
       "desc": "open Machines Run (a prompt or a /command on the machines)"
     },
     "command": {
@@ -336,7 +343,7 @@
     "title": "Scheduler",
     "show": "Scheduler",
     "hide": "Task",
-    "today": "today",
+    "today": "Today",
     "prev": "Previous day",
     "next": "Next day",
     "notes": "Notes of the day",

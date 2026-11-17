@@ -436,7 +436,7 @@ app.use(createSchedulerApp({
       if (!task) return null;
       dir = path.dirname(task.path);
     }
-    return task && { rel: toRel(space.root, dir), title: firstDetailLine(task.details), status: normalizeStatus(task.status) };
+    return task && { rel: toRel(space.root, dir), title: firstDetailLine(task.details), details: task.details, status: normalizeStatus(task.status) };
   }
 }));
 

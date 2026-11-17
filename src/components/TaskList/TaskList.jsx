@@ -10,7 +10,7 @@ import { withKey } from "@utils/keys";
 import styles from "./tasklist.module.css";
 
 // The status box: a tick for done, a "p" for pending, an "a" for aborted, empty for todo.
-function DoneBox({ checked, pending, aborted, onChange, title }) {
+export function DoneBox({ checked, pending, aborted, onChange, title }) {
   return (
     <label className={styles.check} title={title} onClick={(e) => e.stopPropagation()}>
       <input type="checkbox" className={styles.checkInput} checked={checked} onChange={onChange} />

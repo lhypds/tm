@@ -167,9 +167,11 @@ export const fileUrl = (space, rel, download = false) =>
 
 // The scheduler, one page a day (`date` is "YYYY-MM-DD"): { date, text, tasks }, text being the
 // page, its tasks among its lines (see server/scheduler.js), and tasks those, in their order, each
-// { work, repository, ids, title, rel, status, missing } as it is now (`missing` when the task is
+// { work, repository, ids, title, details, rel, status, missing } as it is now (`missing` when the task is
 // gone; `ids` is its id after those of the tasks it is under).
-export const getSchedulerDay = (date) => request(`/api/scheduler?${q({ date })}`);
+// With `carry` (the day is today), a day opened for the first time starts with the tasks left
+// undone on the last day before it.
+export const getSchedulerDay = (date, carry = false) => request(`/api/scheduler?${q({ date, ...(carry ? { carry: "1" } : {}) })}`);
 
 // Write the page: its text. Resolves to the day after it.
 export const saveSchedulerPage = (date, text) => request("/api/scheduler", json("PUT", { date, text }));

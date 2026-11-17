@@ -36,6 +36,7 @@ import styles from "./panel.module.css";
 // `selectedFile` is the rel of the one the keyboard is on).
 export default function TaskPanel({
   task,
+  loading, // the list is being read (another path, a refresh): no task yet, and it says so
   focused,
   focusKey,
   focusArea,
@@ -217,7 +218,7 @@ export default function TaskPanel({
         </>
       ) : (
         <div className={styles.empty}>
-          <p className="muted">{t("panel.none")}</p>
+          <p className="muted">{t(loading ? "common.loading" : "panel.none")}</p>
         </div>
       )}
     </div>

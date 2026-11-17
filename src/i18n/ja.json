@@ -29,6 +29,9 @@
     "showDone": "完了",
     "showPending": "保留",
     "showAbort": "中止",
+    "showDoneTip": "完了したタスクを表示",
+    "showPendingTip": "保留中のタスクを表示",
+    "showAbortTip": "中止したタスクを表示",
     "filter": "検索...",
     "filterLabel": "タスクを絞り込む",
     "clearFilter": "絞り込みを解除",
@@ -232,10 +235,14 @@
     },
     "scheduler": {
       "keys": "t",
-      "desc": "右のペインをタスクとスケジューラで切り替える（スケジューラの文字は vim 風に編集：h j k l で移動、i / a で入力、esc で戻る；タスク上では space / enter で開く、x で外す）"
+      "desc": "右のペインをタスクとスケジューラで切り替える（スケジューラの文字は vim 風に編集：h j k l で移動、i / a で入力、esc で戻る；タスク上では space で開く、enter でその下に改行、x / p / w で状態を変える、backspace / d で外す）"
+    },
+    "refresh": {
+      "keys": "r",
+      "desc": "ページのデータを再読み込み"
     },
     "machines": {
-      "keys": "r",
+      "keys": "m",
       "desc": "マシン実行を開く（マシンで prompt や /コマンドを実行）"
     },
     "command": {

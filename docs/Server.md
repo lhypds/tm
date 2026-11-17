@@ -307,7 +307,7 @@ the ids being the task's id after those of the tasks it is under (its path chang
 A day has no file until its page has something on it, and the file is removed when the page is empty again.  
 A file of the older shape (`tasks: [{ work, repository, ids, title, line }]` beside the text) is read as the page it was.
 
-`GET /api/scheduler?date=` the day (empty when it has no file): `{ date, text, tasks }`, `tasks` those of the text's lines, each `{ work, repository, ids, title, rel, status, missing }` as it is now (`missing: true` when it is gone). 400 for a date that is not `YYYY-MM-DD`.  
+`GET /api/scheduler?date=&carry=1` the day (empty when it has no file; with `carry`, sent for today, a day that has no file yet is first given the tasks of the last day before it that are neither done, aborted nor gone, and keeps that day as `carried`, so it happens once): `{ date, text, tasks }`, `tasks` those of the text's lines, each `{ work, repository, ids, title, rel, status, missing }` as it is now (`missing: true` when it is gone). 400 for a date that is not `YYYY-MM-DD`.  
 `PUT /api/scheduler` `{ date, text }` writes the page. Answers the day.
 
 

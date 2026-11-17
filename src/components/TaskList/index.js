@@ -1,1 +1,1 @@
-export { default, FromTag, keepFocus } from "./TaskList";
+export { default, DoneBox, FromTag, keepFocus } from "./TaskList";
