@@ -61,6 +61,19 @@
   line-height: 1.6;
 }
 
+/* "Loading..." and "no origins" sit in the centre of the area under the head, as the task list's
+   empty states do. */
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  margin: 0;
+  padding: 0 12px 10vh;
+  box-sizing: border-box;
+  text-align: center;
+}
+
 .error {
   color: var(--err);
 }
