@@ -189,6 +189,7 @@ export default function Home({ all = false }) {
   // the calendar view ({ date }), let go once the scheduler has moved on to another.
   const [schedulerDay, setSchedulerDay] = useState(null);
   const [askedDay, setAskedDay] = useState(null);
+  const [chosenEvent, setChosenEvent] = useState(null); // the event chosen in the calendars, by its id: one for the calendar view and the timetable
   const tellSchedulerDay = useCallback((date) => {
     setSchedulerDay(date);
     setAskedDay((asked) => (asked && asked.date !== date ? null : asked));
@@ -2147,7 +2148,7 @@ export default function Home({ all = false }) {
         <main className={styles.main} onMouseDown={() => setPane("tasks")}>
           {/* the calendar view is the whole middle: a month, of no space in particular */}
           {view === "calendar" && (
-            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} chosenDay={scheduler && detailOpen ? schedulerDay : null} onDay={showDay} />
+            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} chosenDay={scheduler && detailOpen ? schedulerDay : null} onDay={showDay} chosenEvent={chosenEvent} onEvent={setChosenEvent} />
           )}
           {view !== "calendar" && (all || origin || space) && (
             <nav className={styles.section} aria-label={t("header.location")}>
@@ -2239,7 +2240,7 @@ export default function Home({ all = false }) {
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
         <aside className={styles.detail} data-open={detailOpen} onMouseDown={() => setPane("detail")} onFocus={() => setPane("detail")}>
-          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} goTo={askedDay} onDate={tellSchedulerDay} onCommand={() => setCommand("")} />}
+          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} goTo={askedDay} onDate={tellSchedulerDay} onCommand={() => setCommand("")} chosenEvent={chosenEvent} onEvent={setChosenEvent} />}
           {!scheduler && spaceTo && (
             <TaskPanel
               task={selected}

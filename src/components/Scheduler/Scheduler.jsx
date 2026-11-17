@@ -207,9 +207,11 @@ function Lines({ value, fill, ...props }) {
 // called "Timetable" on the page: "Calendar" is the month in the middle, see MonthCalendar).
 // `goTo` ({ date }, a new one each time) is a day asked for from outside, a day clicked in the
 // calendar view: the scheduler shows it, and starts on it when it comes on screen with one;
+// `chosenEvent` and `onEvent(id)` are the event chosen in the calendars, the timetable's and the
+// calendar view's alike (see Calendar).
 // `onDate(date)` is told the day shown, whenever it changes. `onCommand()` opens the page's command
 // line: ":" in the text in NORMAL mode, as in vim (elsewhere on the pane the key is the page's own).
-export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar, goTo, onDate, onCommand }) {
+export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar, goTo, onDate, onCommand, chosenEvent, onEvent }) {
   const { t, i18n } = useTranslation();
   const [date, setDate] = useState(() => goTo?.date || today());
   const [loaded, setLoaded] = useState(false); // the day shown has been read
@@ -1083,7 +1085,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
         {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
-      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} loading={loading} focused={focused && onCalendar} keysRef={calendarKeys} onChoose={chooseInCalendar} />}
+      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} loading={loading} focused={focused && onCalendar} keysRef={calendarKeys} onChoose={chooseInCalendar} chosenEvent={chosenEvent} onEvent={onEvent} />}
       {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
     </section>
   );

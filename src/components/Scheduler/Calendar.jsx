@@ -68,7 +68,7 @@ function place(events, from) {
 // timetable puts the keyboard on it (`onChoose()` tells the scheduler so).
 // The pencil at the right of the divider (as the one beside "Origins") opens the dialog that adds and removes calendars (see
 // CalendarsModal); the day is read anew once it has saved.
-export default function Calendar({ date, reloadKey, loading, focused, keysRef, onChoose }) {
+export default function Calendar({ date, reloadKey, loading, focused, keysRef, onChoose, chosenEvent, onEvent }) {
   const { t } = useTranslation();
   const [day, setDay] = useState(null); // { date, configured, events, errors } as read last
   const hoursRef = useRef(null);
@@ -115,17 +115,16 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
   );
   const from1 = (e) => [SOURCES[e.source], e.calendar].filter(Boolean).join(" · ");
 
-  // The event the keyboard is on, by its key: none as the keyboard comes (it is on the calendar
-  // itself, j then goes to the first event) and once it left.
+  // The event chosen, by its id (`chosenEvent`, changed with `onEvent(id)`): the page's, so that
+  // the calendar view in the middle shows the same one chosen, and one chosen there is chosen
+  // here. With none of this day chosen the keyboard, when it is here, is on the timetable itself
+  // (j then goes to the first event).
   const eventKey = (e) => `${e.source}/${e.id}`;
   const ordered = [...whole, ...timed.map((x) => x.event)];
-  const order = ordered.map(eventKey);
+  const order = ordered.map((e) => e.id);
   const [looked, setLooked] = useState(null); // the event whose details are shown
-  const [chosen, setChosen] = useState(null);
-  useEffect(() => {
-    if (!focused) setChosen(null);
-  }, [focused]);
-  useEffect(() => setChosen(null), [date]);
+  const chosen = chosenEvent ?? null;
+  const setChosen = (id) => onEvent?.(id);
   const chosenRef = useRef(null);
   useEffect(() => {
     if (chosen) chosenRef.current?.scrollIntoView({ block: "nearest" });
@@ -153,13 +152,13 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
       keysRef.current = null;
     };
   });
-  const mark = (e) => (focused && eventKey(e) === chosen ? { "data-chosen": "true", ref: chosenRef } : {});
+  const mark = (e) => (e.id === chosen ? { "data-chosen": "true", ref: chosenRef } : {});
   const tint = (e) => (e.color ? { "--event": lightColor(e.color) } : undefined);
   // a click on an event chooses it, as the keys do: the keyboard is then on the timetable
   // (`onChoose()` says so to the scheduler)
   const choose = (e) => {
     onChoose?.();
-    setChosen(eventKey(e));
+    setChosen(e.id);
   };
 
   return (

@@ -101,7 +101,9 @@ function MonthSelect({ month, onPick, onClose }) {
 // it that fill its first and last week are fainter, today's number is framed), each with its
 // events one under another, thin as a tag of the task list and in their calendar's color: its
 // start and its title; a square with more than fit scrolls. A click on an event chooses it (as the
-// keys do, see below) and a double click shows its details (see EventModal), a click anywhere else on a day shows that day in the scheduler at the right,
+// keys do, see below; the scheduler goes to its day, and the event chosen is the page's,
+// `chosenEvent` changed with `onEvent(id)`, so the timetable shows it chosen too, and one chosen
+// there is chosen here) and a double click shows its details (see EventModal), a click anywhere else on a day shows that day in the scheduler at the right,
 // with its timetable (`onDay(day)`), and the day the scheduler shows (`chosenDay`, "YYYY-MM-DD",
 // or null while it is not on screen) is shaded. The pencil at the right of the title adds and removes calendars (see
 // CalendarsModal). The events are read again whenever `reloadKey` changes (the page's refresh,
@@ -113,7 +115,7 @@ function MonthSelect({ month, onPick, onClose }) {
 // the scheduler shows each day the keyboard comes on (so it is the shaded one, as after a click);
 // enter goes into the day, where j and k walk its events and space shows the one chosen (see EventModal); esc is back out of the
 // day, then out of the month.
-export default function MonthCalendar({ reloadKey, loading, focused, keysRef, chosenDay, onDay }) {
+export default function MonthCalendar({ reloadKey, loading, focused, keysRef, chosenDay, onDay, chosenEvent, onEvent }) {
   const { t, i18n } = useTranslation();
   const [month, setMonth] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
   const [read, setRead] = useState(null); // { range, events, errors } as read last
@@ -170,7 +172,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
   // its key), or in that day (`inDay`), on one of its events (`eventId`) or on none yet.
   const [cursor, setCursor] = useState(null);
   const [inDay, setInDay] = useState(false);
-  const [eventId, setEventId] = useState(null);
+  const eventId = chosenEvent ?? null; // the page's: the timetable shows the same one chosen, and one chosen there is chosen here
   // The day the keyboard is on is the one the scheduler shows (the shaded one): when the scheduler
   // goes to another by itself (the refresh is back on today, its own buttons and keys), the
   // keyboard goes with it, so the next key starts from the day that is shaded.
@@ -178,7 +180,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
     if (!chosenDay || !cursor || cursor === chosenDay) return;
     setCursor(chosenDay);
     setInDay(false);
-    setEventId(null);
+    onEvent?.(null);
   }, [chosenDay]); // eslint-disable-line react-hooks/exhaustive-deps
   // a month shown that the day is not in (a step, a month picked, the refresh) lets it go
   const cursorShown = cursor && days.includes(cursor) ? cursor : null;
@@ -197,7 +199,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
         onDay?.(day);
         setCursor(day);
         setInDay(false);
-        setEventId(null);
+        onEvent?.(null);
         if (y !== month.y || m - 1 !== month.m) setMonth({ y, m: m - 1 });
       };
       if (!cursorShown) {
@@ -211,20 +213,20 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
         // out of the day, then out of the month
         if (inDay) {
           setInDay(false);
-          setEventId(null);
+          onEvent?.(null);
         } else setCursor(null);
         return true;
       }
       if (inDay) {
         const at = dayEvents.findIndex((e) => e.id === eventId);
         if (["j", "down"].includes(name)) {
-          if (dayEvents[at + 1]) setEventId(dayEvents[at + 1].id);
+          if (dayEvents[at + 1]) onEvent?.(dayEvents[at + 1].id);
         } else if (["k", "up"].includes(name)) {
-          if (at > 0) setEventId(dayEvents[at - 1].id);
+          if (at > 0) onEvent?.(dayEvents[at - 1].id);
           else {
             // above its first event: back on the day itself
             setInDay(false);
-            setEventId(null);
+            onEvent?.(null);
           }
         } else if (name === "space") {
           if (dayEvents[at]) setLooked(dayEvents[at]);
@@ -240,7 +242,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
       if (name === "enter") {
         // into the day: the keys walk its events
         setInDay(true);
-        setEventId(dayEvents[0]?.id ?? null);
+        onEvent?.(dayEvents[0]?.id ?? null);
         return true;
       }
       return name === "space"; // nothing to look at on a day
@@ -336,8 +338,8 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
               {events[days[i]].map((e) => (
                 <button
                   key={e.id}
-                  ref={focused && inDay && days[i] === cursorShown && e.id === eventId ? chosenRef : undefined}
-                  data-chosen={!!focused && inDay && days[i] === cursorShown && e.id === eventId}
+                  ref={e.id === eventId ? chosenRef : undefined}
+                  data-chosen={e.id === eventId}
                   type="button"
                   className={styles.event}
                   tabIndex={-1}
@@ -346,9 +348,10 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
                   // a click chooses it, as the keys do (the keyboard is then in its day); a double click shows it
                   onClick={(ev) => {
                     let1(ev);
+                    onDay?.(days[i]); // its day in the scheduler, where the timetable shows it chosen too
                     setCursor(days[i]);
                     setInDay(true);
-                    setEventId(e.id);
+                    onEvent?.(e.id);
                   }}
                   onDoubleClick={() => setLooked(e)}
                 >
