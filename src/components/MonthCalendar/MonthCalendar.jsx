@@ -7,6 +7,7 @@ import EventModal from "@components/Scheduler/EventModal";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { lightColor } from "@utils/colors";
+import { withKey } from "@utils/keys";
 import styles from "./monthCalendar.module.css";
 
 const READ_EVERY = 5 * 60 * 1000; // as long as the server keeps a calendar it has read
@@ -176,7 +177,7 @@ function MonthSelect({ month, onPick, onClose }) {
 // or null while it is not on screen) is shaded. The pencil at the right of the title adds and removes calendars (see
 // CalendarsModal), and the plus at its left makes a new event in Apple's Calendar (on the server's
 // machine, a Mac), open there for its time to be chosen, on the day the keyboard is on, else the one the scheduler shows,
-// else today (the first of another month); a does the same. The events are read again whenever `reloadKey` changes (the page's refresh,
+// else today (the first of another month); n does the same. The events are read again whenever `reloadKey` changes (the page's refresh,
 // which reads the calendars anew) and every few minutes. While `focused` (the keyboard is on the
 // middle of the page) the title is shaded (and the row of the weekdays while h j k l move a day) and the keys are its own (`keysRef` is given them; each
 // answers true when it was one of them). The keyboard is in the month from the start, and whenever
@@ -347,7 +348,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
-      if (name === "a") {
+      if (name === "n") {
         addEvent();
         return true;
       }
@@ -428,7 +429,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
               let1(e);
               addEvent();
             }}
-            title={t("scheduler.newEvent")}
+            title={withKey(t("scheduler.newEvent"), "n")}
             aria-label={t("scheduler.newEvent")}
           >
             <PlusIcon />

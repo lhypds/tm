@@ -4,6 +4,7 @@ import { PlusIcon } from "@components/icons";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { lightColor } from "@utils/colors";
+import { withKey } from "@utils/keys";
 import { formatDateTime } from "@utils/task";
 import EventModal from "./EventModal";
 import styles from "./calendar.module.css";
@@ -145,7 +146,7 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
         if (event) setLooked(event);
         return true;
       }
-      if (name === "a") {
+      if (name === "n") {
         addEvent(); // as the plus of the divider
         return true;
       }
@@ -181,7 +182,7 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
               e.currentTarget.blur();
               addEvent();
             }}
-            title={t("scheduler.newEvent")}
+            title={withKey(t("scheduler.newEvent"), "n")}
             aria-label={t("scheduler.newEvent")}
           >
             <PlusIcon />

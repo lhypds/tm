@@ -1750,8 +1750,8 @@ export default function Home({ all = false }) {
       setCommand("");
       return true;
     }
-    // (on the calendar, a adds an event, not a task: see MonthCalendar; n still adds a task)
-    if (name === "a" && view === "calendar" && pane !== "detail" && pane !== "tree" && calendarKeys.current?.(name)) return true;
+    // (on the calendar, n adds an event, not a task: see MonthCalendar; a still adds a task)
+    if (name === "n" && view === "calendar" && pane !== "detail" && pane !== "tree" && calendarKeys.current?.(name)) return true;
     if (name === "n" || (name === "a" && pane !== "tree")) {
       openCreator(view === "board" && boardStatuses.includes(pane) ? pane : "todo");
       return true;

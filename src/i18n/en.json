@@ -249,11 +249,11 @@
     },
     "calendar": {
       "keys": "c",
-      "desc": "show the calendar, a whole month, in the middle in place of the tasks, with the scheduler at the right (t is back on the tasks; v goes through the list, the progress view and the calendar; on the calendar, h j k l choose a day at once (after esc, j goes back into the month), enter goes into the day, where j / k choose an event and space shows it, and a adds an event in Apple Calendar on the day chosen; esc goes back out)"
+      "desc": "show the calendar, a whole month, in the middle in place of the tasks, with the scheduler at the right (t is back on the tasks; v goes through the list, the progress view and the calendar; on the calendar, h j k l choose a day at once (after esc, j goes back into the month), enter goes into the day, where j / k choose an event and space shows it, and n adds an event in Apple Calendar on the day chosen; esc goes back out)"
     },
     "timetable": {
       "keys": "d",
-      "desc": "on the scheduler: show or hide the day's timetable under its page (the day's events in Google and Apple Calendar; after esc, j goes down to it: j / k walk its events, h / l step a day, space shows an event, a adds one in Apple Calendar)"
+      "desc": "on the scheduler: show or hide the day's timetable under its page (the day's events in Google and Apple Calendar; after esc, j goes down to it: j / k walk its events, h / l step a day, space shows an event, n adds one in Apple Calendar)"
     },
     "refresh": {
       "keys": "r",
