@@ -62,4 +62,22 @@ function getEditorCommand(filePath, options) {
   return { cmd, args: getEditorArgs(editor, filePath, options) };
 }
 
-module.exports = { getEditor, getEditorArgs, getEditorCommand, getEditorInfo };
+// Open a folder in VS Code, in a window of its own (or the one that has it already): `code <dir>`,
+// the command VS Code installs on PATH. A daemon may be started without that PATH (pm2, a login
+// item), so on macOS the app itself is asked when the command is not found. Throws when VS Code
+// cannot be started.
+function openInCode(dir) {
+  const win = process.platform === 'win32';
+  // on Windows `code` is code.cmd, which only a shell runs
+  const r = win
+    ? spawnSync(`code "${dir.replace(/"/g, '')}"`, { stdio: 'ignore', shell: true })
+    : spawnSync('code', [dir], { stdio: 'ignore' });
+  if (!r.error && r.status === 0) return;
+  if (process.platform === 'darwin') {
+    const app = spawnSync('open', ['-a', 'Visual Studio Code', dir], { stdio: 'ignore' });
+    if (!app.error && app.status === 0) return;
+  }
+  throw new Error('VS Code could not be started: its "code" command is not on the PATH of tm.');
+}
+
+module.exports = { getEditor, getEditorArgs, getEditorCommand, getEditorInfo, openInCode };

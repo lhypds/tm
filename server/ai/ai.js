@@ -239,4 +239,4 @@ function createAiRunnerApp({ auth }) {
   return app;
 }
 
-module.exports = { createAiApp, createAiRunnerApp, isRunnerConnected: remote.isConnected, isMachineLinked: remote.isLinked, openOnMachine: remote.openFolder, newEventOnMachine: remote.newEvent };
+module.exports = { createAiApp, createAiRunnerApp, isRunnerConnected: remote.isConnected, isMachineLinked: remote.isLinked, openOnMachine: remote.openFolder, codeOnMachine: remote.openCode, newEventOnMachine: remote.newEvent };

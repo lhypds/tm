@@ -35,11 +35,11 @@ const {
   readTasks,
   compareIdsDesc
 } = require('../utils/task');
-const { getEditor } = require('../utils/editor');
+const { getEditor, openInCode } = require('../utils/editor');
 const { resolveConfig, shortPath, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
-const { createAiApp, createAiRunnerApp, isRunnerConnected, isMachineLinked, openOnMachine, newEventOnMachine } = require('./ai');
+const { createAiApp, createAiRunnerApp, isRunnerConnected, isMachineLinked, openOnMachine, codeOnMachine, newEventOnMachine } = require('./ai');
 const { createSchedulerApp } = require('./scheduler');
 const { createCalendarApp } = require('./calendar');
 const { listRecords, lastPrompt } = require('../ai/record');
@@ -781,6 +781,29 @@ app.post('/api/space/open', async (req, res) => {
   if (!dir) throw new HttpError(404, `"${work}" has no tasks folder of its own.`);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new HttpError(404, `Folder not found: ${dir}`);
   openFolder(dir);
+  res.json({ ok: true });
+});
+
+// Open the source code of a repository (its source_path) in VS Code: on this machine, or, for a copy
+// pushed from the machine the browser is on (`here`, see hereOf), on that one, whose own taskmgr.json
+// says where its source code is (a pushed copy has no source_path here).
+app.post('/api/space/code', async (req, res) => {
+  const work = String(req.body?.work || '');
+  const repository = String(req.body?.repository || '');
+  const p = config.getWorks().find(x => x.work === work)?.repositories.find(x => x.name === repository);
+  if (!p) throw new HttpError(404, `Unknown repository "${repository}" in "${work}".`);
+  const here = hereOf(req.body, { work, repository, root: p.root });
+  if (here) {
+    await codeOnMachine(here, { work, repository });
+    return res.json({ ok: true, machine: here });
+  }
+  if (!p.sourcePath) throw new HttpError(404, `"${repository}" has no source_path.`);
+  if (!fs.existsSync(p.sourcePath) || !fs.statSync(p.sourcePath).isDirectory()) throw new HttpError(404, `Folder not found: ${p.sourcePath}`);
+  try {
+    openInCode(p.sourcePath);
+  } catch (e) {
+    throw new HttpError(500, e.message);
+  }
   res.json({ ok: true });
 });
 

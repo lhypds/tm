@@ -19,10 +19,10 @@
 // (it may be in another status folder here) and, when it is nowhere here, made at that path.
 //
 // The connection is kept by every taskmgrd, with AI_RUNNER=1 or not (`ai`): without it the commands
-// about Claude Code (run, prompt, answer, stop) are refused, and what is left is tm and the two
+// about Claude Code (run, prompt, answer, stop) are refused, and what is left is tm and the three
 // commands of the browser that is on this machine (the server's web UI opened here, see
 // src/utils/here.js): open, a folder of taskmgr.json or a task in it shown in the file manager here
-// (Finder, Explorer), and calendar, a new event in Apple's Calendar here (utils/calendar.js).
+// (Finder, Explorer), code, the source code of a repository opened in VS Code here, and calendar, a new event in Apple's Calendar here (utils/calendar.js).
 //
 // With `window` on (AI_RUNNER_WINDOW=1 in .env) each run also opens a terminal window on this machine
 // that shows the transcript as it grows and closes a while after the run (ai/window.js), for whoever
@@ -32,6 +32,7 @@ const path = require('path');
 
 const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId, openFolder } = require('../utils/task');
 const { newEvent } = require('../utils/calendar');
+const { openInCode } = require('../utils/editor');
 const { resolveConfig } = require('../server/config');
 const { isDirectory, spaceOf, taskDirIn, taskDirsUnder, afterOf } = require('./task');
 const { deleteRecord } = require('./record');
@@ -78,7 +79,7 @@ async function* sseMessages(body) {
 // `commandLog` is where a tm command run for the server (the `tm` command) writes what it prints, and
 // `commandWindow` ({ terminal, closeAfter }) the terminal window it is shown in on macOS and Windows.
 // Returns { stop }.
-function startRunner({ server, token, machineId, log, warn, logFile, ai = true, port = null, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), commandWindow = {}, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks(), open = openFolder, calendar = newEvent }) {
+function startRunner({ server, token, machineId, log, warn, logFile, ai = true, port = null, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), commandWindow = {}, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks(), open = openFolder, code = openInCode, calendar = newEvent }) {
   session.configure({ logFile, machine: machineId });
   const unwatch = ai && window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId), 'X-Ai-Runner': ai ? '1' : '0', ...(port ? { 'X-Web-Port': String(port) } : {}) };
@@ -246,6 +247,16 @@ function startRunner({ server, token, machineId, log, warn, logFile, ai = true, 
           const dir = cmd.rel ? locate(cmd, false).taskDir : folderOf(cmd);
           open(dir);
           log(`runner: opened ${dir} for the server`);
+          break;
+        }
+        case 'code': {
+          // For the browser that is on this machine: the repository's source code, in VS Code.
+          const p = getWorks().find(x => x.work === String(cmd.work || ''))?.repositories.find(x => x.name === String(cmd.repository || ''));
+          if (!p) throw httpError(404, `No repository "${cmd.repository}" in "${cmd.work}" on ${machineId}.`);
+          if (!p.sourcePath) throw httpError(404, `"${cmd.repository}" has no source_path on ${machineId}.`);
+          if (!isDirectory(p.sourcePath)) throw httpError(404, `Folder not found on ${machineId}: ${p.sourcePath}`);
+          code(p.sourcePath);
+          log(`runner: opened ${p.sourcePath} in VS Code for the server`);
           break;
         }
         case 'calendar': {

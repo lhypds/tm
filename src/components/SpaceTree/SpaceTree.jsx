@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { EditIcon, FolderIcon, PlusIcon, TrashIcon } from "@components/icons";
+import { CodeIcon, EditIcon, FolderIcon, PlusIcon, TrashIcon } from "@components/icons";
 import TreeLines from "@components/TreeLines";
 import MachineDot from "@components/MachineDot";
 import { Checkbox } from "@ui";
@@ -287,6 +287,8 @@ export default function SpaceTree({
   onEditOrigin,
   onEditRepository,
   onOpenFolder,
+  canCode, // (repository entry) => whether its source code can be opened in VS Code
+  onCode, // ({ work, repository }) opens it
   onDelete,
   onMove,
   onMoveTasks,
@@ -445,7 +447,7 @@ export default function SpaceTree({
                           </RowButton>
                           <RowButton
                             label={t("origin.edit")}
-                            keys="e"
+                            keys="i"
                             onClick={() => onEditOrigin({ origin: g.origin, description: g.description, income: g.income, color: g.color })}
                           >
                             <EditIcon />
@@ -500,7 +502,7 @@ export default function SpaceTree({
                               >
                                 <PlusIcon />
                               </RowButton>
-                              <RowButton label={t("work.edit")} keys="e" onClick={() => onEditWork(w)}>
+                              <RowButton label={t("work.edit")} keys="i" onClick={() => onEditWork(w)}>
                                 <EditIcon />
                               </RowButton>
                               {w.root && (
@@ -544,11 +546,20 @@ export default function SpaceTree({
                                 <>
                                   <RowButton
                                     label={t("repository.edit")}
-                                    keys="e"
+                                    keys="i"
                                     onClick={() => onEditRepository({ work: w.work, name: p.name, description: p.description, paths: p.paths })}
                                   >
                                     <EditIcon />
                                   </RowButton>
+                                  {canCode(p) && (
+                                    <RowButton
+                                      label={t("tree.programming")}
+                                      keys="e"
+                                      onClick={() => onCode({ work: w.work, repository: p.name })}
+                                    >
+                                      <CodeIcon />
+                                    </RowButton>
+                                  )}
                                   <RowButton
                                     label={t("tree.openFolder")}
                                     keys="o"

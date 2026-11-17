@@ -78,6 +78,17 @@ export function FolderIcon({ className }) {
   );
 }
 
+// Programming: the repository's source code, opened in VS Code.
+export function CodeIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <polyline points="8 7 3 12 8 17" />
+      <polyline points="16 7 21 12 16 17" />
+      <line x1="14" y1="5" x2="10" y2="19" />
+    </Icon>
+  );
+}
+
 export function ChevronRightIcon({ className }) {
   return (
     <Icon className={className}>

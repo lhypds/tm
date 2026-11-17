@@ -75,6 +75,8 @@
     "createdUploadFailed": "任务已创建，但附件上传失败：{{error}}",
     "deleted": "任务已删除",
     "opened": "已在文件管理器中打开",
+    "openedCode": "已在 VS Code 中打开",
+    "noSource": "没有可打开的源码：这个任务不属于设置了 source path 的 repository。",
     "notHere": "这个文件夹不在这台电脑上，没有打开。",
     "sayHere": "如果在，请到“机器”里指定这台电脑是哪台机器。",
     "notCommand": "无效命令：{{cmd}}",
@@ -94,6 +96,7 @@
     "allOrigins": "所有 origin",
     "noOrigins": "taskmgr.json 中没有 origin。",
     "openFolder": "打开文件夹",
+    "programming": "编程：在 VS Code 中打开源码",
     "showHidden": "显示已隐藏的 work（{{count}}）"
   },
   "board": {
@@ -161,8 +164,8 @@
       "desc": "回到任务列表"
     },
     "treeRow": {
-      "keys": "目录树上按 a / e / o / d",
-      "desc": "向该项追加（origin 下加 work，work 下加 repository）、编辑、打开文件夹、删除"
+      "keys": "目录树上按 a / i / e / o / d",
+      "desc": "向该项追加（origin 下加 work，work 下加 repository）、编辑、编程（在 VS Code 中打开 repository 的源码）、打开文件夹、删除"
     },
     "tab": {
       "keys": "tab",
@@ -177,8 +180,12 @@
       "desc": "取消选中，之后 a / n 在顶层添加任务"
     },
     "edit": {
-      "keys": "e / i；列表中按 enter",
+      "keys": "i；列表中按 enter",
       "desc": "编辑选中的任务"
+    },
+    "code": {
+      "keys": "e",
+      "desc": "编程：在这台电脑的 VS Code 中打开选中任务的 repository"
     },
     "open": {
       "keys": "o；Progress 中按 enter",

@@ -3,8 +3,8 @@
 // code and the claude login are: on the machine that pushed it, by its taskmgrd (ai/runner.js, with
 // AI_RUNNER=1 in its .env). That runner keeps one connection open here (GET /api/sync/ai/commands in
 // server/ai/ai.js) and gets the browsers' commands over it: run, prompt, answer, stop, forget, tm (command),
-// and two that are not about Claude Code, for the browser that is on that machine: open (a folder, in
-// its file manager) and calendar (a new event in its Apple Calendar). Every taskmgrd keeps that
+// and three that are not about Claude Code, for the browser that is on that machine: open (a folder, in
+// its file manager), code (a repository's source code, in its VS Code) and calendar (a new event in its Apple Calendar). Every taskmgrd keeps that
 // connection, so those and tm reach a machine without AI_RUNNER=1 too (`linked`); the runs need it
 // (`ai`, which the runner says of itself as it connects). What
 // its runs do comes back as the events of its own session (ai/session.js: snapshot, run, item, delta,
@@ -263,6 +263,12 @@ function openFolder(machine, task) {
   return command(machine, { type: 'open', work: task.work, repository: task.repository || '', rel: task.rel || '' });
 }
 
+// Have `machine` open the source code of a repository in VS Code, for the browser that is on it: the
+// `source_path` the repository has there, in its own taskmgr.json (refused when it has none).
+function openCode(machine, { work, repository }) {
+  return command(machine, { type: 'code', work, repository });
+}
+
 // Have `machine` (a Mac) make an event named `title` on the day `date` ("YYYY-MM-DD") in its Apple
 // Calendar and bring it to the front, open (utils/calendar.js). Resolves once it is there.
 function newEvent(machine, date, title) {
@@ -336,4 +342,4 @@ function receive(machine, events) {
   }
 }
 
-module.exports = { subscribe, listRuns, publicRun, has, isConnected, isLinked, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord, tmCommand, openFolder, newEvent };
+module.exports = { subscribe, listRuns, publicRun, has, isConnected, isLinked, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord, tmCommand, openFolder, openCode, newEvent };

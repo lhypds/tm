@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@ui";
 import Attachments from "@components/Attachments";
-import { BrainIcon, FolderIcon, TrashIcon } from "@components/icons";
+import { BrainIcon, CodeIcon, FolderIcon, TrashIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
 import { moveIndex, modKey, withKey } from "@utils/keys";
 import { formatSize, previewKind } from "@utils/task";
@@ -43,14 +43,15 @@ function HeaderButton({ label, keys, dot, pressed, onClick, children }) {
 // hidden, "Save". The button is greyed out while the task's text is blank. For a new task the
 // prompt starts hidden; for an existing one as it was last left (`promptDefault`, onPromptOpen(open)
 // keeps it).
-// An existing task also has, beside the title, its folder (onOpenFolder) and delete (onDelete, which
+// An existing task also has, beside the title, programming (onCode(task): its repository's source
+// code in VS Code; the button is there while `canCode`), its folder (onOpenFolder) and delete (onDelete, which
 // asks first), and under the texts its attachments (`files`, the one at `selectedRel`
 // marked), a click on one opening it through onOpenFile.
 // Keys: esc in a text takes the caret out of it (a second esc closes the dialog, as Cancel does:
 // what was typed is dropped), and the page's keys then work, handed over by Home through `keysRef`
 // (keysRef.current(name) says whether it used the key): j / k walk the task's text, the prompt
-// (when shown) and the attachments (onSelectRel(rel)), the one chosen shaded; e / i put the caret
-// in the text chosen; g shows the prompt and chooses it, and hides it again; r (and cmd/ctrl+enter
+// (when shown) and the attachments (onSelectRel(rel)), the one chosen shaded; i puts the caret
+// in the text chosen (e too in a new task; on an existing one e is programming, as the button); g shows the prompt and chooses it, and hides it again; r (and cmd/ctrl+enter
 // with the caret in the prompt) saves and executes, as the
 // button does (or shows the task's run, `run`, through onRun(task) while one is going; not while
 // `noRunner` says the task cannot run). On
@@ -78,6 +79,8 @@ export default function TaskEditorModal({
   onPreview,
   onOpenFile,
   onOpenFolder,
+  canCode,
+  onCode,
   onDelete,
   onDeleteFile,
 }) {
@@ -188,6 +191,10 @@ export default function TaskEditorModal({
       else onSelectRel?.(row);
       return true;
     }
+    if (name === "e" && task) {
+      onCode(task);
+      return true;
+    }
     if (name === "e" || name === "i") {
       focusText(chosen || "task");
       return true;
@@ -224,6 +231,11 @@ export default function TaskEditorModal({
   const brainLabel = t(promptOpen ? "panel.hidePrompt" : "panel.showPrompt");
   const actions = (
     <div className={styles.headerButtons}>
+      {task && canCode && (
+        <HeaderButton label={t("tree.programming")} keys="e" onClick={() => onCode(task)}>
+          <CodeIcon />
+        </HeaderButton>
+      )}
       {task && (
         <HeaderButton label={t("tree.openFolder")} keys="o" onClick={() => onOpenFolder(task)}>
           <FolderIcon />

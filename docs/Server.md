@@ -141,6 +141,12 @@ when that machine does not sync the folder (nothing is opened: on the server nob
 not served by its own computer, says so instead of asking) or its taskmgrd is not connected, 504 when  
 it does not answer in 15 seconds.  
 
+`POST /api/space/code` `{ work, repository, here? }`  
+Open the source code of a repository (its `source_path`) in VS Code (`code <folder>`; on macOS the app itself when  
+the command is not on the server's PATH) on the server's machine. `{ ok: true }`; 404 when it has no `source_path`, 500  
+when VS Code cannot be started. With `here`, as for `POST /api/space/open`: the repository is opened on that machine,  
+at the `source_path` its own `taskmgr.json` gives it (404 when it has none there).  
+
 
 Tasks
 -----
@@ -307,7 +313,7 @@ The commands for that machine, live: a `text/event-stream` of `command` events, 
 repository, rel, files }` (start Claude Code on that task as run `run`, `files` being `{ "task.txt": text, "prompt.txt": text | null }`  
 as the server has them), `prompt` `{ run, prompt }` (start Claude Code with that prompt on no task, as run `run`), `answer` `{ run, pending, body }`, `stop` `{ run }` and `forget` `{ work, repository, rel, folder }`  
 (remove that run record from the task folder there), `tm` `{ command }` (a tm command there), `open` `{ work, repository, rel }`  
-(open that task's folder in the file manager there, or, without `rel`, the folder the tree shows for the space) and `calendar` `{ date, title }`  
+(open that task's folder in the file manager there, or, without `rel`, the folder the tree shows for the space), `code` `{ work, repository }` (open that repository's `source_path` in VS Code there) and `calendar` `{ date, title }`  
 (a new event in Apple's Calendar there; acknowledged once it is made), with a comment every 25 seconds to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
 
 `POST /api/sync/ai/events` `{ events }`  

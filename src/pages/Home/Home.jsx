@@ -1337,6 +1337,30 @@ export default function Home({ all = false }) {
     }
   }
 
+  // Programming: whether the source code of a space can be opened in VS Code. Only a repository
+  // has any: one with a source path here, or one synced from a machine, whose own taskmgr.json
+  // says where its source code is (a pushed copy has no source path here; that machine says so
+  // when it has none either).
+  const canCode = (sp) => {
+    const entry = sp?.repository ? runSpaceOf(sp) : null;
+    return !!entry && (!!entry.sourcePath || !!entry.remote);
+  };
+
+  // Open the source code of the space's repository in VS Code, on the computer its folder would
+  // be opened on (see notHere). `sp` is a task's space, or a repository of the tree.
+  async function openCode(sp) {
+    if (!canCode(sp)) return showToast(t("toast.noSource"), 4000);
+    const why = notHere(sp);
+    if (why) return showToast(why, 6000);
+    try {
+      await api.openSpaceCode(sp);
+      showToast(t("toast.openedCode"));
+    } catch (e) {
+      showToast(e.message, 4000);
+    }
+  }
+  const openTaskCode = (task) => openCode(task.space);
+
   async function createSpaceFolder() {
     try {
       setSpaces(await api.createSpaceFolder(space));
@@ -1499,9 +1523,10 @@ export default function Home({ all = false }) {
   });
 
   // On the tree: j / k move through the spaces (the right side follows), l / enter go over to
-  // the tasks. a, e, o and d are the buttons of the row the tree is on: a adds into it (a work into
+  // the tasks. a, i, e, o and d are the buttons of the row the tree is on: a adds into it (a work into
   // an origin, a repository into a work, also from one of its repositories; an origin from "All
-  // origins"), e edits it, o opens its folder and d removes it, once confirmed.
+  // origins"), i edits it, e is programming on a repository (its source code in VS Code) and edits
+  // an origin or a work, which have none, o opens its folder and d removes it, once confirmed.
   function treeKey(name) {
     const i = spaces.findIndex((s) => s.to === spaceTo);
     const move = moveIndex(name, i, spaces.length);
@@ -1514,8 +1539,13 @@ export default function Home({ all = false }) {
       }
       return true;
     }
-    if (["a", "e", "o", "d"].includes(name)) {
+    if (["a", "e", "i", "o", "d"].includes(name)) {
       const { group: g, item: w, repository: p } = spaces[i] || {};
+      if (name === "e" && p) {
+        openCode({ work: w.work, repository: p.name });
+        return true;
+      }
+      if (name === "i") name = "e";
       if (name === "a") setAdding(w ? { type: "repository", work: w.work } : g ? { type: "work", origin: g.origin } : { type: "origin" });
       else if (p) {
         if (name === "e") setEditingRepository({ work: w.work, name: p.name, description: p.description, paths: p.paths });
@@ -1791,7 +1821,11 @@ export default function Home({ all = false }) {
           return true;
         }
       } else {
-        if (["enter", "e", "i"].includes(name)) {
+        if (name === "e") {
+          if (selected) openTaskCode(selected);
+          return true;
+        }
+        if (["enter", "i"].includes(name)) {
           if (selected) openEditor(selected, detailSection);
           return true;
         }
@@ -1829,6 +1863,9 @@ export default function Home({ all = false }) {
     const t = selected;
     switch (name) {
       case "e":
+        // programming: the task's repository, in VS Code
+        if (t) openTaskCode(t);
+        return true;
       case "i":
         if (t) openEditor(t);
         return true;
@@ -2161,6 +2198,8 @@ export default function Home({ all = false }) {
             onEditOrigin={setEditingOrigin}
             onEditRepository={setEditingRepository}
             onOpenFolder={openSpaceFolder}
+            canCode={(p) => !!p.sourcePath || !!p.remote}
+            onCode={openCode}
             onDelete={setRemoving}
             onMove={moveSpace}
             onMoveTasks={moveTasksToSpace}
@@ -2289,6 +2328,7 @@ export default function Home({ all = false }) {
               onFocused={() => setFocusing(null)}
               onSave={saveText}
               onOpenFolder={openFolder}
+              onCode={canCode(selected?.space) ? openTaskCode : undefined}
               onDelete={setConfirm}
               onPreview={(file) => selected && setPreview({ ...file, space: selected.space })}
               onDeleteFile={(file) => deleteFile(attachments, fileList, file, setFileRel)}
@@ -2457,6 +2497,8 @@ export default function Home({ all = false }) {
         onPreview={(file) => setPreview({ ...file, space: creating.space })}
         onOpenFile={(file) => openFile(file, peek)}
         onOpenFolder={openFolder}
+        canCode={canCode(peekTask?.space)}
+        onCode={openTaskCode}
         onDelete={setConfirm}
         onDeleteFile={(file) => deleteFile(peekAttachments, peekFiles, file, setPeekFileRel)}
       />

@@ -75,6 +75,8 @@
     "createdUploadFailed": "Task created, but an attachment failed: {{error}}",
     "deleted": "Task deleted",
     "opened": "Opened in file manager",
+    "openedCode": "Opened in VS Code",
+    "noSource": "No source code to open: this is not a task of a repository with a source path.",
     "notHere": "This folder is not on this computer: nothing was opened.",
     "sayHere": "If it is, say which machine this computer is in Machines.",
     "notCommand": "Not a command: {{cmd}}",
@@ -94,6 +96,7 @@
     "allOrigins": "All origins",
     "noOrigins": "No origins in taskmgr.json.",
     "openFolder": "Open folder",
+    "programming": "Programming: open the source code in VS Code",
     "showHidden": "Show hidden works ({{count}})"
   },
   "board": {
@@ -161,8 +164,8 @@
       "desc": "back to the tasks"
     },
     "treeRow": {
-      "keys": "a / e / o / d on the tree",
-      "desc": "add into the row (a work into an origin, a repository into a work), edit it, open its folder, delete it"
+      "keys": "a / i / e / o / d on the tree",
+      "desc": "add into the row (a work into an origin, a repository into a work), edit it, programming on a repository (its source code in VS Code), open its folder, delete it"
     },
     "tab": {
       "keys": "tab",
@@ -177,8 +180,12 @@
       "desc": "drop the selection, so a / n add a task at the top"
     },
     "edit": {
-      "keys": "e / i; enter in list",
+      "keys": "i; enter in list",
       "desc": "edit the selected task"
+    },
+    "code": {
+      "keys": "e",
+      "desc": "programming: open the repository of the selected task in VS Code, on this computer"
     },
     "open": {
       "keys": "o; enter in progress",

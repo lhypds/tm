@@ -79,7 +79,8 @@ The server's commands: the daemon keeps one connection open to the server (`GET 
 command typed in its Machines dialog (`/restart`, below). And, when the server's web UI is open in a browser on this  
 very computer, what has to happen in front of you: the open folder button of a folder synced from here opens it here,  
 in Finder or Explorer (the folder as this machine's `taskmgr.json` has it, a repository's `source_path` for its row in  
-the tree), and the plus of the calendar makes the new event in Apple's Calendar here (macOS). The page finds out that  
+the tree), programming (`e`, the `</>` button of a task or a repository) opens the repository's `source_path` in VS Code  
+here (`code`, or the app itself on macOS when the command is not on the daemon's PATH), and the plus of the calendar makes the new event in Apple's Calendar here (macOS). The page finds out that  
 it is on this computer by asking the web UI here (`GET /api/machine` on `http://127.0.0.1:<PORT>`, answered to that  
 server's pages only), so the web UI has to be running here too; a browser may ask you to allow that the first time, and  
 where it does not allow it at all (Safari, from an https page), say which machine the computer is at the bottom of the  

@@ -64,6 +64,10 @@ const here = () => {
 // file manager: the server's, or, for a folder synced by the machine this browser is on, that one's.
 export const openSpaceFolder = (space) => request("/api/space/open", json("POST", { ...sp(space), ...here() }));
 
+// Open the source code of a repository (its source_path) in VS Code, on the same computer
+// openSpaceFolder opens its folder on.
+export const openSpaceCode = (space) => request("/api/space/code", json("POST", { ...sp(space), ...here() }));
+
 // The path of a folder dropped on the page, found by the server from its name and the names of
 // what is in it: { path }.
 export const locateFolder = ({ name, entries }) => request("/api/folder/locate", json("POST", { name, entries }));

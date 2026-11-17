@@ -75,6 +75,8 @@
     "createdUploadFailed": "タスクを作成しましたが、添付ファイルのアップロードに失敗しました：{{error}}",
     "deleted": "タスクを削除しました",
     "opened": "ファイルマネージャーで開きました",
+    "openedCode": "VS Code で開きました",
+    "noSource": "開くソースコードがありません：source path のある repository のタスクではありません。",
     "notHere": "このフォルダはこのコンピュータにはありません。開いていません。",
     "sayHere": "ある場合は、「マシン」でこのコンピュータがどのマシンかを指定してください。",
     "notCommand": "コマンドではありません：{{cmd}}",
@@ -94,6 +96,7 @@
     "allOrigins": "すべての origin",
     "noOrigins": "taskmgr.json に origin がありません。",
     "openFolder": "フォルダを開く",
+    "programming": "プログラミング：ソースコードを VS Code で開く",
     "showHidden": "非表示の work を表示（{{count}}）"
   },
   "board": {
@@ -161,8 +164,8 @@
       "desc": "タスク一覧へ戻る"
     },
     "treeRow": {
-      "keys": "ツリー上で a / e / o / d",
-      "desc": "その行に追加（origin に work、work に repository）、編集、フォルダを開く、削除"
+      "keys": "ツリー上で a / i / e / o / d",
+      "desc": "その行に追加（origin に work、work に repository）、編集、プログラミング（repository のソースコードを VS Code で開く）、フォルダを開く、削除"
     },
     "tab": {
       "keys": "tab",
@@ -177,8 +180,12 @@
       "desc": "選択を解除し、a / n で最上位にタスクを追加"
     },
     "edit": {
-      "keys": "e / i、一覧では enter",
+      "keys": "i、一覧では enter",
       "desc": "選択中のタスクを編集"
+    },
+    "code": {
+      "keys": "e",
+      "desc": "プログラミング：選択中のタスクの repository をこのコンピュータの VS Code で開く"
     },
     "open": {
       "keys": "o；進捗で enter",
