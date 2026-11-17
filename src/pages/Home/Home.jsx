@@ -620,6 +620,9 @@ export default function Home({ all = false }) {
       return;
     }
     const adding = e.ctrlKey || e.metaKey;
+    // a plain click shows the task: the panel is back in place of the scheduler (a press that
+    // drags a task onto the scheduler is no click)
+    if (e.type === "click" && !adding && !e.shiftKey) setScheduler(false);
     const keys = chosen.map((t) => t.key);
     const from = visible.findIndex((t) => t.key === (keys.includes(anchorKey.current) ? anchorKey.current : selectedKey));
     const to = visible.findIndex((t) => t.key === task.key);

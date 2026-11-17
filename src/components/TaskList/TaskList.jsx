@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import * as api from "@utils/api";
 import TreeLines from "@components/TreeLines";
 import { TASKS_DRAG_TYPE, describe, formatStamp } from "@utils/task";
+import { dragTitle } from "@utils/drag";
 import { lightColor } from "@utils/colors";
 import { withKey } from "@utils/keys";
 import styles from "./tasklist.module.css";
@@ -136,6 +137,7 @@ export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSe
               e.dataTransfer.setData("text/plain", t.title || t.id);
               const keys = chosenKeys.has(t.key) ? [...chosenKeys] : [t.key];
               e.dataTransfer.setData(TASKS_DRAG_TYPE, JSON.stringify(keys)); // for a drop on the tree
+              dragTitle(e, t.title || t.id, keys.length);
               setDragKeys(keys);
               onSelect(t); // a row not chosen is selected alone; the chosen ones stay chosen
             }}

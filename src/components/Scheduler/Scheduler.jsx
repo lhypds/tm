@@ -5,6 +5,7 @@ import { FromTag } from "@components/TaskList";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { copyText } from "@utils/clipboard";
+import { dragTitle } from "@utils/drag";
 import { TASKS_DRAG_TYPE } from "@utils/task";
 import styles from "./scheduler.module.css";
 
@@ -505,7 +506,9 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       });
       end = y;
     }
-    slots.push({ y: end, line: lines.length, index: cards.length });
+    // under it all, unless the text ends in an empty line: the drop takes that row then (the top
+    // of an empty page)
+    if (lines[lines.length - 1] !== "" || blocks[blocks.length - 1].from === lines.length) slots.push({ y: end, line: lines.length, index: cards.length });
     return slots;
   };
 
@@ -820,6 +823,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
               onDragStart={(e) => {
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData(CARD_DRAG_TYPE, cardKey(block.card));
+                dragTitle(e, block.card.title || t("common.untitled"));
               }}
               onDragEnd={endDrag}
             >
