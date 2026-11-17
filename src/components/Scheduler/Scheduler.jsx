@@ -478,7 +478,9 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       const k = e.key.toLowerCase();
       if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.altKey || !["s", "z", "y"].includes(k)) return;
       const inside = sectionRef.current?.contains(e.target);
-      if (!inside && !(focused && e.target === document.body)) return;
+      // with the keyboard on the pane, wherever the focus was left (a row of the list, a link),
+      // but not in another text field nor in a dialog
+      if (!inside && !(focused && !e.target.closest?.('input, textarea, select, [contenteditable="true"], [role="dialog"]'))) return;
       e.preventDefault();
       if (!loaded) return;
       if (k !== "s") {
