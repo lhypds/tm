@@ -55,11 +55,14 @@ function Top({ label, description, income, actions, color }) {
 }
 
 // Focus from a click shows no ring: a browser counts a held key (Shift for a click) as keyboard
-// input and would draw the :focus-visible ring. A key pressed on the element brings it back.
+// input and would draw the :focus-visible ring. It stays off through the shortcut keys (o, e, ...),
+// which act on the chosen row and not on the focused one, and through the window losing focus (o
+// and e open another app): only focus really leaving the element ends it, so Tab still shows a ring.
 const pointerFocus = {
   onPointerDown: (e) => (e.currentTarget.dataset.pointer = "true"),
-  onKeyDown: (e) => delete e.currentTarget.dataset.pointer,
-  onBlur: (e) => delete e.currentTarget.dataset.pointer,
+  onBlur: (e) => {
+    if (document.activeElement !== e.currentTarget) delete e.currentTarget.dataset.pointer;
+  },
 };
 
 // The names of the machines that sync a folder, as its row shows them in place of its path ("" for
