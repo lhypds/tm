@@ -560,9 +560,11 @@ export default function Home({ all = false }) {
   const selected = visible[selectedIndex] || null;
   // The right pane shows the scheduler: asked for (the sundial, t) while a task is selected; with
   // none, it is what the pane shows until the task panel is asked for (`emptyTask`: the sundial
-  // or t again, for "No task selected"), which lasts until a task is selected.
+  // or t again, for "No task selected"), which lasts until a task is selected. Not in the progress
+  // view: there the pane says "No task selected" with none, and shows the scheduler only when asked.
   const [emptyTask, setEmptyTask] = useState(false);
-  const scheduler = selected ? wantScheduler : !emptyTask;
+  const schedulerAsked = !!selected || view === "board"; // the pane goes by `wantScheduler`
+  const scheduler = schedulerAsked ? wantScheduler : !emptyTask;
   const hasSelected = !!selected;
   useEffect(() => {
     if (hasSelected) setEmptyTask(false);
@@ -888,7 +890,7 @@ export default function Home({ all = false }) {
   // gives it back to the task on the next click.
   function toggleScheduler() {
     const next = !(scheduler && detailOpen);
-    if (selected) setScheduler(next);
+    if (schedulerAsked) setScheduler(next);
     else setEmptyTask(!next);
     setDetailOpen(true);
   }

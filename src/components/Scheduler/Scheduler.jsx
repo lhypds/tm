@@ -752,9 +752,11 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   // true when the key was one of them. With no card chosen (the keyboard just came onto the pane,
   // or esc left the text; no cursor is shown): j, k, l and enter go
   // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; h is
-  // the page's (back to the list). On a card (j / k and the arrows get there from the text): k, h,
-  // up and left go into the text above it, j, l, down and right into the text under it, or on to the
-  // next card when there is no text between, in the mode the text was left in; backspace, delete and d
+  // the page's (back to the list). On a card (j / k and the arrows get there from the text): k and
+  // up go into the text above it, j and down into the text under it, or on to the next card when
+  // there is no text between, in the mode the text was left in; a card is a line of its own, so h
+  // and l stay on it (as do left and right, but while typing, where they walk on as in the text);
+  // backspace, delete and d
   // take the card off the day, x, p and w mark its task, space opens its task, enter starts a new
   // line under it, esc lets it go.
   useEffect(() => {
@@ -768,7 +770,9 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         else return false;
         return true;
       }
-      const step = ["j", "l", "down", "right"].includes(name) ? 1 : ["k", "h", "up", "left"].includes(name) ? -1 : 0;
+      const typing = modeRef.current === "insert";
+      if (["h", "l"].includes(name) || (!typing && ["left", "right"].includes(name))) return true;
+      const step = ["j", "down", "right"].includes(name) ? 1 : ["k", "up", "left"].includes(name) ? -1 : 0;
       if (step) {
         const at = blocks.findIndex((b) => b.card === card);
         const beside = blocks[at + step];
