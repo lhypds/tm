@@ -10,11 +10,7 @@
   padding-bottom: 12px;
 }
 
-/* A row dragged is faded; the row it would go into as a subtask is lit. */
-.row[data-dragging="true"] {
-  opacity: 0.4;
-}
-
+/* The row a dragged one would go into as a subtask is lit. */
 .row[data-drop="true"] {
   background: var(--bg-hover);
 }
