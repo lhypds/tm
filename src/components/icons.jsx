@@ -209,6 +209,18 @@ export function SundialIcon({ className }) {
   );
 }
 
+// The day's calendar under the scheduler's page: a sheet with its two rings and the line under its head.
+export function CalendarIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="5" width="18" height="16" rx="1" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="3" x2="8" y2="7" />
+      <line x1="16" y1="3" x2="16" y2="7" />
+    </Icon>
+  );
+}
+
 // The task panel (what the scheduler's button goes back to): a sheet with a ticked box and its lines.
 export function TaskIcon({ className }) {
   return (

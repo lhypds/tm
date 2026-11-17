@@ -18,5 +18,9 @@
         }
       ]
     }
+  ],
+  "calendars": [
+    { "name": "work", "type": "google", "url": "https://calendar.google.com/calendar/ical/you%40example.com/private-xxxxxxxx/basic.ics" },
+    { "name": "home", "type": "apple", "url": "webcal://p12-caldav.icloud.com/published/2/xxxxxxxx" }
   ]
 }

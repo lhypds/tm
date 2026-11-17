@@ -1,0 +1,139 @@
+/* Between the day's page and its calendar: "Calendar", as the "Prompt" divider of the task panel. */
+.divider {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg);
+  border-top: var(--line) solid var(--border);
+  border-bottom: var(--line) solid var(--border);
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Under the divider: no calendar is set, or one could not be read. */
+.note {
+  flex: none;
+  padding: 6px 12px;
+  border-bottom: var(--line) solid var(--border);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.note[data-error="true"] {
+  color: var(--err);
+}
+
+/* The events of whole days, above the hours: they stay while the hours scroll (and scroll
+   themselves past three of them). */
+.whole {
+  flex: none;
+  max-height: 116px;
+  padding: 4px 12px;
+  overflow-y: auto;
+  border-bottom: var(--line) solid var(--border);
+}
+
+/* The hours: the lower half of the pane (the page above takes the other), scrolling. */
+.hours {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.day {
+  position: relative;
+}
+
+/* An hour: a line across, after its time at the left. */
+.hour {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 0;
+  border-top: var(--line) solid var(--soft-line);
+  margin-left: 44px;
+}
+
+.label {
+  position: absolute;
+  right: 100%;
+  top: -8px;
+  width: 44px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Noon, the line the day opens on. */
+.hour[data-noon="true"] {
+  border-top-color: var(--err);
+}
+
+.hour[data-noon="true"] .label {
+  color: var(--err);
+}
+
+/* Where the events are, right of the times. */
+.lane {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 56px;
+  right: 12px;
+}
+
+/* An event: a card as a task's on the page (28px, one line cut short with an ellipsis). */
+.card {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  margin: 4px 0;
+  padding: 0 8px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.card:hover {
+  background: var(--bg-hover);
+}
+
+.card[data-timed="true"] {
+  position: absolute;
+  margin: 0;
+}
+
+.time {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.where {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--muted);
+}

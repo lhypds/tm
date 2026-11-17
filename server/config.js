@@ -32,7 +32,11 @@
 //     ],
 //     "filters": {                                // optional, the web UI's list bar filters, by space path
 //       "/o/gcc3/gcc3.com": { "month": "all", "showDone": false, "showPending": true, "showAbort": false }
-//     }
+//     },
+//     "calendars": [                              // optional, the calendars under the scheduler's page (see server/calendar.js)
+//       { "name": "work", "type": "google", "url": "https://calendar.google.com/calendar/ical/.../basic.ics" },
+//       { "name": "home", "type": "apple", "url": "webcal://p12-caldav.icloud.com/published/2/..." }
+//     ]
 //   }
 //
 // The older form, a top-level "works" list whose works each have an optional "origin", is still
@@ -355,6 +359,23 @@ function normalizeFilter(v) {
   return Object.keys(f).length ? f : null;
 }
 
+// The calendars under the scheduler's page: [{ name, type, url }], each the ICS feed of one calendar
+// (see server/calendar.js), as many as there are accounts and calendars. `type` is "google" or
+// "apple" (told from the address when not given, "" when it is neither), `name` what the calendar
+// is called on the page (the feed's own name when not given). Not part of the works: an entry
+// without an address is dropped rather than refused.
+function normalizeCalendars(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((c) => {
+    if (!c || typeof c !== 'object' || !isNonEmptyString(c.url)) return [];
+    const url = c.url.trim().replace(/^webcal:\/\//i, 'https://');
+    if (!/^https?:\/\//i.test(url)) return [];
+    const given = typeof c.type === 'string' ? c.type.trim().toLowerCase() : '';
+    const type = ['google', 'apple'].includes(given) ? given : /icloud\.com/i.test(url) ? 'apple' : /google\.com/i.test(url) ? 'google' : '';
+    return [{ name: typeof c.name === 'string' ? c.name.trim() : '', type, url }];
+  });
+}
+
 // Parse and validate the text of a config file.
 function parseConfig(text, configPath) {
   let raw;
@@ -365,7 +386,7 @@ function parseConfig(text, configPath) {
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${configPath} must contain a JSON object.`);
   try {
-    return { ...normalizeOrigins(upgradeRaw(raw).origins), filters: normalizeFilters(raw.filters) };
+    return { ...normalizeOrigins(upgradeRaw(raw).origins), filters: normalizeFilters(raw.filters), calendars: normalizeCalendars(raw.calendars) };
   } catch (e) {
     throw new Error(`${configPath}: ${e.message}`);
   }
@@ -413,6 +434,7 @@ function resolveConfig() {
   // The named origins, { origin, description, income, color }, in file order.
   const getOrigins = () => current().origins;
   const getFilters = () => current().filters;
+  const getCalendars = () => current().calendars;
 
   // The config file as written, for editing in the web UI.
   function readText() {
@@ -765,7 +787,7 @@ function resolveConfig() {
   }
 
   return {
-    configPath, port, host, dataDir, usersPath, getWorks, getOrigins, getFilters, setFilter, readText, writeText,
+    configPath, port, host, dataDir, usersPath, getWorks, getOrigins, getFilters, getCalendars, setFilter, readText, writeText,
     addOrigin, addWork, addRepository, updateWork, updateOrigin, updateRepository, removeOrigin, removeWork, removeRepository,
     moveOrigin, moveWork, moveRepository
   };

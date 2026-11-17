@@ -177,6 +177,7 @@ export default function Home({ all = false }) {
   const [treeOpen, setTreeOpen] = useState(() => !isNarrow() && readFlag("panel.tree", true));
   const [detailOpen, setDetailOpen] = useState(() => !isNarrow() && readFlag("panel.detail", true));
   const [wantScheduler, setScheduler] = useState(() => readFlag("panel.scheduler", false)); // the right pane shows the scheduler, not the task (see `scheduler`)
+  const [calendarOpen, setCalendarOpen] = useState(() => readFlag("panel.calendar", false)); // the scheduler shows the day's calendar under its page
   const schedulerKeys = useRef(null); // the scheduler's keys while the keyboard is on it (see Scheduler)
   const [pane, setPane] = useState("tasks"); // where j / k and friends go: "tree" or "tasks"
   // The list last loaded and the path it is for. On any other path `data` is empty and `loading`
@@ -289,6 +290,7 @@ export default function Home({ all = false }) {
     if (!isNarrow()) writeFlag("panel.detail", detailOpen);
   }, [detailOpen]);
   useEffect(() => writeFlag("panel.scheduler", wantScheduler), [wantScheduler]);
+  useEffect(() => writeFlag("panel.calendar", calendarOpen), [calendarOpen]);
   useEffect(() => writeFlag("panel.prompt", promptOpen), [promptOpen]);
   useEffect(() => writeFlag("preview.prompt", peekPromptOpen), [peekPromptOpen]);
   useEffect(() => {
@@ -893,6 +895,15 @@ export default function Home({ all = false }) {
     if (schedulerAsked) setScheduler(next);
     else setEmptyTask(!next);
     setDetailOpen(true);
+  }
+  // The calendar in the scheduler's bar, and c: the day's calendar under the scheduler's page, shown
+  // and hidden. With the scheduler not on screen, c brings it there with its calendar.
+  function toggleCalendar() {
+    if (scheduler && detailOpen) setCalendarOpen((v) => !v);
+    else {
+      setCalendarOpen(true);
+      toggleScheduler();
+    }
   }
   const closePeek = () => {
     setPeek(null);
@@ -1628,6 +1639,11 @@ export default function Home({ all = false }) {
       toggleScheduler();
       return true;
     }
+    // c shows and hides the day's calendar under the scheduler's page, as the calendar in its bar does
+    if (name === "c") {
+      toggleCalendar();
+      return true;
+    }
     if (name === ":") {
       setCommand("");
       return true;
@@ -2178,7 +2194,7 @@ export default function Home({ all = false }) {
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
         <aside className={styles.detail} data-open={detailOpen} onMouseDown={() => setPane("detail")} onFocus={() => setPane("detail")}>
-          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} />}
+          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} />}
           {!scheduler && spaceTo && (
             <TaskPanel
               task={selected}

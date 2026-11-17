@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "@components/icons";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "@components/icons";
 import { DoneBox } from "@components/TaskList";
 import { withKey } from "@utils/keys";
 import { showToast } from "@ui";
@@ -8,6 +8,7 @@ import * as api from "@utils/api";
 import { copyText } from "@utils/clipboard";
 import { dragTitle } from "@utils/drag";
 import { TASKS_DRAG_TYPE, describe } from "@utils/task";
+import Calendar from "./Calendar";
 import styles from "./scheduler.module.css";
 
 // A day as its file is named: "2026-11-17", in local time.
@@ -206,7 +207,10 @@ function Lines({ value, fill, ...props }) {
 // (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere); while `loading` (the page's refresh) the pane under its bar is covered and says "Loading...", as the task list does.
 // The days are synced between the machines (see server/scheduler.js), so a page may have a task that is not on this one: its card is as any other, with the title of its line, but has no box and opens nothing.
 // See server/scheduler.js for what is kept.
-export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus }) {
+// The calendar at the right of the title (c; `onToggleCalendar`) shows and hides the day's calendar
+// (`calendarOpen`): the pane is then split in two, as the task panel is with its prompt, the page
+// above and under it the events the day has in Google and Apple Calendar (see Calendar).
+export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar }) {
   const { t, i18n } = useTranslation();
   const [date, setDate] = useState(today);
   const [loaded, setLoaded] = useState(false); // the day shown has been read
@@ -910,6 +914,21 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     >
       <div className={styles.bar} data-focused={focused}>
         <h2 className={styles.barTitle}>{t("scheduler.title")}</h2>
+        {/* let go after the click, so space and enter are the page's again (as the panel's buttons) */}
+        <button
+          type="button"
+          className="btn"
+          tabIndex={-1}
+          aria-pressed={!!calendarOpen}
+          onClick={(e) => {
+            e.currentTarget.blur();
+            onToggleCalendar();
+          }}
+          title={withKey(t(calendarOpen ? "scheduler.hideCalendar" : "scheduler.showCalendar"), "c")}
+          aria-label={t(calendarOpen ? "scheduler.hideCalendar" : "scheduler.showCalendar")}
+        >
+          <CalendarIcon />
+        </button>
       </div>
       <div className={styles.days}>
         <div className={styles.steps}>
@@ -1026,6 +1045,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
         {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
+      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} />}
       {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
     </section>
   );

@@ -311,6 +311,18 @@ A file of the older shape (`tasks: [{ work, repository, ids, title, line }]` bes
 `PUT /api/scheduler` `{ date, text }` writes the page. Answers the day.
 
 
+Calendar
+--------
+
+Defined in `server/calendar.js`. The day's events under the scheduler's page, read from Google Calendar and Apple (iCloud) Calendar by the address of each calendar's ICS feed.  
+The calendars are listed in `taskmgr.json` under `calendars` (see [Web UI.md](Web%20UI.md)), so they are synced with it: a push sends the list to the server, a pull takes the server's.  
+A feed read is kept for five minutes. Repeating events are expanded (`ical.js`), a cancelled one is left out.
+
+`GET /api/calendar?date=&from=&to=&fresh=1` the events of the day `date` (`from` and `to` its bounds in ms, in the browser's time zone; `fresh` reads the feeds anew): `{ configured, events, errors }`,  
+each event `{ id, title, location, allDay, start, end, source, calendar }`, `start` and `end` in ms (the days, the last one not included, of an `allDay` one), `source` `google`, `apple` or empty, `calendar` its name in `taskmgr.json` (the feed's own without one);  
+`errors` the calendars that could not be read, each `{ source, calendar, error }`; `configured` is false when none is listed.
+
+
 Sync
 ----
 

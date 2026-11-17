@@ -176,6 +176,18 @@ export const getSchedulerDay = (date, carry = false) => request(`/api/scheduler?
 // Write the page: its text. Resolves to the day after it.
 export const saveSchedulerPage = (date, text) => request("/api/scheduler", json("PUT", { date, text }));
 
+// The events of the day `date` ("YYYY-MM-DD", here: its bounds are sent with it) in the Google and
+// Apple calendars the server is given (see server/calendar.js): { configured, events, errors },
+// each event { id, title, location, allDay, start, end, source, calendar } with start and end in
+// ms (the days, "YYYY-MM-DD", the last one not included, of an `allDay` one). `fresh` reads the
+// calendars anew, not the copy the server keeps for a few minutes.
+export const getCalendarDay = (date, fresh = false) => {
+  const [y, m, d] = date.split("-").map(Number);
+  const from = new Date(y, m - 1, d).getTime();
+  const to = new Date(y, m - 1, d + 1).getTime();
+  return request(`/api/calendar?${q({ date, from, to, ...(fresh ? { fresh: "1" } : {}) })}`);
+};
+
 // Route to the tasks of every origin: the root, which is also what the title links to.
 export const allPath = "/";
 

@@ -237,6 +237,10 @@
       "keys": "t",
       "desc": "在任务和日程之间切换右侧面板（日程的文字按 vim 的方式编辑：h j k l 移动，i / a 输入，esc 返回；在任务上 space 打开，enter 在其下换行，x / p / w 标记状态，backspace / d 移除）"
     },
+    "calendar": {
+      "keys": "c",
+      "desc": "显示或隐藏日程页下方的当天日历（Google 和 Apple 日历中当天的日程）"
+    },
     "refresh": {
       "keys": "r",
       "desc": "刷新页面数据"
@@ -348,7 +352,13 @@
     "next": "后一天",
     "notes": "当天的笔记",
     "remove": "从这一天移除",
-    "missing": "该任务不在这台机器上"
+    "missing": "该任务不在这台机器上",
+    "calendar": "日历",
+    "showCalendar": "显示日历",
+    "hideCalendar": "隐藏日历",
+    "allDay": "全天",
+    "calendarOff": "尚未设置日历：请在 taskmgr.json 的 \"calendars\" 中列出（见 docs/Web UI.md）。",
+    "calendarError": "无法读取 {{source}} 日历：{{error}}"
   },
   "analysis": {
     "title": "收入分析",

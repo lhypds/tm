@@ -237,6 +237,10 @@
       "keys": "t",
       "desc": "swap the right pane between the task and the scheduler (its text is edited as in vim: h j k l move, i / a type, esc goes back; on a task, space opens it, enter starts a new line under it, x / p / w mark it and backspace / d removes it)"
     },
+    "calendar": {
+      "keys": "c",
+      "desc": "show or hide the day's calendar under the scheduler's page (the day's events in Google and Apple Calendar)"
+    },
     "refresh": {
       "keys": "r",
       "desc": "refresh the page's data"
@@ -348,7 +352,13 @@
     "next": "Next day",
     "notes": "Notes of the day",
     "remove": "Remove from this day",
-    "missing": "This task is not on this machine"
+    "missing": "This task is not on this machine",
+    "calendar": "Calendar",
+    "showCalendar": "Show calendar",
+    "hideCalendar": "Hide calendar",
+    "allDay": "All day",
+    "calendarOff": "No calendar is set: list them under \"calendars\" in taskmgr.json (see docs/Web UI.md).",
+    "calendarError": "Could not read the {{source}} calendar: {{error}}"
   },
   "analysis": {
     "title": "Income analysis",

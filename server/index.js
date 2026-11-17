@@ -41,6 +41,7 @@ const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
 const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
 const { createSchedulerApp } = require('./scheduler');
+const { createCalendarApp } = require('./calendar');
 const { listRecords, lastPrompt } = require('../ai/record');
 const { trimLogs } = require('../utils/logfile');
 
@@ -444,6 +445,10 @@ app.use(createSchedulerApp({
     return !!(space && space.root);
   }
 }));
+
+// The calendar under the scheduler's page (see server/calendar.js): the day's events, read from
+// the Google and Apple calendars listed in taskmgr.json ("calendars").
+app.use(createCalendarApp({ calendars: config.getCalendars, log: (line) => console.error(line) }));
 
 // A change made here (a task moved, edited, deleted, a file added...) leaves the pushed copies no
 // longer what taskmgrd pushed: the hashes of its snapshots are forgotten, or the next push, finding

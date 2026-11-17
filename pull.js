@@ -162,7 +162,7 @@ const label = (s) => `${s.origin ? `${s.origin} / ` : ''}${s.work}${s.repository
 // taskmgr.json here (raw, "origins" form) with the server's fields merged into what is already
 // here: an origin, work or repository only on the server is not added, and nothing here is removed.
 // A work or repository keeps its own tasks_path and source_path (the server's are folders there).
-// The web UI's filters are taken from the server when it has them.
+// The web UI's filters and the scheduler's calendars are taken from the server when it has them.
 function mergeFromServer(here, server) {
   const merged = { ...here, origins: (here.origins || []).map(g => ({ ...g, works: (g.works || []).map(w => ({ ...w })) })) };
   for (const g of server.origins || []) {
@@ -189,6 +189,8 @@ function mergeFromServer(here, server) {
   }
   // The web UI's list bar filters are the server's, whole: they are preferences, not folders.
   if (server.filters !== undefined) merged.filters = server.filters;
+  // So are the calendars under the scheduler's page (see server/calendar.js): one list for every machine.
+  if (server.calendars !== undefined) merged.calendars = server.calendars;
   return merged;
 }
 

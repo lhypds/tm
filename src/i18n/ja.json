@@ -237,6 +237,10 @@
       "keys": "t",
       "desc": "右のペインをタスクとスケジューラで切り替える（スケジューラの文字は vim 風に編集：h j k l で移動、i / a で入力、esc で戻る；タスク上では space で開く、enter でその下に改行、x / p / w で状態を変える、backspace / d で外す）"
     },
+    "calendar": {
+      "keys": "c",
+      "desc": "スケジューラのページの下に、その日のカレンダー（Google と Apple カレンダーの予定）を表示／非表示"
+    },
     "refresh": {
       "keys": "r",
       "desc": "ページのデータを再読み込み"
@@ -348,7 +352,13 @@
     "next": "次の日",
     "notes": "その日のメモ",
     "remove": "この日から外す",
-    "missing": "このタスクはこのマシンにありません"
+    "missing": "このタスクはこのマシンにありません",
+    "calendar": "カレンダー",
+    "showCalendar": "カレンダーを表示",
+    "hideCalendar": "カレンダーを隠す",
+    "allDay": "終日",
+    "calendarOff": "カレンダーが未設定です：taskmgr.json の \"calendars\" に追加してください（docs/Web UI.md を参照）。",
+    "calendarError": "{{source}} カレンダーを読み込めません：{{error}}"
   },
   "analysis": {
     "title": "収入分析",
