@@ -172,7 +172,7 @@ function MonthSelect({ month, onPick, onClose }) {
 // keys do, see below; the scheduler goes to its day, and the event chosen is the page's,
 // `chosenEvent` changed with `onEvent(id)`, so the timetable shows it chosen too, and one chosen
 // there is chosen here) and a double click shows its details (see EventModal), a click anywhere else on a day shows that day in the scheduler at the right,
-// with its timetable (`onDay(day)`), and the day the scheduler shows (`chosenDay`, "YYYY-MM-DD",
+// with its timetable (`onDay(day)`) and puts the keyboard on it (as the keys do, see below), and the day the scheduler shows (`chosenDay`, "YYYY-MM-DD",
 // or null while it is not on screen) is shaded. The pencil at the right of the title adds and removes calendars (see
 // CalendarsModal), and the plus at its left makes a new event in Apple's Calendar (on the server's
 // machine, a Mac), open there for its time to be chosen, on the day the keyboard is on, else the one the scheduler shows,
@@ -490,8 +490,15 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
             data-other={d.getMonth() !== month.m}
             data-today={days[i] === today}
             data-chosen={days[i] === shadedDay}
-            // anywhere on the day but on an event of it, which shows itself
-            onClick={(e) => !e.target.closest("button") && onDay?.(days[i])}
+            // anywhere on the day but on an event of it, which shows itself; the keyboard is then
+            // on that day, as after the keys came onto it
+            onClick={(e) => {
+              if (e.target.closest("button")) return;
+              onDay?.(days[i]);
+              setCursor(days[i]);
+              setInDay(false);
+              onEvent?.(null);
+            }}
           >
             <span className={styles.number}>{d.getDate()}</span>
             <div className={styles.events} style={taken[days[i]] ? { marginTop: taken[days[i]] * LANE } : undefined}>
