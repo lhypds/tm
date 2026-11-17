@@ -1584,6 +1584,9 @@ export default function Home({ all = false }) {
       openCreator(view === "board" && boardStatuses.includes(pane) ? pane : "todo");
       return true;
     }
+    // on the scheduler with one of its tasks chosen, the arrows step off it into the text and
+    // delete takes it off the day (see Scheduler); with none chosen they are the page's keys
+    if (pane === "detail" && scheduler && ["left", "right", "Delete"].includes(name) && schedulerKeys.current?.(name)) return true;
     // esc drops the selection, so the next a / n adds a task at the top, not a subtask
     if (name === "escape" && selected && pane !== "detail") {
       unselectAll();

@@ -80,7 +80,9 @@ function createSchedulerApp({ dataDir, find, idsOf }) {
 
   // Write the page: its `text` and, with `tasks` ([{ work, repository, ids, line }]), where its
   // tasks sit: they are put in that order, each on its line (one that is not in the list keeps
-  // its line, after them; one that is not on the day is not added).
+  // its line, after them; one that is not on the day is not added). With `exact`, the list is the
+  // day's tasks: one that is not on the day is put on it (when the task is found), and one that is
+  // not in the list is taken off (how the page undoes and redoes its changes).
   app.put('/api/scheduler', (req, res) => {
     const body = req.body || {};
     const day = readDay(dateOf(body.date));
@@ -92,8 +94,13 @@ function createSchedulerApp({ dataDir, find, idsOf }) {
         const entry = { work: String(t.work || ''), repository: String(t.repository || ''), ids: (Array.isArray(t.ids) ? t.ids : []).map(String) };
         const i = rest.findIndex(x => same(x, entry));
         if (i >= 0) placed.push({ ...rest.splice(i, 1)[0], line: lineOf(t.line) });
+        else if (body.exact && entry.ids.length > 0 && !placed.some(x => same(x, entry))) {
+          let now = null;
+          try { now = find(entry); } catch (e) { now = null; }
+          if (now) placed.push({ ...entry, title: now.title, line: lineOf(t.line) });
+        }
       }
-      day.tasks = [...placed, ...rest];
+      day.tasks = body.exact ? placed : [...placed, ...rest];
     }
     writeDay(day);
     res.json(shown(day));

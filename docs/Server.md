@@ -308,7 +308,7 @@ A day has no file until a task is put on it or a text typed, and the file is rem
 Every route answers the day, each task with `title`, `rel` and `status` as they are now, or `missing: true` when it is gone.
 
 `GET /api/scheduler?date=` the day (empty when it has no file). 400 for a date that is not `YYYY-MM-DD`.  
-`PUT /api/scheduler` `{ date, text, tasks: [{ work, repository, ids, line }] }` writes the text and, with `tasks`, puts the day's tasks in that order, each on its line.  
+`PUT /api/scheduler` `{ date, text, tasks: [{ work, repository, ids, line }] }` writes the text and, with `tasks`, puts the day's tasks in that order, each on its line; with `exact: true` the list is the day's tasks (one not on the day is put on it, one left out is taken off).  
 `POST /api/scheduler/tasks` `{ date, tasks: [{ work, repository, rel }], line, index }` puts tasks on the day, on `line`, as the `index`th of its tasks (one already there stays). 404 for a task that is not found.  
 `DELETE /api/scheduler/task?date=&work=&repository=&ids=<id>/<id>` takes a task off the day.
 

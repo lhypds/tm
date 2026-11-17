@@ -61,6 +61,35 @@ function lineHeights(el, lines) {
   return heights;
 }
 
+// Whether the caret of the text box `el` is on its first row and on its last one, a long line
+// wrapping onto several: measured in a hidden copy, as lineHeights does.
+function caretRows(el) {
+  const cs = getComputedStyle(el);
+  const copy = document.createElement("div");
+  Object.assign(copy.style, {
+    position: "absolute",
+    visibility: "hidden",
+    left: "0",
+    top: "0",
+    width: `${el.clientWidth}px`,
+    fontFamily: cs.fontFamily,
+    fontSize: cs.fontSize,
+    fontWeight: cs.fontWeight,
+    letterSpacing: cs.letterSpacing,
+    lineHeight: cs.lineHeight,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+  });
+  const caret = document.createElement("span");
+  caret.textContent = "\u200b";
+  copy.append(el.value.slice(0, el.selectionStart), caret, `${el.value.slice(el.selectionStart)}\u200b`);
+  el.parentNode.appendChild(copy);
+  const row = parseFloat(cs.lineHeight) || caret.offsetHeight;
+  const rows = { first: caret.offsetTop < row / 2, last: caret.offsetTop + row * 1.5 > copy.offsetHeight };
+  copy.remove();
+  return rows;
+}
+
 // A run of the page's text, between two cards (or an end of the page): as tall as what is in it,
 // so the page scrolls, not the text. `fill` is the last one, which takes what is left of the page.
 function Lines({ value, fill, ...props }) {
@@ -81,9 +110,9 @@ function Lines({ value, fill, ...props }) {
 // the line it was dropped on, the text flowing around it: the lines above it stay above, the rest
 // go under it, and close up again when it is dragged to another line (a line across the page shows
 // where it would go). A click on a card opens the task (`onOpen(entry)`), its × takes it off the
-// day. With the keyboard on the pane (`keysRef` is given its keys, see below), j / k walk the
-// cards, space or enter opens the one chosen, esc lets it go, backspace takes it off the day, and e or i (enter too, with no card
-// chosen) put the caret at the end of the text. `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere).
+// day. The page is edited as a document with pictures in it: the arrows walk the caret from the
+// text onto a card and off it again, backspace and delete take a card off the day (see `cross` and
+// the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere).
 // See server/scheduler.js for what is kept.
 export default function Scheduler({ tasks, works, origins, reloadKey, focused, keysRef, onOpen }) {
   const { t, i18n } = useTranslation();
@@ -141,6 +170,8 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     if (next === date) return;
     flush();
     setLoaded(false);
+    history.current = [];
+    undone.current = [];
     setChosen(null);
     backTo.current = null;
     setText("");
@@ -159,6 +190,27 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     else timer.current = setTimeout(flush, SAVE_DELAY);
   };
 
+  // What the page was before each change made here ({ text, cards }, the latest last), and what
+  // was undone: cmd / ctrl + z goes back one change (a card put on the day, moved or taken off, or
+  // a stretch of typing), with shift (or ctrl + y) forward again. A new change drops what was
+  // undone; another day starts over.
+  const undone = useRef([]);
+  const history = useRef([]);
+  const typedAt = useRef(0);
+  const record = () => {
+    history.current.push({ text, cards });
+    if (history.current.length > 200) history.current.shift();
+    undone.current = [];
+    typedAt.current = 0; // the typing after this is a change of its own
+  };
+  const travel = (from, to) => {
+    const was = from.current.pop();
+    if (!was) return;
+    to.current.push({ text, cards });
+    typedAt.current = 0;
+    change(was.text, was.cards, true);
+  };
+
   // The page top to bottom: the lines of the text in runs, the cards between them, each card after
   // as many lines as its `line`. The last run is always there (empty when the last card is under
   // all the text) so there is somewhere to type; an empty run anywhere else is left out.
@@ -173,6 +225,10 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   // A run typed in: its lines replace those it had, and the cards under it move with the text.
   const type = (block, value) => {
+    // typing is one change until it pauses for a second
+    const now = Date.now();
+    if (now - typedAt.current > 1000) record();
+    typedAt.current = now;
     const typed = block.from === block.to && value === "" ? [] : value.split("\n");
     const next = [...lines.slice(0, block.from), ...typed, ...lines.slice(block.to)];
     const delta = typed.length - (block.to - block.from);
@@ -184,45 +240,50 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   // Up on the first character of a run goes to the end of the run above the card, down on the last
   // one to the start of the run under it.
-  // Esc leaves the text (what was typed is written on the blur). Backspace at the very start of a
-  // run under a card leaves it too, for that card, which is chosen (the line, when it is empty, is
-  // deleted on the way): backspace again takes it off
-  // the day (see the page's keys), and the caret is back where it was.
+  // The keys of a run of the text. The page is edited as a document with pictures in it is: the
+  // caret walks off the run onto the card beside it, which is then chosen (the text loses the
+  // caret, and the page's keys below go on from the card): up on the first row and left at the very
+  // start for the card above, down on the last row and right at the very end for the card under
+  // it. Backspace at the very start chooses the card above too (an empty line under that card is
+  // deleted on the way), and delete at the very end the card under it: the same key again takes
+  // the card off the day, and the caret is back where it was. Esc leaves the text (what was typed
+  // is written on the blur).
   const cross = (e, at) => {
     const el = e.currentTarget;
-    const above = blocks[at - 1]?.card;
-    if (e.key === "Backspace" && above && el.selectionStart === 0 && el.selectionEnd === 0 && !e.nativeEvent.isComposing) {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return; // an input method's own keys
+    if (e.key === "Escape") {
       e.preventDefault();
-      // an empty line under the card goes first, the text under it moving up
+      el.blur();
+      return;
+    }
+    if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || el.selectionStart !== el.selectionEnd) return;
+    const above = blocks[at - 1]?.card;
+    const under = blocks[at + 1]?.card;
+    const atStart = el.selectionStart === 0;
+    const atEnd = el.selectionStart === el.value.length;
+    const choose = (card) => {
+      e.preventDefault();
+      setChosen(cardKey(card));
+      el.blur();
+    };
+    if (e.key === "Backspace" && above && atStart) {
+      // an empty line under the card goes first, the text under it moving up (the page's only
+      // line stays, but under the cards that were below it)
       const block = blocks[at];
-      // (the page's only line stays, but under the cards that were below it)
       if (block.to > block.from && lines[block.from] === "") {
+        record();
         change(
           lines.length > 1 ? lines.filter((_, i) => i !== block.from).join("\n") : text,
           cards.map((c, i) => (i >= block.before ? { ...c, line: c.line - 1 } : c)),
           true,
         );
       }
-      backTo.current = { key: cardKey(above), line: above.line };
-      setChosen(cardKey(above));
-      el.blur();
-      return;
-    }
-    if (e.key === "Escape" && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      el.blur();
-      return;
-    }
-    const up = e.key === "ArrowUp" && el.selectionEnd === 0;
-    const down = e.key === "ArrowDown" && el.selectionStart === el.value.length;
-    if ((!up && !down) || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
-    const runs = [...pageRef.current.querySelectorAll("textarea")];
-    const to = runs[runs.indexOf(el) + (up ? -1 : 1)];
-    if (!to) return;
-    e.preventDefault();
-    to.focus();
-    const caret = up ? to.value.length : 0;
-    to.setSelectionRange(caret, caret);
+      choose(above);
+    } else if (e.key === "Delete" && under && atEnd) choose(under);
+    else if (e.key === "ArrowLeft" && above && atStart) choose(above);
+    else if (e.key === "ArrowRight" && under && atEnd) choose(under);
+    else if (e.key === "ArrowUp" && above && caretRows(el).first) choose(above);
+    else if (e.key === "ArrowDown" && under && caretRows(el).last) choose(under);
   };
 
   // Where a drag can drop: before each line of the text and before each card, and under it all,
@@ -281,6 +342,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       // a card of the page, to another line
       const from = cards.findIndex((c) => cardKey(c) === moved);
       if (from < 0) return;
+      record();
       const rest = cards.filter((_, i) => i !== from);
       rest.splice(slot.index > from ? slot.index - 1 : slot.index, 0, { ...cards[from], line: slot.line });
       change(text, rest, true);
@@ -294,6 +356,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     }
     const dropped = tasks.filter((task) => keys.includes(task.key));
     if (!dropped.length) return;
+    record();
     try {
       await flush();
       show(await api.scheduleTasks(date, dropped, slot.line, slot.index));
@@ -302,13 +365,13 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     }
   };
 
-  const remove = async (entry) => {
-    try {
-      await flush();
-      show(await api.unscheduleTask(date, entry));
-    } catch (e) {
-      showToast(e.message, 4000);
-    }
+  const remove = (entry) => {
+    record();
+    change(
+      text,
+      cards.filter((c) => cardKey(c) !== cardKey(entry)),
+      true,
+    );
   };
 
   // Where a card is from, as the list's tag says it: its repository, or its work, on a tint of
@@ -324,45 +387,62 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     };
   };
 
-  // The card the keyboard is on, by its key: none once it is off the day. `backTo` is the card
-  // chosen by a backspace in the text under it ({ key, line }): once it is off the day, the caret
-  // goes back to the start of that line.
+  // The card the keyboard is on, by its key: none once it is off the day. `backTo` is the card a
+  // key is taking off the day ({ key, line }): once it is gone, the caret goes to the start of the
+  // line it was on.
   const [chosen, setChosen] = useState(null);
+  const chosenIndex = cards.findIndex((c) => cardKey(c) === chosen);
   const backTo = useRef(null);
+  const caretTo = (blockIndex, line) => {
+    const el = pageRef.current?.querySelector(`textarea[data-block="${blockIndex}"]`);
+    if (!el) return;
+    const block = blocks[blockIndex];
+    const at = Math.min(lines.slice(block.from, line).reduce((n, l) => n + l.length + 1, 0), el.value.length);
+    el.focus();
+    el.setSelectionRange(at, at);
+  };
   useEffect(() => {
     const back = backTo.current;
     if (!back) return;
-    if (cards.some((c) => cardKey(c) === back.key)) {
-      if (chosen !== back.key) backTo.current = null; // still on the day, and another card chosen or this one let go
-      return;
-    }
+    if (cards.some((c) => cardKey(c) === back.key)) return; // still on the day
     backTo.current = null;
-    const i = blocks.findIndex((b) => !b.card && back.line >= b.from && (b.last || back.line < b.to));
-    const el = i < 0 ? null : pageRef.current?.querySelector(`textarea[data-block="${i}"]`);
-    if (!el) return;
-    const caret = lines.slice(blocks[i].from, back.line).reduce((n, line) => n + line.length + 1, 0);
-    el.focus();
-    el.setSelectionRange(Math.min(caret, el.value.length), Math.min(caret, el.value.length));
+    caretTo(
+      blocks.findIndex((b) => !b.card && back.line >= b.from && (b.last || back.line < b.to)),
+      back.line,
+    );
   });
-  const chosenIndex = cards.findIndex((c) => cardKey(c) === chosen);
   useEffect(() => {
     if (chosen) pageRef.current?.querySelector('[data-chosen="true"]')?.scrollIntoView({ block: "nearest" });
   }, [chosen, chosenIndex]);
 
-  // The page's keys, as Home names them; true when the key was one of them.
+  // The page's keys, as Home names them, while the keyboard is on the pane and not in the text;
+  // true when the key was one of them. j / k walk the cards. On a card, up and left go back into
+  // the text above it (its end), down and right into the text under it (its start), or on to the
+  // next card when there is no text between; backspace and delete take the card off the day, space
+  // and enter open its task, esc lets it go. e and i (enter too, with no card chosen) put the caret
+  // at the end of the text.
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
-      const step = ["j", "down"].includes(name) ? 1 : ["k", "up"].includes(name) ? -1 : 0;
+      const card = cards[chosenIndex];
+      const step = ["j", "down", "right"].includes(name) ? 1 : ["k", "up", "left"].includes(name) ? -1 : 0;
+      if (step && !card) {
+        if (["left", "right"].includes(name)) return false; // the page's: to the pane beside
+        if (cards.length) setChosen(cardKey(cards[step > 0 ? 0 : cards.length - 1])); // j starts at the first card, k at the last
+        return true;
+      }
       if (step) {
-        if (cards.length) {
-          // from no card, j starts at the first one and k at the last; the ends stop
-          const next = chosenIndex < 0 ? (step > 0 ? 0 : cards.length - 1) : Math.max(0, Math.min(cards.length - 1, chosenIndex + step));
-          setChosen(cardKey(cards[next]));
+        const at = blocks.findIndex((b) => b.card === card);
+        const beside = blocks[at + step];
+        if (!["j", "k"].includes(name) && beside && !beside.card) {
+          setChosen(null);
+          caretTo(at + step, step > 0 ? beside.from : beside.to); // past its last line: the end
+        } else {
+          const next = cards[chosenIndex + step];
+          if (next) setChosen(cardKey(next));
         }
         return true;
       }
-      const card = cards[chosenIndex];
       if (card && ["space", "enter"].includes(name)) {
         if (!card.missing) onOpen(card);
         return true;
@@ -371,16 +451,15 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         setChosen(null);
         return true;
       }
-      if (name === "backspace") {
+      if (["backspace", "Delete"].includes(name)) {
         if (!card) return false;
+        backTo.current = { key: cardKey(card), line: card.line };
         remove(card);
         return true;
       }
       if (["e", "i", "enter"].includes(name)) {
-        const texts = pageRef.current.querySelectorAll("textarea");
-        const el = texts[texts.length - 1];
-        el.focus();
-        el.setSelectionRange(el.value.length, el.value.length);
+        setChosen(null);
+        caretTo(blocks.length - 1, lines.length);
         return true;
       }
       return false;
@@ -390,12 +469,43 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     };
   });
 
+  // cmd / ctrl + s, in the text or with the keyboard on the pane, writes the page as it is now (the
+  // text and where the cards sit) and says so; cmd / ctrl + z and its redo go through the page's
+  // changes (see `record`). Not while a dialog has the keyboard: the key is its own.
+  const sectionRef = useRef(null);
+  useEffect(() => {
+    const onKeyDown = async (e) => {
+      const k = e.key.toLowerCase();
+      if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.altKey || !["s", "z", "y"].includes(k)) return;
+      const inside = sectionRef.current?.contains(e.target);
+      if (!inside && !(focused && e.target === document.body)) return;
+      e.preventDefault();
+      if (!loaded) return;
+      if (k !== "s") {
+        // the page's own undo and redo, in place of the text box's
+        if (k === "z" && !e.shiftKey) travel(history, undone);
+        else travel(undone, history);
+        return;
+      }
+      clearTimeout(timer.current);
+      pending.current = null;
+      try {
+        await api.saveSchedulerPage(date, text, cards);
+        showToast(t("toast.saved"));
+      } catch (err) {
+        showToast(err.message, 4000);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  });
+
   const [y, m, d] = date.split("-").map(Number);
   const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(new Date(y, m - 1, d));
   const isToday = date === today();
 
   return (
-    <section className={styles.scheduler} aria-label={t("scheduler.title")}>
+    <section ref={sectionRef} className={styles.scheduler} aria-label={t("scheduler.title")}>
       <div className={styles.bar} data-focused={focused}>
         <h2 className={styles.barTitle}>{t("scheduler.title")}</h2>
       </div>

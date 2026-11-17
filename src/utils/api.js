@@ -172,16 +172,14 @@ export const fileUrl = (space, rel, download = false) =>
 // resolves to the day after it.
 export const getSchedulerDay = (date) => request(`/api/scheduler?${q({ date })}`);
 
-// Write the page: its text, and its tasks in their order, each on its line.
+// Write the page: its text, and its tasks in their order, each on its line. The tasks given are
+// the day's: one that was not on it is put on it, one that is left out is taken off.
 export const saveSchedulerPage = (date, text, tasks) =>
-  request("/api/scheduler", json("PUT", { date, text, tasks: tasks.map(({ work, repository, ids, line }) => ({ work, repository, ids, line })) }));
+  request("/api/scheduler", json("PUT", { date, text, exact: true, tasks: tasks.map(({ work, repository, ids, line }) => ({ work, repository, ids, line })) }));
 
 // Put tasks on a day, each given by its space and rel, on `line`, as the `index`th of its tasks.
 export const scheduleTasks = (date, tasks, line, index) =>
   request("/api/scheduler/tasks", json("POST", { date, line, index, tasks: tasks.map((t) => ({ ...sp(t.space), rel: t.rel })) }));
-
-export const unscheduleTask = (date, entry) =>
-  request(`/api/scheduler/task?${q({ date, work: entry.work, repository: entry.repository, ids: entry.ids.join("/") })}`, { method: "DELETE" });
 
 // Route to the tasks of every origin: the root, which is also what the title links to.
 export const allPath = "/";
