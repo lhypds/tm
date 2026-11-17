@@ -541,8 +541,17 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   const isOurs = (e) => e.dataTransfer.types.includes(TASKS_DRAG_TYPE) || e.dataTransfer.types.includes(CARD_DRAG_TYPE);
 
+  // TEMP: says why a drop put nothing on the page, until the drop that does nothing is found.
+  const why = (message) => showToast(`drop: ${message}`, 8000, "bottom", "error");
   const drop = (e) => {
-    if (!isOurs(e)) return;
+    try {
+      dropped1(e);
+    } catch (err) {
+      why(`error: ${err.message}`);
+    }
+  };
+  const dropped1 = (e) => {
+    if (!isOurs(e)) return why(`not a task (${[...e.dataTransfer.types].join(", ")})`);
     e.preventDefault(); // the text takes no dropped title
     const slot = slotAt(e);
     endDrag();
@@ -550,7 +559,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     if (moved) {
       // a card of the page, to another line
       const from = cards.findIndex((c) => cardKey(c) === moved);
-      if (from < 0) return;
+      if (from < 0) return why(`card not on the page: ${moved}`);
       record();
       const rest = cards.filter((_, i) => i !== from);
       rest.splice(slot.index > from ? slot.index - 1 : slot.index, 0, { ...cards[from], line: slot.line });
@@ -579,12 +588,14 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     if (!added.length) {
       // on the day already: its card is shown as the one meant
       if (dropped.length) setChosen(cardKey(dropped[0]));
+      why(dropped.length ? `already on the day: ${dropped[0].title}` : `no task found for ${JSON.stringify(keys)} (data ${JSON.stringify(e.dataTransfer.getData(TASKS_DRAG_TYPE))}, ${tasks.length} tasks)`);
       return;
     }
     record();
     const next = [...cards];
     next.splice(slot.index, 0, ...added);
     change(text, next, true);
+    showToast(`drop: added ${added.length} at line ${slot.line} (TEMP)`, 3000);
   };
 
   const remove = (entry) => {
