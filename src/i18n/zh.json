@@ -71,6 +71,7 @@
   },
   "toast": {
     "folderCreated": "文件夹已创建",
+    "saving": "保存中...",
     "saved": "已保存",
     "created": "任务已创建",
     "createdUploadFailed": "任务已创建，但附件上传失败：{{error}}",

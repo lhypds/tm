@@ -71,6 +71,7 @@
   },
   "toast": {
     "folderCreated": "Folder created",
+    "saving": "Saving...",
     "saved": "Saved",
     "created": "Task created",
     "createdUploadFailed": "Task created, but an attachment failed: {{error}}",

@@ -883,6 +883,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
       }
       clearTimeout(timer.current);
       pending.current = null;
+      showToast(t("toast.saving"), null);
       try {
         const day = await api.saveSchedulerPage(date, compose(text, cards));
         if (day.date === dateRef.current) setCards((was) => withLive(was, day.tasks));

@@ -71,6 +71,7 @@
   },
   "toast": {
     "folderCreated": "フォルダを作成しました",
+    "saving": "保存中...",
     "saved": "保存しました",
     "created": "タスクを作成しました",
     "createdUploadFailed": "タスクを作成しましたが、添付ファイルのアップロードに失敗しました：{{error}}",

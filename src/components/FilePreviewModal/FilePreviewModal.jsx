@@ -103,9 +103,11 @@ export default function FilePreviewModal({ space, file, editing, onEdit, onEndEd
 
   // Write the text as typed; says whether it did (a failure is shown as a toast).
   async function save(text) {
+    showToast(t("toast.saving"), null);
     try {
       await saveFile(space, file.rel, text);
       onSaved?.();
+      showToast(t("toast.saved"));
       return true;
     } catch (e) {
       showToast(e.message, 4000);

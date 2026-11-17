@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { modKey, withKey } from "@utils/keys";
-import { Modal, TextArea } from "@ui";
+import { Modal, TextArea, showToast, hideToast } from "@ui";
 import * as api from "@utils/api";
 import { jsonTokens } from "@utils/highlight";
 import styles from "./config.module.css";
@@ -30,9 +30,11 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
 
   async function save() {
     setSaving(true);
+    showToast(t("toast.saving"), null);
     try {
       onSaved(await api.saveConfig(text));
     } catch (e) {
+      hideToast(); // the error is shown in the dialog
       setError(e.message);
     } finally {
       setSaving(false);

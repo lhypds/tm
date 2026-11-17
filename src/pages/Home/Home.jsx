@@ -1010,6 +1010,7 @@ export default function Home({ all = false }) {
   // `auto`: saved by itself as the typing rested, which goes without the "Saved" toast. Resolves to
   // whether it was saved.
   async function savePrompt(hook, task, text, auto = false) {
+    if (!auto) showToast(t("toast.saving"), null);
     if (!(await hook.savePrompt(text.trim() ? text : null))) return false;
     setLoads((n) => n + 1);
     if (!auto) showToast(t("toast.saved"));
@@ -1170,6 +1171,7 @@ export default function Home({ all = false }) {
   // The text edited in the task panel. A new first line renames the folder; the task stays
   // selected under its new rel unless another one was picked meanwhile.
   async function saveText(task, text) {
+    showToast(t("toast.saving"), null);
     try {
       const {
         task: { rel },
@@ -1191,6 +1193,7 @@ export default function Home({ all = false }) {
   // Claude Code then runs on the task, as its run button would.
   async function saveEdited(task, { text, prompt, execute }) {
     setSaving(true);
+    showToast(t("toast.saving"), null);
     try {
       let rel = task.rel;
       if (text !== (task.details ?? "")) rel = (await api.saveTaskText(task.space, task.rel, text)).task.rel;
@@ -1222,6 +1225,7 @@ export default function Home({ all = false }) {
   // button would (asking which machine first, when two sync its folder). Null: saved only.
   async function saveEditor(text, files = [], prompt = null) {
     setSaving(true);
+    showToast(t("toast.saving"), null);
     // the new task goes where the editor was opened for: the folder on the right (in a work's
     // list, the work's own tasks), or the folder of the task it is a subtask of
     const { space: inSpace, dir: inDir, status } = creating;
