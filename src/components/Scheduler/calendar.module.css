@@ -22,6 +22,13 @@
   font-weight: 600;
 }
 
+/* At the right of the divider: the plus (a new event in Apple's Calendar) and the pencil. */
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Under the divider: a calendar that could not be read. */
 .note {
   flex: none;

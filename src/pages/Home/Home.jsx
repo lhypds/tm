@@ -1478,7 +1478,12 @@ export default function Home({ all = false }) {
     const i = spaces.findIndex((s) => s.to === spaceTo);
     const move = moveIndex(name, i, spaces.length);
     if (move !== null) {
-      if (move >= 0) selectSpace(spaces[move].to, true);
+      if (move >= 0) {
+        selectSpace(spaces[move].to, true);
+        // the calendar is of no space in particular: the tasks of the one moved to are shown
+        // instead, in the list (the progress view stays); the keyboard stays on the tree
+        if (view === "calendar") setView("list");
+      }
       return true;
     }
     if (["a", "e", "o", "d"].includes(name)) {
@@ -1684,6 +1689,8 @@ export default function Home({ all = false }) {
       setCommand("");
       return true;
     }
+    // (on the calendar, a adds an event, not a task: see MonthCalendar; n still adds a task)
+    if (name === "a" && view === "calendar" && pane !== "detail" && pane !== "tree" && calendarKeys.current?.(name)) return true;
     if (name === "n" || (name === "a" && pane !== "tree")) {
       openCreator(view === "board" && boardStatuses.includes(pane) ? pane : "todo");
       return true;

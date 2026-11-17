@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { EditIcon } from "@components/icons";
+import { EditIcon, PlusIcon } from "@components/icons";
+import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { lightColor } from "@utils/colors";
 import { formatDateTime } from "@utils/task";
@@ -129,6 +130,8 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
   useEffect(() => {
     if (chosen) chosenRef.current?.scrollIntoView({ block: "nearest" });
   }, [chosen]);
+  // A new event on this day in Apple's Calendar (the plus of the divider, a).
+  const addEvent = () => api.newCalendarEvent(date, t("scheduler.newEventTitle")).catch((err) => showToast(err.message, 6000));
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
@@ -146,7 +149,11 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
         if (event) setLooked(event);
         return true;
       }
-      return ["enter", "i", "a", "e"].includes(name); // nothing to do on an event (h and l are the scheduler's: the days)
+      if (name === "a") {
+        addEvent(); // as the plus of the divider
+        return true;
+      }
+      return ["enter", "i", "e"].includes(name); // nothing to do on an event (h and l are the scheduler's: the days)
     };
     return () => {
       keysRef.current = null;
@@ -166,20 +173,37 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
       {/* a press anywhere on the timetable, its divider or what is under it, puts the keyboard on it */}
       <div className={styles.divider} data-focused={!!focused} onMouseDown={() => onChoose?.()}>
         <span className={styles.title}>{t("scheduler.calendar")}</span>
-        {/* let go after the click, so the keys are the page's again (as the bar's buttons) */}
-        <button
-          type="button"
-          className="btn"
-          tabIndex={-1}
-          onClick={(e) => {
-            e.currentTarget.blur();
-            setEditing(true);
-          }}
-          title={t("scheduler.calendars")}
-          aria-label={t("scheduler.calendars")}
-        >
-          <EditIcon />
-        </button>
+        {/* let go after the click, so the keys are the page's again (as the bar's buttons); the plus
+            makes a new event on this day in Apple's Calendar (on the server's machine, a Mac),
+            open there for its time to be chosen, as the one of the calendar view does */}
+        <span className={styles.buttons}>
+          <button
+            type="button"
+            className="btn"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              addEvent();
+            }}
+            title={t("scheduler.newEvent")}
+            aria-label={t("scheduler.newEvent")}
+          >
+            <PlusIcon />
+          </button>
+          <button
+            type="button"
+            className="btn"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              setEditing(true);
+            }}
+            title={t("scheduler.calendars")}
+            aria-label={t("scheduler.calendars")}
+          >
+            <EditIcon />
+          </button>
+        </span>
       </div>
       <EventModal event={looked} onClose={() => setLooked(null)} />
       <CalendarsModal

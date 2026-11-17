@@ -30,6 +30,13 @@
   font-weight: 600;
 }
 
+/* At the right of the title: the plus (a new event in Apple's Calendar) and the pencil. */
+.barButtons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Under the title: the month shown between its two buttons (as the scheduler's day is). */
 .months {
   flex: none;
@@ -171,6 +178,11 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   border-bottom: var(--line) solid var(--border);
+}
+
+/* Shaded while the keyboard is on a day of the month (h j k l move it), as the task list's head is. */
+.names[data-focused="true"] {
+  background: var(--bg-hover);
 }
 
 .name {

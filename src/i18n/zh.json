@@ -240,11 +240,11 @@
     },
     "calendar": {
       "keys": "c",
-      "desc": "在中间用整月的日历替换任务，右侧同时显示日程（t 回到任务；v 在列表、进度视图和日历之间切换；在日历上 j 进入月历，h j k l 选择日期，enter 进入这一天，然后 j / k 选择事件，space 查看；esc 退出）"
+      "desc": "在中间用整月的日历替换任务，右侧同时显示日程（t 回到任务；v 在列表、进度视图和日历之间切换；在日历上 j 进入月历，h j k l 选择日期，enter 进入这一天，然后 j / k 选择事件，space 查看，a 在 Apple 日历中为所选日期新建日程；esc 退出）"
     },
     "timetable": {
       "keys": "d",
-      "desc": "在日程上：显示或隐藏日程页下方的当天时间表（Google 和 Apple 日历中当天的日程；esc 之后按 j 移到它上面：j / k 在事件间移动，h / l 切换日期，space 查看事件）"
+      "desc": "在日程上：显示或隐藏日程页下方的当天时间表（Google 和 Apple 日历中当天的日程；esc 之后按 j 移到它上面：j / k 在事件间移动，h / l 切换日期，space 查看事件，a 在 Apple 日历中新建日程）"
     },
     "refresh": {
       "keys": "r",
@@ -382,6 +382,8 @@
     "eventConfirmed": "已确认",
     "eventFree": "空闲",
     "calendars": "日历设置",
+    "newEvent": "在 Apple 日历中新建日程",
+    "newEventTitle": "新建日程",
     "addCalendar": "添加",
     "removeCalendar": "移除",
     "calendarName": "名称（可选）",

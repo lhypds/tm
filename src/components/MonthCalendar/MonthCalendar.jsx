@@ -1,9 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, EditIcon } from "@components/icons";
+import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon } from "@components/icons";
 import CalendarsModal from "@components/Scheduler/CalendarsModal";
 import { firstDayOf } from "@components/Scheduler/DayPicker";
 import EventModal from "@components/Scheduler/EventModal";
+import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { lightColor } from "@utils/colors";
 import styles from "./monthCalendar.module.css";
@@ -106,9 +107,11 @@ function MonthSelect({ month, onPick, onClose }) {
 // there is chosen here) and a double click shows its details (see EventModal), a click anywhere else on a day shows that day in the scheduler at the right,
 // with its timetable (`onDay(day)`), and the day the scheduler shows (`chosenDay`, "YYYY-MM-DD",
 // or null while it is not on screen) is shaded. The pencil at the right of the title adds and removes calendars (see
-// CalendarsModal). The events are read again whenever `reloadKey` changes (the page's refresh,
+// CalendarsModal), and the plus at its left makes a new event in Apple's Calendar (on the server's
+// machine, a Mac), open there for its time to be chosen, on the day the keyboard is on, else the one the scheduler shows,
+// else today (the first of another month); a does the same. The events are read again whenever `reloadKey` changes (the page's refresh,
 // which reads the calendars anew) and every few minutes. While `focused` (the keyboard is on the
-// middle of the page) the title is shaded and the keys are its own (`keysRef` is given them; each
+// middle of the page) the title is shaded (and the row of the weekdays while h j k l move a day) and the keys are its own (`keysRef` is given them; each
 // answers true when it was one of them). The keyboard is first on the view itself: j (or enter)
 // goes into the month, onto a day (the one the scheduler shows, else today, else the first); h j
 // k l and the arrows then move a day and a week, the month following a day of another one, and
@@ -189,9 +192,21 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
   useEffect(() => {
     if (eventId) chosenRef.current?.scrollIntoView({ block: "nearest" });
   }, [eventId]);
+  // A new event in Apple's Calendar (the plus of the bar, a): on the day the keyboard is on, else
+  // the one the scheduler shows, else today (the first of another month).
+  const addEvent = () => {
+    const inMonth = (day) => !!day && days.includes(day);
+    const now1 = new Date();
+    const day = cursorShown || (inMonth(chosenDay) ? chosenDay : month.y === now1.getFullYear() && month.m === now1.getMonth() ? keyOf(now1) : keyOf(new Date(month.y, month.m, 1)));
+    api.newCalendarEvent(day, t("scheduler.newEventTitle")).catch((err) => showToast(err.message, 6000));
+  };
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
+      if (name === "a") {
+        addEvent();
+        return true;
+      }
       const to = (day) => {
         // onto another day, the month following it when it is in another one; the scheduler
         // shows it, with its timetable, as a click on it does (the day is then shaded)
@@ -260,19 +275,34 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
     <section className={styles.calendar} aria-label={t("calendar.title")}>
       <div className={styles.bar} data-focused={!!focused}>
         <h2 className={styles.barTitle}>{t("calendar.title")}</h2>
-        <button
-          type="button"
-          className="btn"
-          tabIndex={-1}
-          onClick={(e) => {
-            let1(e);
-            setEditing(true);
-          }}
-          title={t("scheduler.calendars")}
-          aria-label={t("scheduler.calendars")}
-        >
-          <EditIcon />
-        </button>
+        <span className={styles.barButtons}>
+          <button
+            type="button"
+            className="btn"
+            tabIndex={-1}
+            onClick={(e) => {
+              let1(e);
+              addEvent();
+            }}
+            title={t("scheduler.newEvent")}
+            aria-label={t("scheduler.newEvent")}
+          >
+            <PlusIcon />
+          </button>
+          <button
+            type="button"
+            className="btn"
+            tabIndex={-1}
+            onClick={(e) => {
+              let1(e);
+              setEditing(true);
+            }}
+            title={t("scheduler.calendars")}
+            aria-label={t("scheduler.calendars")}
+          >
+            <EditIcon />
+          </button>
+        </span>
       </div>
       <div className={styles.months}>
         <div className={styles.steps}>
@@ -315,7 +345,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
           {t("scheduler.calendarError", { source: [{ google: "Google", apple: "Apple" }[err.source], err.calendar].filter(Boolean).join(" · "), error: err.error })}
         </div>
       ))}
-      <div className={styles.names}>
+      <div className={styles.names} data-focused={!!focused && !!cursorShown && !inDay}>
         {dates.slice(0, 7).map((d) => (
           <span key={d.getDay()} className={`muted ${styles.name}`}>
             {names.format(d)}
