@@ -133,23 +133,29 @@
   gap: 12px;
 }
 
-/* Which machine this computer is, at the left end of the actions: a word and the list of them. */
-.here {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin-right: auto;
-  white-space: nowrap;
+/* Forget a machine that is not in touch: a small cross at the right end of its row, as a run's
+   remove is (RunList). */
+.forget {
+  flex: none;
+  display: inline-flex;
+  margin-left: auto;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
 }
 
-.here select {
-  width: auto;
-  min-width: 0;
-  max-width: 200px;
+.forget:hover {
+  color: var(--err);
 }
 
-/* Beside a connected machine that does not run Claude Code: what it can be given. */
+.forget svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Beside a machine's dot: that it is the computer the browser is on, and, for a connected one that
+   does not run Claude Code, what it can be given. */
 .note {
   margin-left: 8px;
   min-width: 0;

@@ -9,46 +9,20 @@ import { useSyncExternalStore } from "react";
 // It is found by asking the web UI of this computer, http://127.0.0.1:<port>/api/machine, which
 // answers only the pages of the server it syncs with (server/index.js); the ports are those the
 // machines' daemons told the server (GET /api/ai/machines). A browser may ask the user first (a
-// public page reaching a local address), or refuse (Safari, from an https page): the machine can
-// then be said by hand, in the Machines dialog, and that is kept for this browser. By hand wins.
+// public page reaching a local address), or refuse (Safari, from an https page): the computer is
+// then none of the machines, as far as the page knows. The Machines dialog marks the one found.
 
-const KEY = "machine.here"; // said by hand: a machine's name, or NONE
-const NONE = "-"; // by hand: this computer is none of the machines
 const ASK_MS = 3000;
 
 let found = ""; // as the web UI of this computer answered
 const asked = new Set(); // the ports tried
 const listeners = new Set();
 
-function byHand() {
-  try {
-    return localStorage.getItem(KEY) || "";
-  } catch (e) {
-    return "";
-  }
-}
-
 // Whether the page is served by this very computer: its folders are then opened here by the server
 // itself, and there is no machine to look for.
 export const isLocalPage = () => ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
 
-export function getHere() {
-  if (isLocalPage()) return "";
-  const hand = byHand();
-  return hand === NONE ? "" : hand || found;
-}
-
-// Say it by hand: `name`, or "" for none of the machines. Saying what was found anyway forgets the
-// hand, so what is found later is followed again.
-export function setHere(name) {
-  try {
-    if (name === found) localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, name || NONE);
-  } catch (e) {
-    /* not kept, then */
-  }
-  listeners.forEach((fn) => fn());
-}
+export const getHere = () => (isLocalPage() ? "" : found);
 
 function subscribe(fn) {
   listeners.add(fn);
@@ -61,9 +35,9 @@ export const useHere = () => useSyncExternalStore(subscribe, getHere);
 const skipped = () => isLocalPage() || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
 // Look for this computer among `machines` (as GET /api/ai/machines lists them): each port of a
-// connected machine is asked once. Nothing is asked once it is found, or said by hand.
+// connected machine is asked once. Nothing is asked once it is found.
 export async function findHere(machines) {
-  if (found || byHand() || skipped()) return;
+  if (found || skipped()) return;
   const ports = [...new Set((machines || []).filter((m) => m.linked && m.port).map((m) => m.port))].filter((p) => !asked.has(p));
   for (const port of ports) {
     asked.add(port);

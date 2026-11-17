@@ -1024,6 +1024,39 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     });
   };
 
+  // Forget the machine `name`: it no longer syncs any space (one left without a machine is this
+  // server's own from then on, as after a config that no longer lists it, see PUT /api/sync/config),
+  // nothing deleted or edited here is remembered for it, nor its filters or when it was last heard
+  // from. Should it sync again, it is a machine anew: the snapshots of its spaces are forgotten too,
+  // so it pushes them whole and is counted again.
+  app.forgetMachine = (name) => {
+    const state = readState();
+    for (const k of Object.keys(state.machines)) {
+      if (!state.machines[k].includes(name)) continue;
+      state.machines[k] = state.machines[k].filter(m => m !== name);
+      if (!state.machines[k].length) delete state.machines[k];
+      delete state.spaces[k];
+    }
+    for (const [k, gone] of Object.entries(state.deleted)) {
+      for (const [p, d] of Object.entries(gone)) {
+        if (Array.isArray(d.machines)) d.machines = d.machines.filter(m => m !== name);
+        if (d.had) delete d.had[name];
+        if (!d.machines || !d.machines.length) delete gone[p];
+      }
+      if (!Object.keys(gone).length) delete state.deleted[k];
+    }
+    for (const [k, edited] of Object.entries(state.edited)) {
+      for (const [p, rec] of Object.entries(edited)) {
+        delete rec[name];
+        if (!Object.keys(rec).length) delete edited[p];
+      }
+      if (!Object.keys(edited).length) delete state.edited[k];
+    }
+    delete state.filters[name];
+    writeState(state);
+    seen.delete(name);
+  };
+
   // ---------- the scheduler ----------
 
   // The scheduler's days (see server/scheduler.js), which every machine shares: they are this

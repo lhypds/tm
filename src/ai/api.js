@@ -20,6 +20,10 @@ export const startRun = (space, rel, after = null, machine = null) =>
 // given a prompt, and `port` the port of the web UI there (see @utils/here).
 export const getMachines = () => request("/api/ai/machines");
 
+// Forget `machine`: it leaves the machines, and the folders it synced stay as the server's own; it
+// is back, syncing as before, at its next push or pull. { ok: true }.
+export const forgetMachine = (machine) => request(`/api/ai/machines/${encodeURIComponent(machine)}`, { method: "DELETE" });
+
 // Start Claude Code on `machine` with `prompt` as it is, on no task, in the home folder there;
 // resolves to { run } with its transcript (409 when the machine's runner is not connected).
 export const startMachineRun = (machine, prompt) => request("/api/ai/machine/run", json("POST", { machine, prompt }));

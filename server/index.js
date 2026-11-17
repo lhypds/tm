@@ -1165,7 +1165,8 @@ app.use(createAiApp({
     const machines = machinesOf(space);
     return { remote: machines.length > 0, machine: runMachine(machines), machines };
   },
-  machines: () => syncApp.allMachines()
+  machines: () => syncApp.allMachines(),
+  forgetMachine: (name) => syncApp.forgetMachine(name)
 }));
 
 app.use('/api', (req, res) => { throw new HttpError(404, 'Unknown API route.'); });

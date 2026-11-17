@@ -7,6 +7,7 @@
 //                                    `after` ("push" or "pr") is what Claude is told to do with its changes
 //                                    once done: commit and push, or a new branch and a pull request (see ai/task.js)
 //   GET    /api/ai/machines          the machines Claude Code can be run on from here: { machines }
+//   DELETE /api/ai/machines/<name>   forget a machine: { ok }
 //   POST   /api/ai/machine/run       { machine, prompt }: start Claude Code on that machine with the prompt as
 //                                    it is, on no task, in its user's home folder; 201 { run }
 //   POST   /api/ai/machine/command   { machine, command }: run a tm command ("/restart") on that machine, in a
@@ -75,8 +76,9 @@ function eventStream(req, res, onClose) {
 // a copy pushed from another machine and `machine` that machine as the web UI shows it ({ name,
 // online, runner }, see index.js), null when unknown. `machine` is this machine's name, for the records
 // of its runs (MACHINE_ID; the hostname when not given). `machines()` lists the machines that sync with
-// this server, [{ name, seenAt, online }] (server/sync.js allMachines), for GET /api/ai/machines.
-function createAiApp({ config, logFile, machine, locate = () => ({ remote: false, machine: null }), machines = () => [] }) {
+// this server, [{ name, seenAt, online }] (server/sync.js allMachines), for GET /api/ai/machines, and
+// `forgetMachine(name)` forgets one of them (server/sync.js forgetMachine).
+function createAiApp({ config, logFile, machine, locate = () => ({ remote: false, machine: null }), machines = () => [], forgetMachine = () => {} }) {
   session.configure({ logFile, machine });
   const app = express.Router();
 
@@ -145,6 +147,17 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
       byName.set(c.name, { name: c.name, seenAt: null, ...byName.get(c.name), online: true, runner: c.ai, linked: true, port: c.port });
     }
     res.json({ machines: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)) });
+  });
+
+  // Forget a machine that is no longer there (the cross beside it in the Machines dialog): it leaves
+  // the list and the folders it synced, which stay here as this server's own. Never refused for a
+  // machine that is known: one that is in touch, or comes back later, syncs on as before and is a
+  // machine again at its next push or pull (the web UI offers it for those not in touch only).
+  app.delete('/api/ai/machines/:name', (req, res) => {
+    const name = String(req.params.name || '');
+    if (!machines().some(m => m.name === name)) throw httpError(404, `Unknown machine "${name}".`);
+    forgetMachine(name);
+    res.json({ ok: true });
   });
 
   app.post('/api/ai/machine/run', async (req, res) => {

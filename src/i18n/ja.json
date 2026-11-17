@@ -12,6 +12,7 @@
     "typeToConfirm": "確認のため「{{name}}」と入力してください"
   },
   "status": {
+    "here": "このデバイスは {{name}}：そのフォルダはここで開きます",
     "todo": "ToDo",
     "done": "完了",
     "pending": "保留",
@@ -78,7 +79,7 @@
     "openedCode": "VS Code で開きました",
     "noSource": "開くソースコードがありません：source path のある repository のタスクではありません。",
     "notHere": "このフォルダはこのコンピュータにはありません。開いていません。",
-    "sayHere": "ある場合は、「マシン」でこのコンピュータがどのマシンかを指定してください。",
+    "sayHere": "ある場合は、このコンピュータで tm が動いていて、ブラウザからのアクセスが許可されているか確認してください。",
     "notCommand": "コマンドではありません：{{cmd}}",
     "copied": "{{id}} をコピーしました",
     "copiedAmbiguous": "{{id}} をコピーしましたが、「{{name}}」は複数の work / repository に当たります：tm run には work/repository が必要です",
@@ -467,9 +468,10 @@
     "runHint": "チェックしたマシンでこのプロンプトの Claude Code を実行（⌘ / ctrl + enter）",
     "none": "このサーバーと同期しているマシンはまだありません：マシンで .env を AI_RUNNER=1 にして taskmgrd を起動してください。",
     "commandStarted": "{{machines}} で {{command}} を開始しました",
-    "here": "このコンピュータは",
-    "hereNone": "どれでもない",
-    "hereHint": "このブラウザがあるマシン：そのフォルダはここで Finder やエクスプローラーで開き、新規イベントもここで作成されます。このコンピュータの tm に問い合わせて自動判別します。判別できないときは手動で選んでください。",
+    "here": "このデバイス",
+    "forget": "{{name}} を削除",
+    "forgetConfirm": "{{name}} をマシン一覧から削除しますか？同期していたフォルダはこのサーバーのものとして残ります。次回の同期でまた表示されます。",
+    "forgetTitle": "マシンを削除",
     "commandsOnly": "/コマンドのみ：Claude Code を実行するには .env で AI_RUNNER=1 にしてください"
   },
   "calendar": {

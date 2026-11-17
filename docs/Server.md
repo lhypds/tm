@@ -267,6 +267,12 @@ taskmgrd connected, sorted by name. `linked`: its taskmgrd is connected, so it c
 open or a new event; `runner`: it runs Claude Code too (`AI_RUNNER=1` there), so it can be given a prompt; `port`: the  
 port of the web UI on that machine (`null` when not known), where a browser on it asks which machine it is on.  
 
+`DELETE /api/ai/machines/<name>`  
+Forget a machine (the × beside one that is not in touch, in the web UI's Machines dialog): it leaves the machines and the  
+`machines` of the spaces it synced (one left with none is the server's own from then on), and what was deleted or edited  
+here is no longer remembered for it. `{ ok: true }`; 404 when it is not known. Never refused otherwise: a machine that  
+is in touch, or comes back later, goes on syncing and is counted again at its next push or pull.  
+
 `POST /api/ai/machine/run` `{ machine, prompt }`  
 Start Claude Code on that machine with the prompt as it is, on no task, in the home folder of its user (the web UI's  
 Machines dialog). 201 `{ run }`, with its transcript: a run as above whose `task` is `{ work: "", repository: "", rel: "",  

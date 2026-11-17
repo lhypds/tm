@@ -12,6 +12,7 @@
     "typeToConfirm": "输入“{{name}}”以确认"
   },
   "status": {
+    "here": "本机是 {{name}}：它的文件夹在这里打开",
     "todo": "待办",
     "done": "完成",
     "pending": "搁置",
@@ -78,7 +79,7 @@
     "openedCode": "已在 VS Code 中打开",
     "noSource": "没有可打开的源码：这个任务不属于设置了 source path 的 repository。",
     "notHere": "这个文件夹不在这台电脑上，没有打开。",
-    "sayHere": "如果在，请到“机器”里指定这台电脑是哪台机器。",
+    "sayHere": "如果在，请确认这台电脑上的 tm 正在运行，并且浏览器允许访问它。",
     "notCommand": "无效命令：{{cmd}}",
     "copied": "已复制 {{id}}",
     "copiedAmbiguous": "已复制 {{id}}，但“{{name}}”对应多个 work / repository：tm run 需要写成 work/repository",
@@ -467,9 +468,10 @@
     "runHint": "用这个 prompt 在勾选的机器上运行 Claude Code（⌘ / ctrl + enter）",
     "none": "还没有机器与这台服务器同步：在一台机器上启动 taskmgrd，并在 .env 里设 AI_RUNNER=1。",
     "commandStarted": "已在 {{machines}} 上启动 {{command}}",
-    "here": "这台电脑是",
-    "hereNone": "都不是",
-    "hereHint": "这个浏览器所在的机器：它的文件夹会在这里用 Finder 或资源管理器打开，新建日程也在这里。通过询问本机的 tm 自动识别；识别不到时请手动选择。",
+    "here": "本机",
+    "forget": "移除 {{name}}",
+    "forgetConfirm": "把 {{name}} 从机器列表中移除？它同步过的文件夹会保留，归这台服务器所有。它下次同步时会重新出现。",
+    "forgetTitle": "移除机器",
     "commandsOnly": "只能执行 /命令：在它的 .env 里设 AI_RUNNER=1 才能运行 Claude Code"
   },
   "calendar": {

@@ -2,9 +2,10 @@ import { useTranslation } from "react-i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, TextArea, Checkbox, showToast } from "@ui";
 import MachineDot from "@components/MachineDot";
-import { StopIcon } from "@components/icons";
+import ConfirmModal from "@components/ConfirmModal";
+import { StopIcon, XIcon } from "@components/icons";
 import { formatDateTime } from "@utils/task";
-import { useHere, setHere, findHere, isLocalPage } from "@utils/here";
+import { useHere, findHere } from "@utils/here";
 import * as api from "../api";
 import { duration } from "../duration";
 import styles from "./machines.module.css";
@@ -43,8 +44,10 @@ function readPicked() {
 // under the first line (↑ / ↓ move, enter or tab takes one, a click too). A toast tells which machines started it, and what the
 // others answered.
 //
-// At the bottom left, which of the machines this computer is (see @utils/here): found by itself where
-// the browser lets the page ask, chosen there otherwise. Its folders are then opened on it.
+// The machine this computer is (see @utils/here: found by itself, where the browser lets the page
+// ask) says so beside its name, "this device": its folders are opened on it. A machine that is not
+// in touch has a cross at the right end of its row, which forgets it once confirmed (DELETE
+// /api/ai/machines/<name>): gone for good, it would stay in the list otherwise.
 export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
   const { t } = useTranslation();
   const [machines, setMachines] = useState(null); // null until first answered
@@ -56,6 +59,9 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   const promptRef = useRef(null);
   const [menu, setMenu] = useState({ off: false, index: 0 }); // the commands listed under "/": put away, and the one the keys are on
   const here = useHere();
+  const [forgetting, setForgetting] = useState(null); // the name of the machine asked to be forgotten
+  const [forgetBusy, setForgetBusy] = useState(false);
+  const loadRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -72,10 +78,12 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
           if (!stale) setError(e.message);
         },
       );
+    loadRef.current = load;
     load();
     const id = setInterval(load, REFRESH_MS);
     return () => {
       stale = true;
+      loadRef.current = null;
       clearInterval(id);
     };
   }, [isOpen]);
@@ -124,6 +132,20 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
             : r.status === "stopped"
               ? t("ai.stopped")
               : t("ai.failed");
+
+  const forget = async () => {
+    setForgetBusy(true);
+    try {
+      await api.forgetMachine(forgetting);
+      setMachines((list) => list && list.filter((m) => m.name !== forgetting));
+    } catch (e) {
+      showToast(e.message, 6000, "bottom", "error");
+      loadRef.current?.(); // gone already: as it is now
+    } finally {
+      setForgetBusy(false);
+      setForgetting(null);
+    }
+  };
 
   const canRun = !busy && !!prompt.trim() && targets.length > 0;
   // Once run, the box is emptied and what was run stays in it as its placeholder, grey and not to be
@@ -186,130 +208,139 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t("machines.runTitle")} className={styles.modal} onEscape={prompt ? clear : undefined}>
-      <div className={styles.body}>
-        <div className={styles.promptWrap}>
-          <TextArea
-            ref={promptRef}
-            value={prompt}
-            className={styles.prompt}
-            placeholder={sent || ""}
-            minHeight={80}
-            aria-label={t("machines.prompt")}
-            onChange={(e) => {
-              setPrompt(e.target.value);
-              setMenu({ off: false, index: 0 });
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                run();
-              } else if (e.key === "Tab" && !e.shiftKey && !prompt && sent) {
-                e.preventDefault();
-                setPrompt(sent);
-                setMenu({ off: true, index: 0 });
-              } else if (options.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-                e.preventDefault();
-                setMenu({
-                  off: false,
-                  index: (optionIndex + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length,
-                });
-              } else if (options.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                take(options[optionIndex]);
-              }
-            }}
-          />
-          {options.length > 0 && (
-            <ul className={styles.commands} role="listbox">
-              {options.map((c, i) => (
-                <li
-                  key={c}
-                  role="option"
-                  aria-selected={i === optionIndex}
-                  className={styles.command}
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // the prompt keeps the focus
-                    take(c);
-                  }}
-                  onMouseEnter={() => setMenu({ off: false, index: i })}
-                >
-                  /{c}
+    <>
+      <Modal isOpen={isOpen} onClose={onClose} title={t("machines.runTitle")} className={styles.modal} onEscape={prompt ? clear : undefined}>
+        <div className={styles.body}>
+          <div className={styles.promptWrap}>
+            <TextArea
+              ref={promptRef}
+              value={prompt}
+              className={styles.prompt}
+              placeholder={sent || ""}
+              minHeight={80}
+              aria-label={t("machines.prompt")}
+              onChange={(e) => {
+                setPrompt(e.target.value);
+                setMenu({ off: false, index: 0 });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  run();
+                } else if (e.key === "Tab" && !e.shiftKey && !prompt && sent) {
+                  e.preventDefault();
+                  setPrompt(sent);
+                  setMenu({ off: true, index: 0 });
+                } else if (options.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                  e.preventDefault();
+                  setMenu({
+                    off: false,
+                    index: (optionIndex + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length,
+                  });
+                } else if (options.length && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  take(options[optionIndex]);
+                }
+              }}
+            />
+            {options.length > 0 && (
+              <ul className={styles.commands} role="listbox">
+                {options.map((c, i) => (
+                  <li
+                    key={c}
+                    role="option"
+                    aria-selected={i === optionIndex}
+                    className={styles.command}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // the prompt keeps the focus
+                      take(c);
+                    }}
+                    onMouseEnter={() => setMenu({ off: false, index: i })}
+                  >
+                    /{c}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {error && <div className={styles.error}>{error}</div>}
+          {machines === null && !error && <div className="muted">{t("common.loading")}</div>}
+          {machines?.length === 0 && <div className={`muted ${styles.hint}`}>{t("machines.none")}</div>}
+
+          {machines?.length > 0 && (
+            <ul className={styles.machines}>
+              {machines.map((m) => (
+                <li key={m.name} className={styles.machine} data-ready={!!m.linked}>
+                  <div className={styles.row}>
+                    <Checkbox checked={isPicked(m)} disabled={!m.linked} onChange={(on) => toggle(m, on)}>
+                      <span className={styles.name}>{m.name}</span>
+                    </Checkbox>
+                    <MachineDot machine={m} />
+                    {m.name === here && <span className={`muted ${styles.note}`}>{t("machines.here")}</span>}
+                    {m.linked && !m.runner && (
+                      <span className={`muted ${styles.note}`} title={t("machines.commandsOnly")}>
+                        {t("machines.commandsOnly")}
+                      </span>
+                    )}
+                    {!m.linked && !m.online && (
+                      <button
+                        type="button"
+                        className={styles.forget}
+                        tabIndex={-1}
+                        onClick={() => setForgetting(m.name)}
+                        title={t("machines.forget", { name: m.name })}
+                        aria-label={t("machines.forget", { name: m.name })}
+                      >
+                        <XIcon />
+                      </button>
+                    )}
+                  </div>
+                  {(runsOf[m.name] || []).slice(0, RUNS_SHOWN).map((r) => (
+                    <div key={r.id} className={styles.run}>
+                      <span className={`muted ${styles.when}`}>{formatDateTime(r.startedAt)}</span>
+                      <button
+                        type="button"
+                        className={styles.runTitle}
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          e.currentTarget.blur();
+                          onOpenRun(r);
+                        }}
+                        title={r.task.title}
+                      >
+                        {r.task.title}
+                      </button>
+                      <span className={`muted ${styles.state}`} data-pending={!!r.pending} title={r.error || ""}>
+                        {stateOf(r)}
+                      </span>
+                      {(r.status === "running" || r.status === "queued") && (
+                        <button type="button" className={styles.stop} tabIndex={-1} onClick={() => onStop(r)} title={t("ai.stop")} aria-label={t("ai.stop")}>
+                          <StopIcon />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </li>
               ))}
             </ul>
           )}
+
+          <div className={styles.actions}>
+            <button type="button" className="btn primary lg" disabled={!canRun} onClick={run} title={t("machines.runHint")}>
+              {t("machines.run")}
+            </button>
+          </div>
         </div>
-
-        {error && <div className={styles.error}>{error}</div>}
-        {machines === null && !error && <div className="muted">{t("common.loading")}</div>}
-        {machines?.length === 0 && <div className={`muted ${styles.hint}`}>{t("machines.none")}</div>}
-
-        {machines?.length > 0 && (
-          <ul className={styles.machines}>
-            {machines.map((m) => (
-              <li key={m.name} className={styles.machine} data-ready={!!m.linked}>
-                <div className={styles.row}>
-                  <Checkbox checked={isPicked(m)} disabled={!m.linked} onChange={(on) => toggle(m, on)}>
-                    <span className={styles.name}>{m.name}</span>
-                  </Checkbox>
-                  <MachineDot machine={m} />
-                  {m.linked && !m.runner && (
-                    <span className={`muted ${styles.note}`} title={t("machines.commandsOnly")}>
-                      {t("machines.commandsOnly")}
-                    </span>
-                  )}
-                </div>
-                {(runsOf[m.name] || []).slice(0, RUNS_SHOWN).map((r) => (
-                  <div key={r.id} className={styles.run}>
-                    <span className={`muted ${styles.when}`}>{formatDateTime(r.startedAt)}</span>
-                    <button
-                      type="button"
-                      className={styles.runTitle}
-                      tabIndex={-1}
-                      onClick={(e) => {
-                        e.currentTarget.blur();
-                        onOpenRun(r);
-                      }}
-                      title={r.task.title}
-                    >
-                      {r.task.title}
-                    </button>
-                    <span className={`muted ${styles.state}`} data-pending={!!r.pending} title={r.error || ""}>
-                      {stateOf(r)}
-                    </span>
-                    {(r.status === "running" || r.status === "queued") && (
-                      <button type="button" className={styles.stop} tabIndex={-1} onClick={() => onStop(r)} title={t("ai.stop")} aria-label={t("ai.stop")}>
-                        <StopIcon />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className={styles.actions}>
-          {/* not on a page served by this computer: the server is where its folders open */}
-          {!isLocalPage() && machines?.length > 0 && (
-            <label className={styles.here} title={t("machines.hereHint")}>
-              <span className="muted">{t("machines.here")}</span>
-              <select className="select" value={machines.some((m) => m.name === here) ? here : ""} onChange={(e) => setHere(e.target.value)}>
-                <option value="">{t("machines.hereNone")}</option>
-                {machines.map((m) => (
-                  <option key={m.name} value={m.name}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <button type="button" className="btn primary lg" disabled={!canRun} onClick={run} title={t("machines.runHint")}>
-            {t("machines.run")}
-          </button>
-        </div>
-      </div>
-    </Modal>
+      </Modal>
+      <ConfirmModal
+        isOpen={!!forgetting}
+        title={t("machines.forgetTitle")}
+        message={forgetting ? t("machines.forgetConfirm", { name: forgetting }) : ""}
+        busy={forgetBusy}
+        onCancel={() => setForgetting(null)}
+        onConfirm={forget}
+      />
+    </>
   );
 }

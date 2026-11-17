@@ -46,7 +46,7 @@ import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
 import { getMachines } from "@ai/api";
-import { findHere, getHere, isLocalPage } from "@utils/here";
+import { findHere, getHere, useHere, isLocalPage } from "@utils/here";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -842,6 +842,7 @@ export default function Home({ all = false }) {
   // server, on no task (see MachinesModal). A run picked there, or just started, shows in a run
   // dialog of its own, in front of it (`machineRunId`), under a stand-in for the task it has not.
   const [machinesOpen, setMachinesOpen] = useState(false);
+  const here = useHere(); // the machine this browser is on, "" until found: named at the right end of the status bar
   const [machineRunId, setMachineRunId] = useState(null);
   const [machineRunFile, setMachineRunFile] = useState(null); // its prompt, previewed from that dialog
   const machineRun = machineRunId ? ai.runs[machineRunId] || null : null;
@@ -2390,6 +2391,13 @@ export default function Home({ all = false }) {
                     aria-label={pollingTitle(polling, t)}
                   />
                 )}
+              </span>
+            )}
+            {/* the machine this browser is on, once found (see @utils/here) */}
+            {here && (
+              <span className={`mono ${styles.server}`} title={t("status.here", { name: here })}>
+                {here}
+                <span className="machine-dot" data-online="true" aria-label={t("status.here", { name: here })} />
               </span>
             )}
           </>

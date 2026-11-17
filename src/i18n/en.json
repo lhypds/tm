@@ -12,6 +12,7 @@
     "typeToConfirm": "Type “{{name}}” to confirm"
   },
   "status": {
+    "here": "This device is {{name}}: its folders open here",
     "todo": "todo",
     "done": "done",
     "pending": "pending",
@@ -78,7 +79,7 @@
     "openedCode": "Opened in VS Code",
     "noSource": "No source code to open: this is not a task of a repository with a source path.",
     "notHere": "This folder is not on this computer: nothing was opened.",
-    "sayHere": "If it is, say which machine this computer is in Machines.",
+    "sayHere": "If it is, tm has to be running on this computer, and the browser allowed to reach it.",
     "notCommand": "Not a command: {{cmd}}",
     "copied": "Copied {{id}}",
     "copiedAmbiguous": "Copied {{id}}, but “{{name}}” names more than one work / repository: tm run needs work/repository",
@@ -467,9 +468,10 @@
     "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",
     "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env.",
     "commandStarted": "{{command}} started on {{machines}}",
-    "here": "This computer is",
-    "hereNone": "none of these",
-    "hereHint": "The machine this browser is on: its folders open here, in Finder or Explorer, and a new calendar event is made here. Found by asking the tm on this computer; choose it by hand when it is not.",
+    "here": "this device",
+    "forget": "Remove {{name}}",
+    "forgetConfirm": "Remove {{name}} from the machines? The folders it synced are kept, as this server's own. It is back at its next sync.",
+    "forgetTitle": "Remove machine",
     "commandsOnly": "/commands only: AI_RUNNER=1 in its .env runs Claude Code there"
   },
   "calendar": {
