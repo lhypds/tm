@@ -179,13 +179,15 @@ function MonthSelect({ month, onPick, onClose }) {
 // else today (the first of another month); a does the same. The events are read again whenever `reloadKey` changes (the page's refresh,
 // which reads the calendars anew) and every few minutes. While `focused` (the keyboard is on the
 // middle of the page) the title is shaded (and the row of the weekdays while h j k l move a day) and the keys are its own (`keysRef` is given them; each
-// answers true when it was one of them). The keyboard is first on the view itself: j (or enter)
+// answers true when it was one of them). The keyboard is in the month from the start, and whenever
+// `enterKey` changes (c, v: the view is asked for), on the day the scheduler shows; out of it (esc),
+// it is on the view itself, where j (or enter)
 // goes into the month, onto a day (the one the scheduler shows, else today, else the first); h j
 // k l and the arrows then move a day and a week, the month following a day of another one, and
 // the scheduler shows each day the keyboard comes on (so it is the shaded one, as after a click);
 // enter goes into the day, where j and k walk its events and space shows the one chosen (see EventModal); esc is back out of the
 // day, then out of the month.
-export default function MonthCalendar({ reloadKey, loading, focused, keysRef, chosenDay, onDay, chosenEvent, onEvent }) {
+export default function MonthCalendar({ reloadKey, loading, focused, keysRef, enterKey, chosenDay, onDay, chosenEvent, onEvent }) {
   const { t, i18n } = useTranslation();
   const [month, setMonth] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
   const [read, setRead] = useState(null); // { range, events, errors } as read last
@@ -315,6 +317,20 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
   }, [chosenDay]); // eslint-disable-line react-hooks/exhaustive-deps
   // a month shown that the day is not in (a step, a month picked, the refresh) lets it go
   const cursorShown = cursor && days.includes(cursor) ? cursor : null;
+  // The view asked for (shown, or c again: `enterKey`): the keyboard goes into the month by itself,
+  // onto the day the scheduler shows (the shaded one; awaited while the scheduler has not said
+  // it yet), the month following it, so h j k l move from there at once. A day it is already on stays.
+  const [entering, setEntering] = useState(true);
+  useEffect(() => setEntering(true), [enterKey]);
+  useEffect(() => {
+    if (!entering || !chosenDay) return;
+    setEntering(false);
+    if (cursorShown) return;
+    const [y, m] = chosenDay.split("-").map(Number);
+    setCursor(chosenDay);
+    setInDay(false);
+    if (y !== month.y || m - 1 !== month.m) setMonth({ y, m: m - 1 });
+  }, [entering, chosenDay]); // eslint-disable-line react-hooks/exhaustive-deps
   const dayEvents = cursorShown ? events[cursorShown] : [];
   const chosenRef = useRef(null);
   useEffect(() => {

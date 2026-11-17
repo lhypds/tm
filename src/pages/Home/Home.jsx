@@ -185,6 +185,7 @@ export default function Home({ all = false }) {
   const [wantScheduler, setScheduler] = useState(() => readFlag("panel.scheduler", false)); // the right pane shows the scheduler, not the task (see `scheduler`)
   const [calendarOpen, setCalendarOpen] = useState(() => readFlag("panel.calendar", false)); // the scheduler shows the day's calendar under its page
   const schedulerKeys = useRef(null); // the scheduler's keys while the keyboard is on it (see Scheduler)
+  const [calendarEnters, setCalendarEnters] = useState(0); // how many times the calendar view was asked for (see MonthCalendar's enterKey)
   const calendarKeys = useRef(null); // the calendar view's, while the keyboard is on the middle (see MonthCalendar)
   // The day the scheduler shows (it says so, see Scheduler), and a day asked of it: one clicked in
   // the calendar view ({ date }), let go once the scheduler has moved on to another.
@@ -1390,7 +1391,10 @@ export default function Home({ all = false }) {
   // pane with it (c, v or the header's button): the days beside their month.
   function showView(next) {
     setView(next);
-    if (next === "calendar") showScheduler(true);
+    if (next === "calendar") {
+      showScheduler(true);
+      setCalendarEnters((n) => n + 1); // the keyboard goes into the month, on the scheduler's day
+    }
     setPane(next === "board" ? (selected ? boardStatus(selected) : boardStatuses[0]) : "tasks");
   }
   // v, and the header's button: the next view, list > progress > calendar > list.
@@ -1705,8 +1709,8 @@ export default function Home({ all = false }) {
       if (name === "t" && view === "calendar") showView("list");
       return true;
     }
-    // c puts the calendar (a month) in the middle, in place of the tasks; again, it stays (t, or
-    // v, is back on the tasks)
+    // c puts the calendar (a month) in the middle, in place of the tasks, with the keyboard in the
+    // month (h j k l move a day at once); again, it stays (t, or v, is back on the tasks)
     if (name === "c") {
       showView("calendar");
       return true;
@@ -2182,7 +2186,7 @@ export default function Home({ all = false }) {
         <main className={styles.main} onMouseDown={() => setPane("tasks")}>
           {/* the calendar view is the whole middle: a month, of no space in particular */}
           {view === "calendar" && (
-            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} chosenDay={scheduler && detailOpen ? schedulerDay : null} onDay={showDay} chosenEvent={chosenEvent} onEvent={setChosenEvent} />
+            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} enterKey={calendarEnters} chosenDay={scheduler && detailOpen ? schedulerDay : null} onDay={showDay} chosenEvent={chosenEvent} onEvent={setChosenEvent} />
           )}
           {view !== "calendar" && (all || origin || space) && (
             <nav className={styles.section} aria-label={t("header.location")}>
