@@ -302,15 +302,14 @@ Scheduler
 ---------
 
 Defined in `server/scheduler.js`. One page a day, kept as `data/scheduler/<YYYY-MM-DD>.json` (git-ignored, not synced):  
-`{ date, text, tasks }`, `text` what was typed on the page, `tasks` those put on it, each `{ work, repository, ids, title, line }`:  
-`ids` is the task's id after those of the tasks it is under (its path changes with its title and status, its ids do not); `line` is the row of the page it sits on, how many lines of the text are above it.  
-A day has no file until a task is put on it or a text typed, and the file is removed when both are gone again.  
-Every route answers the day, each task with `title`, `rel` and `status` as they are now, or `missing: true` when it is gone.
+`{ date, text }`, `text` the page. A task put on the page is a line of the text, shown as a card: `[title](tm://<work>/<repository>#<id>/<id>)`,  
+the ids being the task's id after those of the tasks it is under (its path changes with its title and status, its ids do not), the title the one it had when the line was written.  
+A day has no file until its page has something on it, and the file is removed when the page is empty again.  
+A file of the older shape (`tasks: [{ work, repository, ids, title, line }]` beside the text) is read as the page it was.
 
-`GET /api/scheduler?date=` the day (empty when it has no file). 400 for a date that is not `YYYY-MM-DD`.  
-`PUT /api/scheduler` `{ date, text, tasks: [{ work, repository, ids, line }] }` writes the text and, with `tasks`, puts the day's tasks in that order, each on its line; with `exact: true` the list is the day's tasks (one not on the day is put on it, one left out is taken off).  
-`POST /api/scheduler/tasks` `{ date, tasks: [{ work, repository, rel }], line, index }` puts tasks on the day, on `line`, as the `index`th of its tasks (one already there stays). 404 for a task that is not found.  
-`DELETE /api/scheduler/task?date=&work=&repository=&ids=<id>/<id>` takes a task off the day.
+`GET /api/scheduler?date=` the day (empty when it has no file): `{ date, text, tasks }`, `tasks` those of the text's lines, each `{ work, repository, ids, title, rel, status, missing }` as it is now (`missing: true` when it is gone). 400 for a date that is not `YYYY-MM-DD`.  
+`PUT /api/scheduler` `{ date, text }` writes the page. Answers the day.  
+`POST /api/scheduler/tasks` `{ tasks: [{ work, repository, rel }] }` answers those tasks as a day's `tasks` are, and writes nothing. 404 for a task that is not found.
 
 
 Sync

@@ -165,21 +165,18 @@ export const saveFile = (space, rel, text) => request("/api/file", json("PUT", {
 export const fileUrl = (space, rel, download = false) =>
   `/api/file?${q({ ...sp(space), rel, ...(download ? { download: "1" } : {}) })}`;
 
-// The scheduler, one page a day (`date` is "YYYY-MM-DD"): { date, text, tasks }, text being what
-// was typed on the page and tasks those dragged onto it, each { work, repository, ids, title, line,
-// rel, status, missing } as it is now (`missing` when the task is gone; `ids` is its id after those
-// of the tasks it is under; `line` is how many lines of the text are above it). Every change below
-// resolves to the day after it.
+// The scheduler, one page a day (`date` is "YYYY-MM-DD"): { date, text, tasks }, text being the
+// page, its tasks among its lines (see server/scheduler.js), and tasks those, in their order, each
+// { work, repository, ids, title, rel, status, missing } as it is now (`missing` when the task is
+// gone; `ids` is its id after those of the tasks it is under).
 export const getSchedulerDay = (date) => request(`/api/scheduler?${q({ date })}`);
 
-// Write the page: its text, and its tasks in their order, each on its line. The tasks given are
-// the day's: one that was not on it is put on it, one that is left out is taken off.
-export const saveSchedulerPage = (date, text, tasks) =>
-  request("/api/scheduler", json("PUT", { date, text, exact: true, tasks: tasks.map(({ work, repository, ids, line }) => ({ work, repository, ids, line })) }));
+// Write the page: its text. Resolves to the day after it.
+export const saveSchedulerPage = (date, text) => request("/api/scheduler", json("PUT", { date, text }));
 
-// Put tasks on a day, each given by its space and rel, on `line`, as the `index`th of its tasks.
-export const scheduleTasks = (date, tasks, line, index) =>
-  request("/api/scheduler/tasks", json("POST", { date, line, index, tasks: tasks.map((t) => ({ ...sp(t.space), rel: t.rel })) }));
+// The tasks given by their space and rel, as a page keeps them (see getSchedulerDay's tasks).
+export const scheduledTasks = (tasks) =>
+  request("/api/scheduler/tasks", json("POST", { tasks: tasks.map((t) => ({ ...sp(t.space), rel: t.rel })) }));
 
 // Route to the tasks of every origin: the root, which is also what the title links to.
 export const allPath = "/";

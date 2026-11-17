@@ -2,15 +2,18 @@
 
 // The scheduler: one page a day, kept as <data>/scheduler/<YYYY-MM-DD>.json:
 //
-//   { "date": "2026-11-17", "text": "what was typed on the page", "tasks": [{ work, repository, ids, title, line }] }
+//   { "date": "2026-11-17", "text": "the page" }
 //
-// A day has no file until something is put on it (a task dragged onto the page, or a text typed),
-// and its file is removed once it is empty again. A task is kept by where it lives, not by its
-// path, which changes with its title and status: its space (work and repository) and `ids`, its
-// own id after those of the tasks it is under (an id alone is unique in its folder only). `title`
-// is the one it had when it was put there, shown when the task is no longer found. `line` is the
-// row of the page the task sits on: how many lines of the text are above it (0 the top; tasks on
-// the same line are in the list's order).
+// The page is its text and nothing else. A task put on it is a line of that text (the page shows
+// such a line as a card), so the text copied from the page has its tasks in it:
+//
+//   [the task's title](tm://<work>/<repository>#<id>/<id>)
+//
+// A task is kept by where it lives, not by its path, which changes with its title and status: its
+// space (work and repository, percent-encoded) and its ids, its own id after those of the tasks it
+// is under (an id alone is unique in its folder only). The title is the one it had when the line
+// was written, shown when the task is no longer found. A day has no file until something is on its
+// page, and its file is removed once the page is empty again.
 
 const fs = require('fs');
 const path = require('path');
@@ -34,22 +37,49 @@ function createSchedulerApp({ dataDir, find, idsOf }) {
     return date;
   }
 
-  const lineOf = (n) => (Number.isInteger(n) && n > 0 ? n : 0);
-
   const fileOf = (date) => path.join(dir, `${date}.json`);
+
+  // A line of the page that is a task (see above), and the task of such a line (null for any
+  // other line): { work, repository, ids, title }.
+  const TASK_RE = /^\[(.*)\]\(tm:\/\/([^/#()\s]*)\/([^/#()\s]*)#([^#()\s]+)\)$/;
+  const enc = (v) => encodeURIComponent(v).replace(/\(/g, '%28').replace(/\)/g, '%29');
+  const taskLine = (t) => `[${t.title}](tm://${enc(t.work)}/${enc(t.repository)}#${t.ids.map(enc).join('/')})`;
+  function taskOf(line) {
+    const m = TASK_RE.exec(line);
+    if (!m) return null;
+    try {
+      return { work: decodeURIComponent(m[2]), repository: decodeURIComponent(m[3]), ids: m[4].split('/').map(decodeURIComponent), title: m[1] };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // A day written before its tasks were lines of its text had them beside it, each
+  // { work, repository, ids, title, line } with `line` the lines of the text above it: read as
+  // the page it was.
+  function withTasks(text, tasks) {
+    const lines = text === '' && tasks.every(t => !(t.line > 0)) ? [] : text.split('\n');
+    const out = [];
+    for (let i = 0; i <= lines.length; i++) {
+      for (const t of tasks) if (Math.max(0, Math.min(Number(t.line) || 0, lines.length)) === i) out.push(taskLine(t));
+      if (i < lines.length) out.push(lines[i]);
+    }
+    return out.join('\n');
+  }
 
   function readDay(date) {
     let raw = {};
     try { raw = JSON.parse(fs.readFileSync(fileOf(date), 'utf8')) || {}; } catch (e) { raw = {}; }
-    const tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])
+    const text = typeof raw.text === 'string' ? raw.text : '';
+    const old = (Array.isArray(raw.tasks) ? raw.tasks : [])
       .filter(t => t && typeof t.work === 'string' && Array.isArray(t.ids) && t.ids.length > 0)
-      .map(t => ({ work: t.work, repository: String(t.repository || ''), ids: t.ids.map(String), title: String(t.title || ''), line: lineOf(t.line) }));
-    return { date, text: typeof raw.text === 'string' ? raw.text : '', tasks };
+      .map(t => ({ work: t.work, repository: String(t.repository || ''), ids: t.ids.map(String), title: String(t.title || ''), line: t.line }));
+    return { date, text: old.length ? withTasks(text, old) : text };
   }
 
   function writeDay(day) {
     const file = fileOf(day.date);
-    if (!day.text && day.tasks.length === 0) {
+    if (!day.text) {
       fs.rmSync(file, { force: true });
       return;
     }
@@ -59,78 +89,39 @@ function createSchedulerApp({ dataDir, find, idsOf }) {
     fs.renameSync(tmp, file);
   }
 
-  const same = (a, b) => a.work === b.work && a.repository === b.repository && a.ids.join('/') === b.ids.join('/');
-
-  // The day as the page shows it: each task with its title, path and status as they are now, or
-  // `missing` (and the title it was put there with) when it is gone.
-  function shown(day) {
-    return {
-      ...day,
-      tasks: day.tasks.map((t) => {
-        let now = null;
-        try { now = find(t); } catch (e) { now = null; }
-        return now ? { ...t, title: now.title, rel: now.rel, status: now.status, missing: false } : { ...t, rel: null, status: null, missing: true };
-      })
-    };
+  // A task as it is now: with its title, path and status, or `missing` (and the title given) when
+  // it is gone.
+  function live(t) {
+    let now = null;
+    try { now = find(t); } catch (e) { now = null; }
+    return now ? { ...t, title: now.title, rel: now.rel, status: now.status, missing: false } : { ...t, rel: null, status: null, missing: true };
   }
+
+  // The day as the page shows it: its text, and the tasks of its lines, in their order, as they
+  // are now.
+  const shown = (day) => ({ ...day, tasks: day.text.split('\n').map(taskOf).filter(Boolean).map(live) });
 
   app.get('/api/scheduler', (req, res) => {
     res.json(shown(readDay(dateOf(req.query.date))));
   });
 
-  // Write the page: its `text` and, with `tasks` ([{ work, repository, ids, line }]), where its
-  // tasks sit: they are put in that order, each on its line (one that is not in the list keeps
-  // its line, after them; one that is not on the day is not added). With `exact`, the list is the
-  // day's tasks: one that is not on the day is put on it (when the task is found), and one that is
-  // not in the list is taken off (how the page undoes and redoes its changes).
+  // Write the page: `text`, its tasks among its lines.
   app.put('/api/scheduler', (req, res) => {
     const body = req.body || {};
-    const day = readDay(dateOf(body.date));
-    if (body.text !== undefined) day.text = String(body.text ?? '');
-    if (Array.isArray(body.tasks)) {
-      const rest = [...day.tasks];
-      const placed = [];
-      for (const t of body.tasks) {
-        const entry = { work: String(t.work || ''), repository: String(t.repository || ''), ids: (Array.isArray(t.ids) ? t.ids : []).map(String) };
-        const i = rest.findIndex(x => same(x, entry));
-        if (i >= 0) placed.push({ ...rest.splice(i, 1)[0], line: lineOf(t.line) });
-        else if (body.exact && entry.ids.length > 0 && !placed.some(x => same(x, entry))) {
-          let now = null;
-          try { now = find(entry); } catch (e) { now = null; }
-          if (now) placed.push({ ...entry, title: now.title, line: lineOf(t.line) });
-        }
-      }
-      day.tasks = body.exact ? placed : [...placed, ...rest];
-    }
+    const day = { date: dateOf(body.date), text: String(body.text ?? '') };
     writeDay(day);
     res.json(shown(day));
   });
 
-  // Put tasks ({ work, repository, rel } each) on a day, on `line` (0, the top, when not given),
-  // as the `index`th of its tasks (the last ones when not given); one that is there already stays
-  // where it is.
+  // The tasks at { work, repository, rel } each, as a page keeps them: [{ work, repository, ids,
+  // title, rel, status, missing }] (nothing is written: the page puts their lines in its text).
   app.post('/api/scheduler/tasks', (req, res) => {
     const body = req.body || {};
-    const day = readDay(dateOf(body.date));
-    let at = Number.isInteger(body.index) && body.index >= 0 ? Math.min(body.index, day.tasks.length) : day.tasks.length;
-    for (const t of Array.isArray(body.tasks) ? body.tasks : []) {
-      const entry = { work: String(t.work || ''), repository: String(t.repository || ''), ids: idsOf(t), title: '', line: lineOf(body.line) };
-      const now = find(entry);
-      if (!now) throw fail(404, 'Task not found.');
-      entry.title = now.title;
-      if (!day.tasks.some(x => same(x, entry))) day.tasks.splice(at++, 0, entry);
-    }
-    writeDay(day);
-    res.json(shown(day));
-  });
-
-  // Take a task off a day: ?date=&work=&repository=&ids=<id>/<id>.
-  app.delete('/api/scheduler/task', (req, res) => {
-    const day = readDay(dateOf(req.query.date));
-    const entry = { work: String(req.query.work || ''), repository: String(req.query.repository || ''), ids: String(req.query.ids || '').split('/') };
-    day.tasks = day.tasks.filter(x => !same(x, entry));
-    writeDay(day);
-    res.json(shown(day));
+    res.json((Array.isArray(body.tasks) ? body.tasks : []).map((t) => {
+      const entry = live({ work: String(t.work || ''), repository: String(t.repository || ''), ids: idsOf(t), title: '' });
+      if (entry.missing) throw fail(404, 'Task not found.');
+      return entry;
+    }));
   });
 
   return app;

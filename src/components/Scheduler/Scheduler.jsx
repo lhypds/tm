@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "@components/icons";
 import { FromTag } from "@components/TaskList";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
+import { copyText } from "@utils/clipboard";
 import { TASKS_DRAG_TYPE } from "@utils/task";
 import styles from "./scheduler.module.css";
 
@@ -22,6 +23,54 @@ const SAVE_DELAY = 600; // ms after the last key before the page is written
 const CARD_DRAG_TYPE = "application/x-taskmgr-scheduled"; // a card of the page, dragged to another line
 
 const cardKey = (c) => `${c.work}/${c.repository}/${c.ids.join("/")}`;
+
+// A line of the page's text that is a task, shown as a card (see server/scheduler.js):
+// "[title](tm://<work>/<repository>#<id>/<id>)", and the task of such a line (null for any other).
+const TASK_RE = /^\[(.*)\]\(tm:\/\/([^/#()\s]*)\/([^/#()\s]*)#([^#()\s]+)\)$/;
+const enc = (v) => encodeURIComponent(v).replace(/\(/g, "%28").replace(/\)/g, "%29");
+const taskLine = (c) => `[${c.title}](tm://${enc(c.work)}/${enc(c.repository)}#${c.ids.map(enc).join("/")})`;
+function taskOf(line) {
+  const m = TASK_RE.exec(line);
+  if (!m) return null;
+  try {
+    return { work: decodeURIComponent(m[2]), repository: decodeURIComponent(m[3]), ids: m[4].split("/").map(decodeURIComponent), title: m[1] };
+  } catch {
+    return null;
+  }
+}
+
+// The page as it is kept and copied, one text: the lines typed (`text`) with each card's line
+// among them, after as many of them as its `line`. A page of cards only is their lines alone.
+function compose(text, cards) {
+  const lines = text === "" && cards.every((c) => !(c.line > 0)) ? [] : text.split("\n");
+  const out = [];
+  for (let i = 0; i <= lines.length; i++) {
+    for (const c of cards) if (Math.max(0, Math.min(c.line || 0, lines.length)) === i) out.push(taskLine(c));
+    if (i < lines.length) out.push(lines[i]);
+  }
+  return out.join("\n");
+}
+
+// The other way: { text, cards } of a page, each card on its `line`. A task is on a page once:
+// its line again is left out.
+function parse(page) {
+  const lines = [];
+  const cards = [];
+  for (const line of page.split("\n")) {
+    const task = taskOf(line);
+    if (!task) lines.push(line);
+    else if (!cards.some((c) => cardKey(c) === cardKey(task))) cards.push({ ...task, line: lines.length });
+  }
+  return { text: lines.join("\n"), cards };
+}
+
+// `cards` with what `tasks` (the same tasks, as the server found them) say of each now: its title,
+// path and status, or that it is missing.
+const withLive = (cards, tasks) =>
+  cards.map((c) => {
+    const now = tasks.find((x) => cardKey(x) === cardKey(c));
+    return now ? { ...c, title: now.title, rel: now.rel, status: now.status, missing: now.missing } : c;
+  });
 
 // The cards in the page's order: by line (none past the last line of the text), those on one line
 // as they were.
@@ -132,7 +181,7 @@ function Lines({ value, fill, ...props }) {
 
 // The scheduler, in place of the task panel: one page a day. Under its title, a row steps a day back, goes to
 // today, steps a day forward, and says which day is shown. The page is squared paper to write on
-// (saved as it is typed) with the tasks dragged onto it from the list or the board (`tasks` are
+// (saved as it is typed; kept as one text, a task a line of it, see compose) with the tasks dragged onto it from the list or the board (`tasks` are
 // those, found by the keys the drag carries), each a card of one line: where it is from (the tag
 // the list has, in its origin's color, from `works` and `origins`) and its title. A card sits on
 // the line it was dropped on, the text flowing around it: the lines above it stay above, the rest
@@ -150,7 +199,10 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   const [text, setText] = useState("");
   const [cards, setCards] = useState([]); // in the page's order (see arrange)
   const [mark, setMark] = useState(null); // where a drag would drop: the page's y of that line
-  const pending = useRef(null); // { date, text, cards } changed and not written yet
+  const pending = useRef(null); // { date, text } changed and not written yet: the page as one text (see compose)
+  const dateRef = useRef(date); // the day shown now, for what comes back later
+  dateRef.current = date;
+  const [all, setAll] = useState(false); // the whole page is selected (cmd + a), to be copied
   const timer = useRef(null);
   const pageRef = useRef(null);
   const slotsRef = useRef(null); // the lines a drag can drop on, measured once per drag
@@ -163,15 +215,18 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     if (!p) return;
     pending.current = null;
     try {
-      await api.saveSchedulerPage(p.date, p.text, p.cards);
+      const day = await api.saveSchedulerPage(p.date, p.text);
+      // a task pasted in as its line is now known as it is
+      if (day.date === dateRef.current) setCards((was) => withLive(was, day.tasks));
     } catch (e) {
       showToast(e.message, 4000);
     }
   }, []);
 
   const show = (day) => {
-    setText(day.text);
-    setCards(arrange(day.tasks, day.text.split("\n").length));
+    const page = parse(day.text);
+    setText(page.text);
+    setCards(arrange(withLive(page.cards, day.tasks), page.text.split("\n").length));
   };
 
   useEffect(() => {
@@ -202,6 +257,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     history.current = [];
     undone.current = [];
     setChosen(null);
+    setAll(false);
     backTo.current = null;
     setText("");
     setCards([]);
@@ -213,7 +269,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     const arranged = arrange(nextCards, nextText.split("\n").length);
     setText(nextText);
     setCards(arranged);
-    pending.current = { date, text: nextText, cards: arranged };
+    pending.current = { date, text: compose(nextText, arranged) };
     clearTimeout(timer.current);
     if (now) flush();
     else timer.current = setTimeout(flush, SAVE_DELAY);
@@ -261,10 +317,14 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     const typed = block.from === block.to && value === "" ? [] : value.split("\n");
     const next = [...lines.slice(0, block.from), ...typed, ...lines.slice(block.to)];
     const delta = typed.length - (block.to - block.from);
-    change(
-      next.join("\n"),
-      cards.map((c, i) => (i >= block.before ? { ...c, line: c.line + delta } : c)),
-    );
+    const moved = cards.map((c, i) => (i >= block.before ? { ...c, line: c.line + delta } : c));
+    if (typed.some(taskOf)) {
+      // a task's line typed or pasted in is a card from here on
+      const page = parse(compose(next.join("\n"), arrange(moved, next.length)));
+      change(page.text, withLive(page.cards, cards), true);
+      return;
+    }
+    change(next.join("\n"), moved);
   };
 
   // Up on the first character of a run goes to the end of the run above the card, down on the last
@@ -491,10 +551,13 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     }
     const dropped = tasks.filter((task) => keys.includes(task.key));
     if (!dropped.length) return;
-    record();
     try {
-      await flush();
-      show(await api.scheduleTasks(date, dropped, slot.line, slot.index));
+      const added = (await api.scheduledTasks(dropped)).filter((x) => !cards.some((c) => cardKey(c) === cardKey(x)));
+      if (!added.length) return; // on the day already
+      record();
+      const next = [...cards];
+      next.splice(slot.index, 0, ...added.map((x) => ({ ...x, line: slot.line })));
+      change(text, next, true);
     } catch (err) {
       showToast(err.message, 4000);
     }
@@ -608,7 +671,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         return true;
       }
       if (["space", "enter"].includes(name)) {
-        if (!card.missing) onOpen(card);
+        if (!card.missing && card.rel) onOpen(card);
         return true;
       }
       if (name === "escape") {
@@ -635,13 +698,28 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   useEffect(() => {
     const onKeyDown = async (e) => {
       const k = e.key.toLowerCase();
-      if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.altKey || !["s", "z", "y"].includes(k)) return;
+      if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.altKey || !["s", "z", "y", "a", "c"].includes(k)) return;
       const inside = sectionRef.current?.contains(e.target);
       // with the keyboard on the pane, wherever the focus was left (a row of the list, a link),
       // but not in another text field nor in a dialog
       if (!inside && !(focused && !e.target.closest?.('input, textarea, select, [contenteditable="true"], [role="dialog"]'))) return;
+      if (k === "c") {
+        // the whole page when it is selected, the chosen card's line else; any other copy is the
+        // browser's (the text selected in a run) or the page's (the list's task)
+        const card = cards[chosenIndex];
+        const copied = all ? compose(text, cards) : card && e.target.tagName !== "TEXTAREA" ? taskLine(card) : null;
+        if (copied === null) return;
+        e.preventDefault();
+        if (!(await copyText(copied))) showToast(t("toast.copyFailed"), 1800, "bottom", "error");
+        return;
+      }
       e.preventDefault();
       if (!loaded) return;
+      if (k === "a") {
+        setChosen(null);
+        setAll(true);
+        return;
+      }
       if (k !== "s") {
         // the page's own undo and redo, in place of the text box's
         if (k === "z" && !e.shiftKey) travel(history, undone);
@@ -651,14 +729,36 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       clearTimeout(timer.current);
       pending.current = null;
       try {
-        await api.saveSchedulerPage(date, text, cards);
+        const day = await api.saveSchedulerPage(date, compose(text, cards));
+        if (day.date === dateRef.current) setCards((was) => withLive(was, day.tasks));
         showToast(t("toast.saved"));
       } catch (err) {
         showToast(err.message, 4000);
       }
     };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    // before the keys every text box has (cmd + a, see useTextKeys) and the list's copy
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  });
+
+  // The page is copied as the one text it is kept as, its tasks lines of it (pasted into a page,
+  // such a line is a card again): cmd / ctrl + a selects the whole page, text and cards, and
+  // cmd / ctrl + c then copies it all; on a card, it copies its line (see the keys above). Any
+  // other key, or a click, lets the selection go. A copy inside a run of the text is the text
+  // box's own.
+  useEffect(() => {
+    const letGo = (e) => {
+      if (e.type === "keydown" && (["Meta", "Control", "Shift", "Alt"].includes(e.key) || ((e.metaKey || e.ctrlKey) && ["a", "c"].includes(e.key.toLowerCase())))) return;
+      setAll(false);
+    };
+    if (all) {
+      document.addEventListener("keydown", letGo, true);
+      document.addEventListener("mousedown", letGo, true);
+    }
+    return () => {
+      document.removeEventListener("keydown", letGo, true);
+      document.removeEventListener("mousedown", letGo, true);
+    };
   });
 
   const [y, m, d] = date.split("-").map(Number);
@@ -694,6 +794,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
         ref={pageRef}
         className={styles.page}
         data-mode={mode}
+        data-all={all}
         onFocus={(e) => e.target.tagName === "TEXTAREA" && setInText(true)}
         onBlur={(e) => e.target.tagName === "TEXTAREA" && setInText(false)}
         onDragOver={(e) => {
@@ -726,7 +827,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
               <button
                 type="button"
                 className={styles.cardTitle}
-                disabled={block.card.missing}
+                disabled={block.card.missing || !block.card.rel}
                 title={block.card.missing ? t("scheduler.missing") : undefined}
                 onClick={() => onOpen(block.card)}
               >

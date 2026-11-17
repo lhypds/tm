@@ -235,3 +235,9 @@
   background: var(--fg);
   pointer-events: none;
 }
+
+/* The whole page selected (cmd + a): its text and its cards, as a selection is shown. */
+.page[data-all="true"] .text,
+.page[data-all="true"] .card {
+  background: color-mix(in srgb, Highlight 35%, transparent);
+}
