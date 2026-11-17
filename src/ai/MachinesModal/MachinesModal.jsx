@@ -35,7 +35,7 @@ function readPicked() {
 // ones of this dialog are those on no task (`task.free`).
 //
 // A prompt that starts with "/" is a tm command, not a prompt for Claude: "/restart" runs `tm restart`
-// on every machine whose runner is connected, ticked or not (POST /api/ai/machine/command; each
+// on every machine ticked, as a prompt does (POST /api/ai/machine/command; each
 // machine starts it in a process of its own, so a restart of the daemon that got the command goes
 // through). While only "/" and the start of a name are typed, the commands that fit are listed
 // under the first line (↑ / ↓ move, enter or tab takes one, a click too). A toast tells which machines started it, and what the
@@ -115,7 +115,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
               : t("ai.failed");
 
   const isCommand = prompt.trimStart().startsWith("/");
-  const canRun = !busy && !!prompt.trim() && (isCommand ? ready : targets).length > 0;
+  const canRun = !busy && !!prompt.trim() && targets.length > 0;
   // Once run, the box is emptied and what was run stays in it as its placeholder, grey and not to be
   // edited; tab in the empty box brings it back as text.
   const ran = () => {
@@ -124,7 +124,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   };
   const runCommand = async () => {
     const results = await Promise.all(
-      ready.map((m) =>
+      targets.map((m) =>
         api.runMachineCommand(m.name, prompt.trim()).then(
           (d) => ({ name: m.name, command: d.command }),
           (e) => ({ name: m.name, error: e.message }),
