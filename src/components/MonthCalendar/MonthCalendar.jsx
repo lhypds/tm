@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon } from "@components/icons";
 import CalendarsModal from "@components/Scheduler/CalendarsModal";
 import { firstDayOf } from "@components/Scheduler/DayPicker";
@@ -10,6 +10,9 @@ import { lightColor } from "@utils/colors";
 import styles from "./monthCalendar.module.css";
 
 const READ_EVERY = 5 * 60 * 1000; // as long as the server keeps a calendar it has read
+const WHEEL_REST = 200; // ms the wheel is still for before the scheduler shows the day it is on
+const WHEEL_TURN = 150; // ms the wheel is still for before it is turned anew
+const WHEEL_DAY = 100; // px of the wheel a day: a notch of a mouse's wheel
 
 const p2 = (n) => String(n).padStart(2, "0");
 const keyOf = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -36,6 +39,69 @@ function byDay(events, days) {
     }
   }
   return out;
+}
+
+const MAX_LANES = 3; // the bars one over another in a week; an event of several days beyond them is on each of its days, as one of a day is
+const LANE = 18; // px a bar takes: its 16px and the 2px under it
+const BARS_TOP = 22; // px from the top of a week to its first bar: the day's number and its margins
+
+// The events of several days as bars, each one line through its days: `events` is byDay's, of
+// `days` (whole weeks). An event on two days or more is a bar in each week it has days in, from
+// the first of them to the last (`col`, `span`), on a line of its own there (`lane`: the bars of a
+// week that share a day are one over another, MAX_LANES at most); `starts` and `ends` say whether
+// the event itself starts and ends in that week (it goes on, without an end, else). Answers
+// { bars, rest, ordered, taken }: per day, `rest` the events that are not a bar (those of that day
+// alone, and what is beyond the lanes), `ordered` all of them as they are seen from the top (the
+// bars, then the rest: the order the keys walk), and `taken` the lanes to leave free over `rest`.
+function spanBars(events, days) {
+  const count = new Map();
+  for (const day of days) for (const e of events[day]) count.set(e.id, (count.get(e.id) || 0) + 1);
+  const bars = [];
+  const on = Object.fromEntries(days.map((day) => [day, []])); // the bars of each day
+  for (let week = 0; week * 7 < days.length; week++) {
+    const at = (col) => days[week * 7 + col];
+    const has = (col, id) => events[at(col)].some((e) => e.id === id);
+    const segments = [];
+    for (let col = 0; col < 7; col++) {
+      for (const event of events[at(col)]) {
+        if (count.get(event.id) < 2 || (col > 0 && has(col - 1, event.id))) continue;
+        let span = 1;
+        while (col + span < 7 && has(col + span, event.id)) span++;
+        segments.push({ event, week, col, span });
+      }
+    }
+    segments.sort((a, b) => a.col - b.col || b.span - a.span);
+    const lanes = []; // the first column free in each
+    for (const bar of segments) {
+      let lane = lanes.findIndex((free) => free <= bar.col);
+      if (lane < 0) lane = lanes.length;
+      if (lane >= MAX_LANES) continue;
+      lanes[lane] = bar.col + bar.span;
+      const before = days[week * 7 + bar.col - 1];
+      const after = days[week * 7 + bar.col + bar.span];
+      // off the days shown, the event's own times say (a whole day's are days, the last not included)
+      const [y, m, d] = at(bar.col + bar.span - 1).split("-").map(Number);
+      const [y0, m0, d0] = days[0].split("-").map(Number);
+      const { id, allDay, start, end } = bar.event;
+      if (before) bar.starts = !events[before].some((e) => e.id === id);
+      else bar.starts = allDay ? start >= days[0] : start >= new Date(y0, m0 - 1, d0).getTime();
+      if (after) bar.ends = !events[after].some((e) => e.id === id);
+      else bar.ends = allDay ? end <= keyOf(new Date(y, m - 1, d + 1)) : end <= new Date(y, m - 1, d + 1).getTime();
+      bar.lane = lane;
+      bars.push(bar);
+      for (let i = 0; i < bar.span; i++) on[at(bar.col + i)].push(bar);
+    }
+  }
+  const rest = {};
+  const ordered = {};
+  const taken = {};
+  for (const day of days) {
+    const mine = on[day].sort((a, b) => a.lane - b.lane);
+    rest[day] = events[day].filter((e) => !mine.some((bar) => bar.event.id === e.id));
+    ordered[day] = [...mine.map((bar) => bar.event), ...rest[day]];
+    taken[day] = mine.length ? mine[mine.length - 1].lane + 1 : 0;
+  }
+  return { bars, rest, ordered, taken };
 }
 
 // The months to pick one from, under the month the calendar shows (a click on it): a year between
@@ -96,12 +162,13 @@ function MonthSelect({ month, onPick, onClose }) {
 // The calendar view, in place of the task list (v, or c): a whole month of the Google and Apple
 // calendars the server is given (see server/calendar.js). Under its title, a row says which month
 // is shown, between the buttons that step a month back and forward; a click on the month picks
-// another (see MonthSelect), and the page's refresh (r; `loading` while it lasts) is back on this
+// another (see MonthSelect), and the wheel over the month moves the day that is shaded (see onWheel), and the page's refresh (r; `loading` while it lasts) is back on this
 // month, reads the calendars anew, and covers the view under its bar with "Loading..." meanwhile,
 // as the task list says it. The month is a grid, a week a row and a day a square (the days of the months around
 // it that fill its first and last week are fainter, today's number is framed), each with its
 // events one under another, thin as a tag of the task list and in their calendar's color: its
-// start and its title; a square with more than fit scrolls. A click on an event chooses it (as the
+// start and its title; a square with more than fit scrolls. An event of several days is one bar
+// through them, over the events of each day alone (see spanBars). A click on an event chooses it (as the
 // keys do, see below; the scheduler goes to its day, and the event chosen is the page's,
 // `chosenEvent` changed with `onEvent(id)`, so the timetable shows it chosen too, and one chosen
 // there is chosen here) and a double click shows its details (see EventModal), a click anywhere else on a day shows that day in the scheduler at the right,
@@ -168,8 +235,69 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
   const step = (n) => setMonth(({ y, m }) => ({ y: new Date(y, m + n, 1).getFullYear(), m: new Date(y, m + n, 1).getMonth() }));
   const now = new Date();
 
+  // The wheel over the month moves the day that is shaded, down to the next one and up to the one
+  // before, as far as it turns (see below), the month following a day of another one. The day is
+  // shaded at once (`rolled`), and the scheduler is told (`onDay`, which reads the day and its
+  // timetable) only once the wheel has been still for WHEEL_REST: the days passed on the way are
+  // not read.
+  const [rolled, setRolled] = useState(null); // the day the wheel is on, the scheduler not told yet
+  const wheel = useRef({ last: 0, sum: 0, day: null, timer: 0, pending: false });
+  useEffect(() => () => clearTimeout(wheel.current.timer), []);
+  const onWheel = (e) => {
+    if (!e.deltaY || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+    e.preventDefault(); // not the events of the day under it too, which would scroll (see the listener)
+    const w = wheel.current;
+    // A day every WHEEL_DAY px of it, as many as it turns: turned fast, the days go by fast.
+    const at = Date.now();
+    if (at - w.last > WHEEL_TURN) w.sum = 0; // what was left of a turn that is over
+    w.last = at;
+    w.sum += e.deltaY * (e.deltaMode === 1 ? WHEEL_DAY / 3 : 1); // (a wheel that counts lines: three a notch)
+    const n = Math.trunc(w.sum / WHEEL_DAY);
+    if (!n) return;
+    w.sum -= n * WHEEL_DAY;
+    // from the day shaded, else the one the keyboard is on, else today (the first of another month)
+    const here = month.y === now.getFullYear() && month.m === now.getMonth() ? keyOf(now) : keyOf(new Date(month.y, month.m, 1));
+    // (the wheel's own day is kept beside the state: more of the wheel may come before it is drawn)
+    const [y, m, d] = (w.day || chosenDay || cursor || here).split("-").map(Number);
+    const to = new Date(y, m - 1, d + n);
+    const day = keyOf(to);
+    w.day = day;
+    setRolled(day);
+    setMonth((was) => (was.y === to.getFullYear() && was.m === to.getMonth() ? was : { y: to.getFullYear(), m: to.getMonth() }));
+    clearTimeout(w.timer);
+    w.pending = true;
+    w.timer = setTimeout(() => {
+      w.pending = false;
+      onDay?.(day);
+    }, WHEEL_REST);
+  };
+  // The wheel is listened to by hand: React's own listener may not keep it from scrolling what is
+  // under it (a day with more events than fit, which the wheel would scroll in place of moving
+  // the day; its events are reached with the keys, which scroll to the one chosen).
+  const gridRef = useRef(null);
+  const onWheelRef = useRef(onWheel);
+  onWheelRef.current = onWheel;
+  useEffect(() => {
+    const el = gridRef.current;
+    const listen = (e) => onWheelRef.current(e);
+    el.addEventListener("wheel", listen, { passive: false });
+    return () => el.removeEventListener("wheel", listen);
+  }, []);
+  // The day of the wheel stays the shaded one until the scheduler shows a day of its own again: it
+  // takes the day it is told a few renders later, and the shade must not go back to the day
+  // before meanwhile (nor the next turn of the wheel start from it). A day that comes while the
+  // wheel has gone on is an earlier one of the wheel's: the wheel's own stays.
+  useEffect(() => {
+    if (wheel.current.pending) return;
+    wheel.current.day = null;
+    setRolled(null);
+  }, [chosenDay]);
+  const shadedDay = rolled || chosenDay;
+
   const shown = read?.range === range ? read : null;
-  const events = byDay(shown?.events || [], days);
+  // (kept while the month and what was read of it are the same: the wheel draws the month again
+  // at each day it moves)
+  const { bars, rest, ordered: events, taken } = useMemo(() => spanBars(byDay(shown?.events || [], days), days), [shown, range]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Where the keyboard is in the month: on no day (it is on the view itself), on a day (`cursor`,
   // its key), or in that day (`inDay`), on one of its events (`eventId`) or on none yet.
@@ -352,20 +480,22 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
           </span>
         ))}
       </div>
-      <div className={styles.grid} style={{ gridTemplateRows: `repeat(${count / 7}, minmax(0, 1fr))` }}>
+      <div ref={gridRef} className={styles.grid} style={{ gridTemplateRows: `repeat(${count / 7}, minmax(0, 1fr))` }}>
         {dates.map((d, i) => (
           <div
             key={days[i]}
             className={styles.day}
+            // placed by hand: the bars of the events of several days are on the same grid, over them
+            style={{ gridRow: Math.floor(i / 7) + 1, gridColumn: (i % 7) + 1 }}
             data-other={d.getMonth() !== month.m}
             data-today={days[i] === today}
-            data-chosen={days[i] === chosenDay}
+            data-chosen={days[i] === shadedDay}
             // anywhere on the day but on an event of it, which shows itself
             onClick={(e) => !e.target.closest("button") && onDay?.(days[i])}
           >
             <span className={styles.number}>{d.getDate()}</span>
-            <div className={styles.events}>
-              {events[days[i]].map((e) => (
+            <div className={styles.events} style={taken[days[i]] ? { marginTop: taken[days[i]] * LANE } : undefined}>
+              {rest[days[i]].map((e) => (
                 <button
                   key={e.id}
                   ref={e.id === eventId ? chosenRef : undefined}
@@ -391,6 +521,35 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, ch
               ))}
             </div>
           </div>
+        ))}
+        {/* an event of several days: one bar through its days of a week, over them (its title at
+            its start, and again in each week it goes on in); a click chooses it on the day
+            clicked, a double click shows it, as one of a day */}
+        {bars.map(({ event: e, week, col, span, lane, starts, ends }) => (
+          <button
+            key={`${week}/${e.id}`}
+            data-chosen={e.id === eventId}
+            data-starts={starts}
+            data-ends={ends}
+            type="button"
+            className={`${styles.event} ${styles.span}`}
+            tabIndex={-1}
+            style={{ gridRow: week + 1, gridColumn: `${col + 1} / span ${span}`, marginTop: BARS_TOP + lane * LANE, ...(e.color ? { "--event": lightColor(e.color) } : {}) }}
+            title={e.title}
+            onClick={(ev) => {
+              let1(ev);
+              const box = ev.currentTarget.getBoundingClientRect();
+              const day = days[week * 7 + col + Math.min(span - 1, Math.max(0, Math.floor(((ev.clientX - box.left) / box.width) * span)))];
+              onDay?.(day);
+              setCursor(day);
+              setInDay(true);
+              onEvent?.(e.id);
+            }}
+            onDoubleClick={() => setLooked(e)}
+          >
+            {!e.allDay && starts && <span className={styles.time}>{hm(e.start)}</span>}
+            <span className={styles.title}>{e.title || t("common.untitled")}</span>
+          </button>
         ))}
       </div>
       {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
