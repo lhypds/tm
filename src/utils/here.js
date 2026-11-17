@@ -28,7 +28,12 @@ function byHand() {
   }
 }
 
+// Whether the page is served by this very computer: its folders are then opened here by the server
+// itself, and there is no machine to look for.
+export const isLocalPage = () => ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+
 export function getHere() {
+  if (isLocalPage()) return "";
   const hand = byHand();
   return hand === NONE ? "" : hand || found;
 }
@@ -53,7 +58,7 @@ function subscribe(fn) {
 export const useHere = () => useSyncExternalStore(subscribe, getHere);
 
 // A page served by this computer has its folders opened here already; a phone is no machine.
-const skipped = () => ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname) || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+const skipped = () => isLocalPage() || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
 // Look for this computer among `machines` (as GET /api/ai/machines lists them): each port of a
 // connected machine is asked once. Nothing is asked once it is found, or said by hand.

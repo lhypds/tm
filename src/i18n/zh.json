@@ -75,6 +75,8 @@
     "createdUploadFailed": "任务已创建，但附件上传失败：{{error}}",
     "deleted": "任务已删除",
     "opened": "已在文件管理器中打开",
+    "notHere": "这个文件夹不在这台电脑上，没有打开。",
+    "sayHere": "如果在，请到“机器”里指定这台电脑是哪台机器。",
     "notCommand": "无效命令：{{cmd}}",
     "copied": "已复制 {{id}}",
     "copiedAmbiguous": "已复制 {{id}}，但“{{name}}”对应多个 work / repository：tm run 需要写成 work/repository",

@@ -46,7 +46,7 @@ import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
 import { getMachines } from "@ai/api";
-import { findHere } from "@utils/here";
+import { findHere, getHere, isLocalPage } from "@utils/here";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -1301,7 +1301,22 @@ export default function Home({ all = false }) {
     }
   }
 
+  // Why a folder of the space cannot be opened in front of the user, for a toast; null when it can.
+  // On a page served by this computer the server opens it here. On a server's page it opens only on
+  // the machine this browser is on (see @utils/here), when that machine syncs the folder: anywhere
+  // else nobody here would see it, so nothing is opened and the toast says so.
+  const notHere = (sp) => {
+    if (isLocalPage()) return null;
+    const here = getHere();
+    const machines = runMachinesOf(sp).map((m) => m.name);
+    if (here && machines.includes(here)) return null;
+    // which computer it is on is not said: a folder may be synced by several
+    return machines.length && !here ? `${t("toast.notHere")} ${t("toast.sayHere")}` : t("toast.notHere");
+  };
+
   async function openFolder(task) {
+    const why = notHere(task.space);
+    if (why) return showToast(why, 6000);
     try {
       await api.openInFileManager(task.space, task.rel);
       showToast(t("toast.opened"));
@@ -1311,6 +1326,8 @@ export default function Home({ all = false }) {
   }
 
   async function openSpaceFolder(target) {
+    const why = notHere(target);
+    if (why) return showToast(why, 6000);
     try {
       await api.openSpaceFolder(target);
       showToast(t("toast.opened"));

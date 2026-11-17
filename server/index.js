@@ -221,10 +221,15 @@ function machinesWithRunner(space) {
 
 // The machine the browser of a request says it is on (`here` in its body, see src/utils/here.js), when
 // that is one of the machines that sync the space: the folder asked for is then opened there, in
-// front of who asked, and not on this server. null otherwise.
+// front of who asked, and not on this server. null when it does not say (the browser is on this
+// server's machine, or does not know). A browser on a machine that does not sync the space is
+// refused: opened on this server, the folder would be seen by nobody (the web UI says so itself,
+// before asking).
 function hereOf(body, space) {
   const here = String(body?.here || '');
-  return here && machinesOf(space).some(m => m.name === here) ? here : null;
+  if (!here) return null;
+  if (!machinesOf(space).some(m => m.name === here)) throw new HttpError(409, `This folder is not on ${here}.`);
+  return here;
 }
 
 // Of a space's machines (see machinesWithRunner), the one its tasks run on: one whose runner is

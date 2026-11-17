@@ -137,7 +137,9 @@ Open the folder of a tree row with the OS file manager on the server's machine: 
 or a repository's source folder (its tasks folder when it has none). Answers `{ ok: true }`.  
 `here` is the machine the browser is on, when it knows (see `GET /api/machine`): for a folder that machine syncs, the  
 folder is opened there instead, as it is there (its own `taskmgr.json`), by its taskmgrd; `{ ok: true, machine }`. 409  
-when that machine's taskmgrd is not connected, 504 when it does not answer in 15 seconds.  
+when that machine does not sync the folder (nothing is opened: on the server nobody would see it; the web UI, on a page  
+not served by its own computer, says so instead of asking) or its taskmgrd is not connected, 504 when  
+it does not answer in 15 seconds.  
 
 
 Tasks

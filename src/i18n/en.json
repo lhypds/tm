@@ -75,6 +75,8 @@
     "createdUploadFailed": "Task created, but an attachment failed: {{error}}",
     "deleted": "Task deleted",
     "opened": "Opened in file manager",
+    "notHere": "This folder is not on this computer: nothing was opened.",
+    "sayHere": "If it is, say which machine this computer is in Machines.",
     "notCommand": "Not a command: {{cmd}}",
     "copied": "Copied {{id}}",
     "copiedAmbiguous": "Copied {{id}}, but “{{name}}” names more than one work / repository: tm run needs work/repository",

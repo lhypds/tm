@@ -4,7 +4,7 @@ import { Modal, TextArea, Checkbox, showToast } from "@ui";
 import MachineDot from "@components/MachineDot";
 import { StopIcon } from "@components/icons";
 import { formatDateTime } from "@utils/task";
-import { useHere, setHere, findHere } from "@utils/here";
+import { useHere, setHere, findHere, isLocalPage } from "@utils/here";
 import * as api from "../api";
 import { duration } from "../duration";
 import styles from "./machines.module.css";
@@ -291,7 +291,8 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
         )}
 
         <div className={styles.actions}>
-          {machines?.length > 0 && (
+          {/* not on a page served by this computer: the server is where its folders open */}
+          {!isLocalPage() && machines?.length > 0 && (
             <label className={styles.here} title={t("machines.hereHint")}>
               <span className="muted">{t("machines.here")}</span>
               <select className="select" value={machines.some((m) => m.name === here) ? here : ""} onChange={(e) => setHere(e.target.value)}>
