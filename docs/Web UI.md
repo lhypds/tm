@@ -39,7 +39,8 @@ went through recently (within twice `POLLING_INTERVAL`, three minutes at least),
 time (the daemon is not running); the tooltip says which, with the time and the error. On a server's page opened on one  
 of its machines, the right end names that machine instead (its machine id and a green dot), once it is found (see the  
 Machines Run dialog above). Both are links, opened in the same tab: the server's host leads to the web UI of that  
-server, the machine id to the web UI of this computer (`http://localhost:<port>`, the port its tm answered on).  
+server, the machine id to the web UI of this computer (`http://localhost:<port>`, the port its tm answered on). `shift` + `r` follows whichever  
+of the two links the page has, so it switches between this computer's page and the server's.  
 
 Configuration: `taskmgr.json` (copy `taskmgr.json.example`; the file is git-ignored).  
 The bare `tm` command reads the same file:  

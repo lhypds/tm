@@ -260,6 +260,10 @@
       "keys": "r",
       "desc": "刷新页面数据"
     },
+    "switch": {
+      "keys": "shift + r",
+      "desc": "在本机页面和服务器页面之间切换（状态栏右端的链接）"
+    },
     "machines": {
       "keys": "m",
       "desc": "打开机器运行（在机器上执行 prompt 或 /命令）"

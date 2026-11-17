@@ -260,6 +260,10 @@
       "keys": "r",
       "desc": "refresh the page's data"
     },
+    "switch": {
+      "keys": "shift + r",
+      "desc": "switch between this computer's page and the server's (the link at the right end of the status bar)"
+    },
     "machines": {
       "keys": "m",
       "desc": "open Machines Run (a prompt or a /command on the machines)"

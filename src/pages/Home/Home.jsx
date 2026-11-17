@@ -1717,6 +1717,13 @@ export default function Home({ all = false }) {
       refresh();
       return true;
     }
+    // shift+r goes to the other page of the two, as the link at the right end of the status bar does:
+    // from this computer's page to the server it syncs with, from the server's to this computer's
+    if (name === "R") {
+      const url = getHereUrl() || syncServerUrl;
+      if (url) window.location.assign(url);
+      return true;
+    }
     if (name === "m") {
       setMachinesOpen(true);
       return true;
