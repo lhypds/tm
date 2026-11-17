@@ -46,7 +46,7 @@ import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
 import { getMachines } from "@ai/api";
-import { findHere, getHere, useHere, isLocalPage } from "@utils/here";
+import { findHere, getHere, getHereUrl, useHere, isLocalPage } from "@utils/here";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -437,8 +437,15 @@ export default function Home({ all = false }) {
   // The host of the server this machine syncs with (SYNC_SERVER in .env), for the status bar's right
   // end; "" when there is none. Read once: it changes only with a restart.
   const [syncServer, setSyncServer] = useState("");
+  const [syncServerUrl, setSyncServerUrl] = useState(""); // its web UI, which the host in the status bar opens
   useEffect(() => {
-    api.getSettings().then((s) => setSyncServer(s.syncServer || ""), () => {});
+    api.getSettings().then(
+      (s) => {
+        setSyncServer(s.syncServer || "");
+        setSyncServerUrl(s.syncServerUrl || "");
+      },
+      () => {},
+    );
   }, []);
 
   // Which of the server's machines this browser is on, looked for once the page is open (see
@@ -2383,7 +2390,8 @@ export default function Home({ all = false }) {
             </span>
             {syncServer && (
               <span className={`mono ${styles.server}`} title={pollingTitle(polling, t) || syncServer}>
-                {syncServer}
+                {/* a click opens the server's web UI, in this tab */}
+                {syncServerUrl ? <a href={syncServerUrl} data-url>{syncServer}</a> : syncServer}
                 {polling?.on && (
                   <span
                     className="machine-dot"
@@ -2393,10 +2401,10 @@ export default function Home({ all = false }) {
                 )}
               </span>
             )}
-            {/* the machine this browser is on, once found (see @utils/here) */}
+            {/* the machine this browser is on, once found (see @utils/here): a click opens its own web UI, in this tab */}
             {here && (
               <span className={`mono ${styles.server}`} title={t("status.here", { name: here })}>
-                {here}
+                {getHereUrl() ? <a href={getHereUrl()}>{here}</a> : here}
                 <span className="machine-dot" data-online="true" aria-label={t("status.here", { name: here })} />
               </span>
             )}

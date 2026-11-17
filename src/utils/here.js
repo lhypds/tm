@@ -15,6 +15,7 @@ import { useSyncExternalStore } from "react";
 const ASK_MS = 3000;
 
 let found = ""; // as the web UI of this computer answered
+let foundPort = 0; // and the port it answered on
 const asked = new Set(); // the ports tried
 const listeners = new Set();
 
@@ -23,6 +24,9 @@ const listeners = new Set();
 export const isLocalPage = () => ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
 
 export const getHere = () => (isLocalPage() ? "" : found);
+
+// The web UI of this computer, where it was found: the page the status bar's machine id leads to.
+export const getHereUrl = () => (getHere() && foundPort ? `http://localhost:${foundPort}` : "");
 
 function subscribe(fn) {
   listeners.add(fn);
@@ -46,6 +50,7 @@ export async function findHere(machines) {
       const name = res.ok ? (await res.json()).machine : "";
       if (name && machines.some((m) => m.name === name)) {
         found = name;
+        foundPort = port;
         listeners.forEach((fn) => fn());
         return;
       }

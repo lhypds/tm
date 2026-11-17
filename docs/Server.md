@@ -56,8 +56,8 @@ Settings
 --------
 
 `GET /api/settings`  
-`{ configPath, editor, syncServer }`: the path of `taskmgr.json` (in its short form, `./taskmgr.json`), the default text editor, and the host of the server  
-this machine syncs with (`SYNC_SERVER` in `.env`, as `tm.example.com`, no scheme; `""` when it is not set).  
+`{ configPath, editor, syncServer, syncServerUrl }`: the path of `taskmgr.json` (in its short form, `./taskmgr.json`), the default text editor, and the host of the server  
+this machine syncs with (`SYNC_SERVER` in `.env`, as `tm.example.com`, no scheme; `""` when it is not set), with `syncServerUrl` its origin (`https://tm.example.com`), which that host links to.  
 
 `GET /api/machine`  
 Which machine this is, for the pages of the server it syncs with: `{ machine }`, its `MACHINE_ID` (the hostname when not  

@@ -38,7 +38,8 @@ when there is one. With `POLLING=1` a dot follows it, for taskmgrd's pulls from 
 went through recently (within twice `POLLING_INTERVAL`, three minutes at least), red when it failed or none came in  
 time (the daemon is not running); the tooltip says which, with the time and the error. On a server's page opened on one  
 of its machines, the right end names that machine instead (its machine id and a green dot), once it is found (see the  
-Machines Run dialog above).  
+Machines Run dialog above). Both are links, opened in the same tab: the server's host leads to the web UI of that  
+server, the machine id to the web UI of this computer (`http://localhost:<port>`, the port its tm answered on).  
 
 Configuration: `taskmgr.json` (copy `taskmgr.json.example`; the file is git-ignored).  
 The bare `tm` command reads the same file:  

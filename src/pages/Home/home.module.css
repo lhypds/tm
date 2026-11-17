@@ -363,6 +363,17 @@
   flex: none;
 }
 
+/* It is a link (to that server's page, or to this machine's own). The server's host, a url, says so
+   under the pointer; the machine id, a name, stays plain. */
+.server a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.server a[data-url]:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 860px) {
   .header {
     grid-template-columns: 1fr auto;

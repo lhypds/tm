@@ -536,7 +536,8 @@ function syncServerHost() {
 }
 
 app.get('/api/settings', (req, res) => {
-  res.json({ configPath: shortPath(config.configPath), editor: getEditor(), syncServer: syncServerHost() });
+  // syncServerUrl: where the status bar's host leads (the web UI of that server), "" when there is none
+  res.json({ configPath: shortPath(config.configPath), editor: getEditor(), syncServer: syncServerHost(), syncServerUrl: syncOrigin });
 });
 
 // For the dot beside the sync server in the status bar: whether taskmgrd polls that server (POLLING=1
