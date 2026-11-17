@@ -558,14 +558,6 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       spot.current.col + after,
     );
   };
-  // The keyboard coming onto the pane (l from the list, t) goes straight into the text, in NORMAL
-  // mode; a click does not (it lands where it lands).
-  const pressedAt = useRef(0);
-  useEffect(() => {
-    if (!focused || !loaded || Date.now() - pressedAt.current < 500) return;
-    if (sectionRef.current?.contains(document.activeElement)) return;
-    enter("normal");
-  }, [focused, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const back = backTo.current;
     if (!back) return;
@@ -581,7 +573,8 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   }, [chosen, chosenIndex]);
 
   // The page's keys, as Home names them, while the keyboard is on the pane and not in the text;
-  // true when the key was one of them. With no card chosen (esc left the text): j, k and enter go
+  // true when the key was one of them. With no card chosen (the keyboard just came onto the pane,
+  // or esc left the text; no cursor is shown): j, k and enter go
   // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; h and l are
   // the page's (to the pane beside). On a card (j / k and the arrows get there from the text): k,
   // up and left go into the text above it, j, down and right into the text under it, or on to the
@@ -677,9 +670,6 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       ref={sectionRef}
       className={styles.scheduler}
       aria-label={t("scheduler.title")}
-      onMouseDownCapture={() => {
-        pressedAt.current = Date.now();
-      }}
     >
       <div className={styles.bar} data-focused={focused}>
         <h2 className={styles.barTitle}>{t("scheduler.title")}</h2>
