@@ -4,6 +4,7 @@ import { Modal, TextArea, Checkbox, showToast } from "@ui";
 import MachineDot from "@components/MachineDot";
 import { StopIcon } from "@components/icons";
 import { formatDateTime } from "@utils/task";
+import { useHere, setHere, findHere } from "@utils/here";
 import * as api from "../api";
 import { duration } from "../duration";
 import styles from "./machines.module.css";
@@ -25,7 +26,8 @@ function readPicked() {
 
 // The machines Claude Code can be run on from here, opened from the header: the machines that sync
 // with this server (GET /api/ai/machines, asked again every few seconds while open), each with its
-// dot, a tick to pick it once its runner is connected (AI_RUNNER=1 in its taskmgrd),
+// dot, a tick to pick it once its taskmgrd is connected (for a prompt it has to run Claude Code too,
+// AI_RUNNER=1 there: a machine that does not takes the / commands only, and says so),
 // and under it its latest runs started from here: when, what was asked and how it goes, a click
 // showing the run (onOpenRun(run)). Above them the prompt and the run button: it starts Claude Code
 // with that prompt on every machine ticked (onRun(machine, prompt), resolving to the run, or null
@@ -40,6 +42,9 @@ function readPicked() {
 // through). While only "/" and the start of a name are typed, the commands that fit are listed
 // under the first line (↑ / ↓ move, enter or tab takes one, a click too). A toast tells which machines started it, and what the
 // others answered.
+//
+// At the bottom left, which of the machines this computer is (see @utils/here): found by itself where
+// the browser lets the page ask, chosen there otherwise. Its folders are then opened on it.
 export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
   const { t } = useTranslation();
   const [machines, setMachines] = useState(null); // null until first answered
@@ -50,6 +55,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
   const [busy, setBusy] = useState(false);
   const promptRef = useRef(null);
   const [menu, setMenu] = useState({ off: false, index: 0 }); // the commands listed under "/": put away, and the one the keys are on
+  const here = useHere();
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -60,6 +66,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
           if (stale) return;
           setMachines(d.machines);
           setError("");
+          findHere(d.machines);
         },
         (e) => {
           if (!stale) setError(e.message);
@@ -77,11 +84,15 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     if (isOpen) promptRef.current?.focus();
   }, [isOpen]);
 
-  const ready = (machines || []).filter((m) => m.runner);
-  const isPicked = (m) => m.runner && (picked ? picked.includes(m.name) : ready.length === 1);
-  const targets = ready.filter(isPicked);
+  // A machine can be ticked once connected; a prompt goes to those of the ticked that run Claude Code,
+  // a / command to all of them.
+  const isCommand = prompt.trimStart().startsWith("/");
+  const ready = (machines || []).filter((m) => m.linked);
+  const isPicked = (m) => m.linked && (picked ? picked.includes(m.name) : ready.length === 1);
+  const chosen = ready.filter(isPicked);
+  const targets = chosen.filter((m) => isCommand || m.runner);
   const toggle = (m, on) => {
-    const next = [...new Set([...(picked || targets.map((x) => x.name)).filter((n) => n !== m.name), ...(on ? [m.name] : [])])];
+    const next = [...new Set([...(picked || chosen.map((x) => x.name)).filter((n) => n !== m.name), ...(on ? [m.name] : [])])];
     setPicked(next);
     try {
       localStorage.setItem(PICKED_KEY, JSON.stringify(next));
@@ -114,7 +125,6 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
               ? t("ai.stopped")
               : t("ai.failed");
 
-  const isCommand = prompt.trimStart().startsWith("/");
   const canRun = !busy && !!prompt.trim() && targets.length > 0;
   // Once run, the box is emptied and what was run stays in it as its placeholder, grey and not to be
   // edited; tab in the empty box brings it back as text.
@@ -238,12 +248,17 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
         {machines?.length > 0 && (
           <ul className={styles.machines}>
             {machines.map((m) => (
-              <li key={m.name} className={styles.machine} data-ready={m.runner}>
+              <li key={m.name} className={styles.machine} data-ready={!!m.linked}>
                 <div className={styles.row}>
-                  <Checkbox checked={isPicked(m)} disabled={!m.runner} onChange={(on) => toggle(m, on)}>
+                  <Checkbox checked={isPicked(m)} disabled={!m.linked} onChange={(on) => toggle(m, on)}>
                     <span className={styles.name}>{m.name}</span>
                   </Checkbox>
                   <MachineDot machine={m} />
+                  {m.linked && !m.runner && (
+                    <span className={`muted ${styles.note}`} title={t("machines.commandsOnly")}>
+                      {t("machines.commandsOnly")}
+                    </span>
+                  )}
                 </div>
                 {(runsOf[m.name] || []).slice(0, RUNS_SHOWN).map((r) => (
                   <div key={r.id} className={styles.run}>
@@ -276,6 +291,19 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
         )}
 
         <div className={styles.actions}>
+          {machines?.length > 0 && (
+            <label className={styles.here} title={t("machines.hereHint")}>
+              <span className="muted">{t("machines.here")}</span>
+              <select className="select" value={machines.some((m) => m.name === here) ? here : ""} onChange={(e) => setHere(e.target.value)}>
+                <option value="">{t("machines.hereNone")}</option>
+                {machines.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button type="button" className="btn primary lg" disabled={!canRun} onClick={run} title={t("machines.runHint")}>
             {t("machines.run")}
           </button>

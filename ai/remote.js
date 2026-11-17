@@ -2,7 +2,11 @@
 // pushes from taskmgrd (server/sync.js), a task of a pushed copy is run where its tasks, the source
 // code and the claude login are: on the machine that pushed it, by its taskmgrd (ai/runner.js, with
 // AI_RUNNER=1 in its .env). That runner keeps one connection open here (GET /api/sync/ai/commands in
-// server/ai/ai.js) and gets the browsers' commands over it: run, prompt, answer, stop, forget, tm (command). What
+// server/ai/ai.js) and gets the browsers' commands over it: run, prompt, answer, stop, forget, tm (command),
+// and two that are not about Claude Code, for the browser that is on that machine: open (a folder, in
+// its file manager) and calendar (a new event in its Apple Calendar). Every taskmgrd keeps that
+// connection, so those and tm reach a machine without AI_RUNNER=1 too (`linked`); the runs need it
+// (`ai`, which the runner says of itself as it connects). What
 // its runs do comes back as the events of its own session (ai/session.js: snapshot, run, item, delta,
 // remove; POST /api/sync/ai/events, see receive) and is kept here, run by run, so the browsers see
 // those runs as they see the runs of this machine: the same events (subscribe), the same shape
@@ -20,9 +24,10 @@ const { FREE_KEY, TITLE_MAX } = require('./session');
 const { TM_COMMANDS, tmCommandOf } = require('../utils/tmcommand');
 
 const ACK_MS = 15 * 1000;   // how long a machine has to acknowledge a command
+const CALENDAR_MS = 45 * 1000;  // a new event: Calendar is started and scripted first (utils/calendar.js)
 
 const runs = new Map();        // id -> run: the machine's publicRun, items included, plus machine
-const machines = new Map();    // machine -> { send(command), close(), since }: the connection of its runner
+const machines = new Map();    // machine -> { send(command), close(), since, ai, port }: the connection of its runner
 const waiting = new Map();     // command id -> { machine, resolve, reject, timer }
 const listeners = new Set();   // (event, data) => void, the browsers following the runs
 
@@ -65,23 +70,31 @@ function getRun(id) {
 }
 
 const notConnected = (machine) => httpError(409, `Claude Code runs on ${machine}, which is not connected: start taskmgrd there with AI_RUNNER=1 in its .env.`);
+const notLinked = (machine) => httpError(409, `${machine} is not connected: start taskmgrd there.`);
 
-// Whether the runner of `machine` is connected (and so can be given a run).
-const isConnected = (machine) => machines.has(machine);
+// Whether the runner of `machine` is connected and runs Claude Code (and so can be given a run).
+const isConnected = (machine) => !!machines.get(machine)?.ai;
 
-// The machines whose runner is connected now, by name: [{ name, since }], `since` when (ms) it connected.
-const connected = () => [...machines].map(([name, c]) => ({ name, since: c.since })).sort((a, b) => a.name.localeCompare(b.name));
+// Whether the taskmgrd of `machine` is connected at all (and so can be given a tm command, a folder
+// to open or a new event).
+const isLinked = (machine) => machines.has(machine);
+
+// The machines whose taskmgrd is connected now, by name: [{ name, since, ai, port }], `since` when
+// (ms) it connected, `ai` whether it runs Claude Code and `port` the port of the web UI there (null
+// when not said).
+const connected = () => [...machines].map(([name, c]) => ({ name, since: c.since, ai: c.ai, port: c.port })).sort((a, b) => a.name.localeCompare(b.name));
 
 // The runner of `machine` has connected: `send(command)` writes a command to it, `close()` ends the
-// connection. Returns the way to say it is gone. A second connection of the same machine replaces
-// the first, which is closed.
-function connect(machine, send, close) {
+// connection; `ai` is whether it runs Claude Code (AI_RUNNER=1 there) and `port` the port of the web
+// UI on that machine, which a browser there is found by (see src/utils/here.js). Returns the way to
+// say it is gone. A second connection of the same machine replaces the first, which is closed.
+function connect(machine, send, close, { ai = true, port = null } = {}) {
   const old = machines.get(machine);
   if (old) {
     machines.delete(machine);
     try { old.close(); } catch (e) { /* already gone */ }
   }
-  const conn = { send, close, since: Date.now() };
+  const conn = { send, close, since: Date.now(), ai, port };
   machines.set(machine, conn);
   return () => {
     if (machines.get(machine) !== conn) return;  // replaced meanwhile
@@ -104,7 +117,7 @@ function connect(machine, send, close) {
 // connected or does not answer within `timeout`.
 function command(machine, cmd, timeout = ACK_MS) {
   const conn = machines.get(machine);
-  if (!conn) return Promise.reject(notConnected(machine));
+  if (!conn) return Promise.reject(notLinked(machine));
   const id = newId();
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -149,7 +162,7 @@ function fail(run, error) {
 // are here ({ "task.txt": text, "prompt.txt": text | null }), written there before the run, and
 // `after` what Claude is told to do with its changes once done ("push", "pr" or null; see ai/task.js).
 async function startRun({ machine, task, taskDir, files, after = null }) {
-  if (!machines.has(machine)) throw notConnected(machine);
+  if (!isConnected(machine)) throw notConnected(machine);
   for (const r of runs.values()) {
     if (r.task.key === task.key && (r.status === 'running' || r.status === 'queued')) throw httpError(409, 'Claude Code is already running on this task.');
   }
@@ -160,7 +173,7 @@ async function startRun({ machine, task, taskDir, files, after = null }) {
 // Ask `machine` to run Claude Code with `prompt` as it is, on no task, in its user's home folder (the
 // web UI's Machines dialog; see session.startPrompt, whose run this one is shaped as while queued).
 async function startPrompt({ machine, prompt }) {
-  if (!machines.has(machine)) throw notConnected(machine);
+  if (!isConnected(machine)) throw notConnected(machine);
   const text = String(prompt || '').trim();
   if (!text) throw httpError(400, 'Missing prompt.');
   const id = newId();
@@ -241,6 +254,21 @@ async function tmCommand(machine, text) {
   return name;
 }
 
+// Have `machine` open a folder in its file manager (Finder, Explorer), for the browser that is on it:
+// the task at `rel` of the space as it is there, or, without `rel`, the folder the tree shows for the
+// space (a work's tasks folder, a repository's source code, else its tasks). `task` is { work,
+// repository, rel? }: the machine finds the folder itself, so nothing but a folder of its own
+// taskmgr.json can be opened.
+function openFolder(machine, task) {
+  return command(machine, { type: 'open', work: task.work, repository: task.repository || '', rel: task.rel || '' });
+}
+
+// Have `machine` (a Mac) make an event named `title` on the day `date` ("YYYY-MM-DD") in its Apple
+// Calendar and bring it to the front, open (utils/calendar.js). Resolves once it is there.
+function newEvent(machine, date, title) {
+  return command(machine, { type: 'calendar', date, title }, CALENDAR_MS);
+}
+
 // A run as the machine tells it (its publicRun, items included in a snapshot), kept as this machine's.
 function upsert(machine, pub) {
   if (!pub || typeof pub.id !== 'string') return;
@@ -308,4 +336,4 @@ function receive(machine, events) {
   }
 }
 
-module.exports = { subscribe, listRuns, publicRun, has, isConnected, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord, tmCommand };
+module.exports = { subscribe, listRuns, publicRun, has, isConnected, isLinked, connected, connect, receive, startRun, startPrompt, answerRun, stopRun, forgetRecord, tmCommand, openFolder, newEvent };

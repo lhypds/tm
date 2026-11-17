@@ -133,6 +133,31 @@
   gap: 12px;
 }
 
+/* Which machine this computer is, at the left end of the actions: a word and the list of them. */
+.here {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: auto;
+  white-space: nowrap;
+}
+
+.here select {
+  width: auto;
+  min-width: 0;
+  max-width: 200px;
+}
+
+/* Beside a connected machine that does not run Claude Code: what it can be given. */
+.note {
+  margin-left: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The prompt and, under its first line while a tm command is being typed ("/"), the commands that fit. */
 .promptWrap {
   position: relative;

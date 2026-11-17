@@ -46,6 +46,7 @@ import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
 import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
 import { getMachines } from "@ai/api";
+import { findHere } from "@utils/here";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
 import styles from "./home.module.css";
 
@@ -437,6 +438,12 @@ export default function Home({ all = false }) {
   const [syncServer, setSyncServer] = useState("");
   useEffect(() => {
     api.getSettings().then((s) => setSyncServer(s.syncServer || ""), () => {});
+  }, []);
+
+  // Which of the server's machines this browser is on, looked for once the page is open (see
+  // @utils/here): a folder synced by it is then opened on it, in front of the user.
+  useEffect(() => {
+    getMachines().then((d) => findHere(d.machines), () => {});
   }, []);
 
   // The page re-reads itself every ten seconds while the tab is visible: the tasks, for changes

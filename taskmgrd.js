@@ -17,6 +17,9 @@
 // off. With POLLING=1 the daemon also pulls: once when it starts, before its first push, and then
 // every POLLING_INTERVAL seconds (600, ten minutes, when not set), it runs pull.js as `tm pull`
 // does, so a change made on the server, or pushed to it by another machine, comes here. With
+// Whatever it does, it keeps a connection to the server for its commands (ai/runner.js): a tm
+// command typed in the server's Machines dialog, and, for a browser on this machine, a folder opened
+// in the file manager here or a new event in Apple's Calendar here. With
 // AI_RUNNER=1 it also runs Claude Code for the server: a task pushed from here can be run from the
 // server's web UI, and runs here, where the tasks, the source code and the claude login are (see
 // ai/runner.js); with AI_RUNNER_WINDOW=1 as well, each of those runs opens a terminal window here
@@ -467,15 +470,16 @@ if (POLLING) poll();
 else if (PUSHING) rescan();
 if (PUSHING) setInterval(rescan, RESCAN_MS);
 
-// The runner: Claude Code run here for the server (ai/runner.js), logging what claude writes to
+// The runner: the server's commands carried out here, and, with AI_RUNNER=1, Claude Code run here
+// for the server (ai/runner.js), logging what claude writes to
 // stderr where the web UI's runs do, and each run in a terminal window here when asked (which
 // terminal on macOS, and how long it stays after the run; see ai/window.js).
 const window = AI_RUNNER_WINDOW ? { terminal: AI_RUNNER_TERMINAL, closeAfter: AI_RUNNER_WINDOW_CLOSE } : false;
-const runner = AI_RUNNER ? startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, logFile: path.join(__dirname, 'logs', 'ai.log'), window, commandWindow: { terminal: AI_RUNNER_TERMINAL, closeAfter: AI_RUNNER_WINDOW_CLOSE } }) : null;
+const runner = startRunner({ server: SERVER, token: TOKEN, machineId: MACHINE_ID, log, warn, ai: AI_RUNNER, port: Number(process.env.PORT) || 3456, logFile: path.join(__dirname, 'logs', 'ai.log'), window, commandWindow: { terminal: AI_RUNNER_TERMINAL, closeAfter: AI_RUNNER_WINDOW_CLOSE } });
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
-    if (runner) runner.stop();
+    runner.stop();
     if (pollTimer) clearTimeout(pollTimer);
     if (rescanRetry) clearTimeout(rescanRetry);
     for (const r of [...roots.values()]) forgetRoot(r);

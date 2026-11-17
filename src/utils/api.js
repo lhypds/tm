@@ -1,3 +1,5 @@
+import { getHere } from "./here";
+
 // Fired on window when the server answers that there is no session any more (it restarted, or
 // the cookie expired). The auth store listens and takes the app back to the login page.
 export const UNAUTHORIZED_EVENT = "taskmgr:unauthorized";
@@ -51,8 +53,16 @@ export const getPolling = () => request("/api/polling");
 
 export const listSpaces = () => request("/api/spaces");
 
-// Open the folder a tree row shows (a work's tasks folder, or a repository's source folder) in the OS file manager.
-export const openSpaceFolder = (space) => request("/api/space/open", json("POST", sp(space)));
+// The machine this browser is on, for the requests that open something in front of the user: { here },
+// nothing when it is not known (see ./here).
+const here = () => {
+  const name = getHere();
+  return name ? { here: name } : {};
+};
+
+// Open the folder a tree row shows (a work's tasks folder, or a repository's source folder) in the OS
+// file manager: the server's, or, for a folder synced by the machine this browser is on, that one's.
+export const openSpaceFolder = (space) => request("/api/space/open", json("POST", { ...sp(space), ...here() }));
 
 // The path of a folder dropped on the page, found by the server from its name and the names of
 // what is in it: { path }.
@@ -145,7 +155,8 @@ export const setStatus = (space, rel, status) => request("/api/task/status", jso
 export const moveTask = (space, rel, into, to) =>
   request("/api/task/move", json("POST", { ...sp(space), rel, into, ...(to ? { to: sp(to) } : {}) }));
 
-export const openInFileManager = (space, rel) => request("/api/task/open", json("POST", { ...sp(space), rel }));
+// Open the task's folder in the OS file manager, as openSpaceFolder does a space's.
+export const openInFileManager = (space, rel) => request("/api/task/open", json("POST", { ...sp(space), rel, ...here() }));
 
 export const deleteTask = (space, rel) => request(`/api/task?${q({ ...sp(space), rel })}`, { method: "DELETE" });
 
@@ -193,10 +204,10 @@ export const getCalendars = () => request("/api/calendars");
 // Replace that list. Resolves to it as it is kept.
 export const saveCalendars = (calendars) => request("/api/calendars", json("PUT", { calendars }));
 
-// A new event named `title` on the day `date` ("YYYY-MM-DD") in Apple's Calendar, on the server's
-// machine (a Mac), which comes to the front with it open, for its time to be chosen (see
-// defaultNewEvent in server/calendar.js).
-export const newCalendarEvent = (date, title) => request("/api/calendar/new-event", json("POST", { date, title }));
+// A new event named `title` on the day `date` ("YYYY-MM-DD") in Apple's Calendar, on the machine this
+// browser is on when that is one of the server's machines, else on the server's (a Mac either way),
+// which comes to the front with it open, for its time to be chosen (see utils/calendar.js).
+export const newCalendarEvent = (date, title) => request("/api/calendar/new-event", json("POST", { date, title, ...here() }));
 
 // The events of the day `date` ("YYYY-MM-DD", here: its bounds are sent with it) in the Google and
 // Apple calendars the server is given (see server/calendar.js): { configured, events, errors },

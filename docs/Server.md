@@ -59,6 +59,13 @@ Settings
 `{ configPath, editor, syncServer }`: the path of `taskmgr.json` (in its short form, `./taskmgr.json`), the default text editor, and the host of the server  
 this machine syncs with (`SYNC_SERVER` in `.env`, as `tm.example.com`, no scheme; `""` when it is not set).  
 
+`GET /api/machine`  
+Which machine this is, for the pages of the server it syncs with: `{ machine }`, its `MACHINE_ID` (the hostname when not  
+set). No login: it is asked across origins by the web UI of `SYNC_SERVER` opened in a browser on this computer  
+(`http://127.0.0.1:<port>/api/machine`), which so learns it is on one of that server's machines and has folders opened  
+here (`here` in `POST /api/space/open`). Only that server's origin may read it (CORS; 403 for any other, or none); the  
+route is not there without a `SYNC_SERVER`.  
+
 `GET /api/polling`  
 `{ on, at, ok, error, fresh }`: whether taskmgrd polls the sync server (`POLLING=1` and a `SYNC_SERVER` in `.env`) and how  
 its last pull went, from `.tm-poll-state.json` next to `taskmgr.json`, which the daemon writes after each pull: when (ms) it  
@@ -125,9 +132,12 @@ in its list. Nothing moves to another list (a work to another origin, a reposito
 `POST /api/space/create` `{ work, repository? }`  
 Create the missing tasks folder of a work or a repository. 201.  
 
-`POST /api/space/open` `{ work, repository? }`  
+`POST /api/space/open` `{ work, repository?, here? }`  
 Open the folder of a tree row with the OS file manager on the server's machine: a work's tasks folder,  
 or a repository's source folder (its tasks folder when it has none). Answers `{ ok: true }`.  
+`here` is the machine the browser is on, when it knows (see `GET /api/machine`): for a folder that machine syncs, the  
+folder is opened there instead, as it is there (its own `taskmgr.json`), by its taskmgrd; `{ ok: true, machine }`. 409  
+when that machine's taskmgrd is not connected, 504 when it does not answer in 15 seconds.  
 
 
 Tasks
@@ -173,8 +183,9 @@ The `task.txt` text: `{ text }`.
 `PUT /api/task/text` `{ work, repository?, rel, text }`  
 Write `task.txt` as typed, tidy it and rename the folder after its first line. `{ task }`.  
 
-`POST /api/task/open` `{ work, repository?, rel }`  
-Open the task folder with the OS file manager on the server's machine. `{ ok: true }`.  
+`POST /api/task/open` `{ work, repository?, rel, here? }`  
+Open the task folder with the OS file manager on the server's machine. `{ ok: true }`. With `here`, as for  
+`POST /api/space/open`: the task of a folder that machine syncs is opened there, found by its path or its id.  
 
 `DELETE /api/task?work=&repository=&rel=`  
 Delete a task folder. `{ ok: true }`.  
@@ -242,9 +253,11 @@ they differ), and answered once the machine has started it (201) or refused (its
 runner is not connected, or the folder was pushed without a machine id; 504 when the machine does not answer in 15 seconds.  
 
 `GET /api/ai/machines`  
-The machines Claude Code can be run on from here: `{ machines: [{ name, seenAt, online, runner }] }`, as `GET /api/spaces`  
+The machines Claude Code can be run on from here: `{ machines: [{ name, seenAt, online, runner, linked, port }] }`, as `GET /api/spaces`  
 says a machine, for every machine that syncs a space with this server, made a request since it started, or has its  
-runner connected (`runner`), sorted by name.  
+taskmgrd connected, sorted by name. `linked`: its taskmgrd is connected, so it can be given a tm command, a folder to  
+open or a new event; `runner`: it runs Claude Code too (`AI_RUNNER=1` there), so it can be given a prompt; `port`: the  
+port of the web UI on that machine (`null` when not known), where a browser on it asks which machine it is on.  
 
 `POST /api/ai/machine/run` `{ machine, prompt }`  
 Start Claude Code on that machine with the prompt as it is, on no task, in the home folder of its user (the web UI's  
@@ -258,7 +271,7 @@ Run a tm command on that machine (the web UI's Machines dialog, a prompt that st
 `/start`, `/stop`, `/push`, `/pull` or `/status` (the `/` may be left out; no arguments), run there as `tm restart` and so on  
 by the machine's runner, in a process of its own, so a restart of the daemon that got the command goes through.  
 `{ ok: true, command }` once the machine has started it; what it prints is in that machine's `logs/command.log`, and in a terminal window there on macOS and Windows.  
-400 when it is not one of those commands, 409 when the machine's runner is not connected, 504 when it does not answer in 15 seconds.  
+400 when it is not one of those commands, 409 when the machine's taskmgrd is not connected (`AI_RUNNER` is not needed), 504 when it does not answer in 15 seconds.  
 
 `POST /api/ai/runs/:id/answer` `{ pending, decision }` or `{ pending, answers }`  
 Answer the run's pending question `pending` (its id): `decision` `allow` or `deny` for a permission, `answers` for a  
@@ -282,15 +295,18 @@ record's, 404 when there is none.
 Remove a record. For a task of a pushed copy, the machine it came from removes it too (its next push would bring it back  
 otherwise), so its runner must be connected (409 otherwise). `{ ok: true }`; 404 when there is none.  
 
-The routes of a runner (the taskmgrd of another machine with `AI_RUNNER=1`, see [taskmgrd.md](taskmgrd.md)), authorized  
+The routes of a runner (the taskmgrd of another machine, see [taskmgrd.md](taskmgrd.md)), authorized  
 as the sync routes are (`Authorization: Bearer <SYNC_SERVER_TOKEN>` and `X-Machine-Id`, which names the machine; 400 without  
-one), so a runner connected counts as its machine being in touch:  
+one), so a runner connected counts as its machine being in touch. The runner also says `X-Ai-Runner` (`1` or `0`: whether it  
+runs Claude Code, `AI_RUNNER` there; a runner that does not say does) and `X-Web-Port` (the port of the web UI there):  
 
 `GET /api/sync/ai/commands`  
 The commands for that machine, live: a `text/event-stream` of `command` events, each `{ id, type, ... }`: `run` `{ run, work,  
 repository, rel, files }` (start Claude Code on that task as run `run`, `files` being `{ "task.txt": text, "prompt.txt": text | null }`  
 as the server has them), `prompt` `{ run, prompt }` (start Claude Code with that prompt on no task, as run `run`), `answer` `{ run, pending, body }`, `stop` `{ run }` and `forget` `{ work, repository, rel, folder }`  
-(remove that run record from the task folder there), with a comment every 25 seconds to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
+(remove that run record from the task folder there), `tm` `{ command }` (a tm command there), `open` `{ work, repository, rel }`  
+(open that task's folder in the file manager there, or, without `rel`, the folder the tree shows for the space) and `calendar` `{ date, title }`  
+(a new event in Apple's Calendar there; acknowledged once it is made), with a comment every 25 seconds to keep the connection. One connection per machine: a new one replaces the old. While a machine has none, its tasks cannot be run.  
 
 `POST /api/sync/ai/events` `{ events }`  
 The events of the machine's session, in order, each `{ event, data }` as `GET /api/ai/events` sends them (`snapshot` first,  
@@ -324,6 +340,8 @@ each event `{ id, title, location, allDay, start, end, source, calendar, color }
 
 `GET /api/calendars` the calendars as `taskmgr.json` lists them, for the dialog that adds and removes them: `{ calendars }`, each `{ name, type, url, color }`.  
 `PUT /api/calendars` `{ calendars }` replaces the list in `taskmgr.json` (an entry whose address is not an `https://`, `http://` or `webcal://` one is refused) and answers it as it is kept.
+
+`POST /api/calendar/new-event` `{ date, title, here? }` a new event of an hour on that day in Apple's Calendar (`utils/calendar.js`), which comes to the front with it open: on the server's machine (a Mac), or, with `here` (the machine the browser is on, see `GET /api/machine`) naming a machine in touch with this server, on that one, by its taskmgrd. `{ ok: true }`; 500 with the reason otherwise (not a Mac, the machine not connected, macOS not letting tm press the keys).
 
 
 Sync

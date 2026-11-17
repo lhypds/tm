@@ -39,7 +39,7 @@ const { getEditor } = require('../utils/editor');
 const { resolveConfig, shortPath, POLL_STATE_PATH } = require('./config');
 const { createAuthApp } = require('./auth');
 const { createSyncApp, isMirrored, spaceKey } = require('./sync');
-const { createAiApp, createAiRunnerApp, isRunnerConnected } = require('./ai');
+const { createAiApp, createAiRunnerApp, isRunnerConnected, isMachineLinked, openOnMachine, newEventOnMachine } = require('./ai');
 const { createSchedulerApp } = require('./scheduler');
 const { createCalendarApp } = require('./calendar');
 const { listRecords, lastPrompt } = require('../ai/record');
@@ -210,12 +210,21 @@ function crumbsFor(root, abs) {
 
 // The machines that sync a space as the web UI shows them: syncApp.machinesInfo, each with `runner`,
 // whether its taskmgrd is connected to run Claude Code for this server (AI_RUNNER=1 there, see
-// ai/remote.js); a machine so connected is in touch.
+// ai/remote.js), and `linked`, whether it is connected at all (for a tm command, a folder to open);
+// a machine so connected is in touch.
 function machinesWithRunner(space) {
   return syncApp.machinesInfo(space).map(m => {
-    const runner = isRunnerConnected(m.name);
-    return { ...m, runner, online: m.online || runner };
+    const linked = isMachineLinked(m.name);
+    return { ...m, runner: isRunnerConnected(m.name), linked, online: m.online || linked };
   });
+}
+
+// The machine the browser of a request says it is on (`here` in its body, see src/utils/here.js), when
+// that is one of the machines that sync the space: the folder asked for is then opened there, in
+// front of who asked, and not on this server. null otherwise.
+function hereOf(body, space) {
+  const here = String(body?.here || '');
+  return here && machinesOf(space).some(m => m.name === here) ? here : null;
 }
 
 // Of a space's machines (see machinesWithRunner), the one its tasks run on: one whose runner is
@@ -417,6 +426,35 @@ app.use(syncApp);
 // the tasks pushed from there (see server/ai/ai.js): the same token.
 app.use(createAiRunnerApp({ auth: syncApp.auth }));
 
+// Which machine this is, for the web UI of the server this one syncs with (SYNC_SERVER) when it is
+// opened in a browser here: that page asks, across origins, the web UI of its own computer (this
+// one, http://127.0.0.1:<port>) and so learns it is on one of the server's machines, where a folder
+// can be opened in front of who asks (see src/utils/here.js). { machine }, the MACHINE_ID pushes go
+// under (the hostname when not set, as in push.js). Only that server's pages may read the answer
+// (CORS), without a login: it is asked from another site, where this one's cookie is not sent.
+// Without a SYNC_SERVER there is no such page, and no route.
+const syncOrigin = (() => {
+  try {
+    return new URL(String(process.env.SYNC_SERVER || '').trim()).origin;
+  } catch (e) {
+    return '';
+  }
+})();
+if (syncOrigin) {
+  app.use('/api/machine', (req, res, next) => {
+    res.set('Vary', 'Origin');
+    if (req.headers.origin !== syncOrigin) return res.status(403).json({ error: 'Not the sync server.' });
+    res.set('Access-Control-Allow-Origin', syncOrigin);
+    if (req.method === 'OPTIONS') {
+      // the preflight of a browser that asks before a public page reaches a local address
+      res.set({ 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Private-Network': 'true', 'Access-Control-Max-Age': '600' });
+      return res.status(204).end();
+    }
+    if (req.method !== 'GET') return res.status(405).json({ error: 'GET only.' });
+    res.json({ machine: String(process.env.MACHINE_ID || '').trim() || os.hostname() });
+  });
+}
+
 app.use(express.json({ limit: '10mb' }));
 
 // Login first: everything under /api below needs a session (see server/auth.js).
@@ -448,7 +486,12 @@ app.use(createSchedulerApp({
 
 // The calendar under the scheduler's page (see server/calendar.js): the day's events, read from
 // the Google and Apple calendars listed in taskmgr.json ("calendars").
-app.use(createCalendarApp({ calendars: config.getCalendars, log: (line) => console.error(line) }));
+app.use(createCalendarApp({
+  calendars: config.getCalendars,
+  log: (line) => console.error(line),
+  // a new event for a browser on one of the machines: made there (see `here` in server/calendar.js)
+  newEventOn: (machine, date, title) => (isMachineLinked(machine) || syncApp.allMachines().some(m => m.name === machine) ? newEventOnMachine(machine, date, title) : null)
+}));
 
 // The calendars themselves, for the dialog that adds and removes them (the pencil beside "Calendar"):
 // { calendars }, each { name, type, url }. The addresses are secrets, and are given only here and
@@ -716,13 +759,19 @@ app.post('/api/repository/move', (req, res) => {
 });
 
 // Open the folder a tree row shows with the OS file manager: a work's tasks folder, or a
-// repository's source code folder (its tasks folder when it has none).
-app.post('/api/space/open', (req, res) => {
+// repository's source code folder (its tasks folder when it has none). On this machine, or, for a
+// copy pushed from the machine the browser is on (`here`, see hereOf), on that one, as it is there.
+app.post('/api/space/open', async (req, res) => {
   const work = String(req.body?.work || '');
   const repository = String(req.body?.repository || '');
   const w = config.getWorks().find(x => x.work === work);
   const p = repository ? w?.repositories.find(x => x.name === repository) : null;
   if (!w || (repository && !p)) throw new HttpError(404, repository ? `Unknown repository "${repository}" in "${work}".` : `Unknown work "${work}".`);
+  const here = hereOf(req.body, { work, repository, root: p ? p.root : w.root });
+  if (here) {
+    await openOnMachine(here, { work, repository });
+    return res.json({ ok: true, machine: here });
+  }
   const dir = p ? p.sourcePath || p.root : w.root;
   if (!dir) throw new HttpError(404, `"${work}" has no tasks folder of its own.`);
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new HttpError(404, `Folder not found: ${dir}`);
@@ -951,11 +1000,19 @@ app.post('/api/tasks/text', (req, res) => {
   res.status(201).json({ task: writeTaskText(root, taskDir, body.text) });
 });
 
-// Open the task folder with the OS file manager (only meaningful when the browser runs on the same machine).
-app.post('/api/task/open', (req, res) => {
+// Open the task folder with the OS file manager: on this machine (only meaningful when the browser
+// runs on it), or, for a task of a copy pushed from the machine the browser is on (`here`, see
+// hereOf), on that one, where the task is found by its path or its id.
+app.post('/api/task/open', async (req, res) => {
   const body = req.body || {};
-  const { root } = spaceFrom(body);
+  const space = spaceFrom(body);
+  const { root } = space;
   const taskDir = resolveTaskDir(root, body.rel);
+  const here = hereOf(body, space);
+  if (here) {
+    await openOnMachine(here, { work: space.work, repository: space.repository, rel: toRel(root, taskDir) });
+    return res.json({ ok: true, machine: here });
+  }
   openTask(taskFromDir(taskDir));
   res.json({ ok: true });
 });

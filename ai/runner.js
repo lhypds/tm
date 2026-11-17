@@ -18,13 +18,20 @@
 // left as it is here). A task the server has at a path this machine has not is looked for by its id
 // (it may be in another status folder here) and, when it is nowhere here, made at that path.
 //
+// The connection is kept by every taskmgrd, with AI_RUNNER=1 or not (`ai`): without it the commands
+// about Claude Code (run, prompt, answer, stop) are refused, and what is left is tm and the two
+// commands of the browser that is on this machine (the server's web UI opened here, see
+// src/utils/here.js): open, a folder of taskmgr.json or a task in it shown in the file manager here
+// (Finder, Explorer), and calendar, a new event in Apple's Calendar here (utils/calendar.js).
+//
 // With `window` on (AI_RUNNER_WINDOW=1 in .env) each run also opens a terminal window on this machine
 // that shows the transcript as it grows and closes a while after the run (ai/window.js), for whoever
 // sits here; the server's browser is where the run is answered, as before.
 const fs = require('fs');
 const path = require('path');
 
-const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId } = require('../utils/task');
+const { TASK_FILE, PROMPT_FILE, TASK_FOLDER_RE, folderId, openFolder } = require('../utils/task');
+const { newEvent } = require('../utils/calendar');
 const { resolveConfig } = require('../server/config');
 const { isDirectory, spaceOf, taskDirIn, taskDirsUnder, afterOf } = require('./task');
 const { deleteRecord } = require('./record');
@@ -61,7 +68,9 @@ async function* sseMessages(body) {
 }
 
 // Start the runner; `server` is SYNC_SERVER, `token` SYNC_SERVER_TOKEN, `machineId` MACHINE_ID, and
-// log / warn the daemon's. `session` is this machine's runs (ai/session.js unless a test gives
+// log / warn the daemon's. `ai` is whether Claude Code is run here for the server (AI_RUNNER; the
+// commands about it are refused otherwise) and `port` the port of the web UI on this machine, told
+// to the server for the browsers that look for it. `session` is this machine's runs (ai/session.js unless a test gives
 // another), `getWorks` the works of taskmgr.json as they are now (read each time, as the file may
 // change), `logFile` where the runs log what claude writes to stderr, `window` whether each run opens
 // a terminal window here (AI_RUNNER_WINDOW): false, or { terminal, closeAfter } as ai/window.js
@@ -69,10 +78,10 @@ async function* sseMessages(body) {
 // `commandLog` is where a tm command run for the server (the `tm` command) writes what it prints, and
 // `commandWindow` ({ terminal, closeAfter }) the terminal window it is shown in on macOS and Windows.
 // Returns { stop }.
-function startRunner({ server, token, machineId, log, warn, logFile, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), commandWindow = {}, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks() }) {
+function startRunner({ server, token, machineId, log, warn, logFile, ai = true, port = null, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), commandWindow = {}, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks(), open = openFolder, calendar = newEvent }) {
   session.configure({ logFile, machine: machineId });
-  const unwatch = window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
-  const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId) };
+  const unwatch = ai && window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
+  const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId), 'X-Ai-Runner': ai ? '1' : '0', ...(port ? { 'X-Web-Port': String(port) } : {}) };
 
   let stopped = false;
   let abort = null;        // the connection under way, to end it
@@ -179,9 +188,25 @@ function startRunner({ server, token, machineId, log, warn, logFile, commandLog 
     return written;
   }
 
-  function handle(cmd) {
+  // The folder the server's tree shows for a space, here: a work's tasks folder, a repository's
+  // source code folder (its tasks folder when it has none).
+  function folderOf({ work, repository }) {
+    const w = getWorks().find(x => x.work === String(work || ''));
+    const p = repository ? w?.repositories.find(x => x.name === String(repository)) : null;
+    if (!w || (repository && !p)) throw httpError(404, `No ${repository ? `repository "${repository}" in "${work}"` : `work "${work}"`} on ${machineId}.`);
+    const dir = p ? p.sourcePath || p.root : w.root;
+    if (!dir) throw httpError(404, `"${work}" has no tasks folder of its own on ${machineId}.`);
+    if (!isDirectory(dir)) throw httpError(404, `Folder not found on ${machineId}: ${dir}`);
+    return dir;
+  }
+
+  const AI_COMMANDS = ['run', 'prompt', 'answer', 'stop'];
+
+  // Carry a command out and acknowledge it, once it is done (a new event takes a few seconds).
+  async function handle(cmd) {
     const reply = (extra) => enqueue('ack', { id: cmd.id, ...extra });
     try {
+      if (!ai && AI_COMMANDS.includes(cmd.type)) throw httpError(409, `Claude Code is not run on ${machineId} for the server: AI_RUNNER=1 in its .env turns it on.`);
       switch (cmd.type) {
         case 'run': {
           const { space, taskDir, made } = locate(cmd);
@@ -216,6 +241,20 @@ function startRunner({ server, token, machineId, log, warn, logFile, commandLog 
           log(`runner: tm ${name} started for the server (its output: ${commandLog})`);
           break;
         }
+        case 'open': {
+          // For the browser that is on this machine: the task's folder, or the space's.
+          const dir = cmd.rel ? locate(cmd, false).taskDir : folderOf(cmd);
+          open(dir);
+          log(`runner: opened ${dir} for the server`);
+          break;
+        }
+        case 'calendar': {
+          const date = String(cmd.date || '');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw httpError(400, 'Invalid day.');
+          await calendar(date, String(cmd.title || '').trim().slice(0, 200) || 'New Event');
+          log(`runner: new event on ${date} in Calendar for the server`);
+          break;
+        }
         default:
           throw httpError(400, `Unknown command "${cmd.type}".`);
       }
@@ -245,7 +284,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, commandLog 
     if (failures) log(`runner: ${server} answers again`);
     failures = 0;
     connected = true;
-    log(`runner: connected to ${server}, running Claude Code for it as ${machineId}`);
+    log(`runner: connected to ${server} as ${machineId}${ai ? ', running Claude Code for it' : ''}`);
     const snapshot = session.listRuns(true);
     const off = session.subscribe((event, data) => { if (connected) enqueue(event, data); });
     enqueue('snapshot', { runs: snapshot });

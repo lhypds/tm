@@ -457,7 +457,11 @@
     "run": "Run",
     "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",
     "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env.",
-    "commandStarted": "{{command}} started on {{machines}}"
+    "commandStarted": "{{command}} started on {{machines}}",
+    "here": "This computer is",
+    "hereNone": "none of these",
+    "hereHint": "The machine this browser is on: its folders open here, in Finder or Explorer, and a new calendar event is made here. Found by asking the tm on this computer; choose it by hand when it is not.",
+    "commandsOnly": "/commands only: AI_RUNNER=1 in its .env runs Claude Code there"
   },
   "calendar": {
     "title": "Calendar"

@@ -15,8 +15,9 @@ export const startRun = (space, rel, after = null, machine = null) =>
   request("/api/ai/run", json("POST", { ...sp(space), rel, ...(after ? { after } : {}), ...(machine ? { machine } : {}) }));
 
 // The machines Claude Code can be run on from here (those that sync with this server): { machines:
-// [{ name, seenAt, online, runner }] }, `runner` whether the machine's runner is connected, so it can
-// be given a prompt.
+// [{ name, seenAt, online, runner, linked, port }] }, `linked` whether the machine's taskmgrd is
+// connected, so it can be given a tm command, `runner` whether it runs Claude Code too, so it can be
+// given a prompt, and `port` the port of the web UI there (see @utils/here).
 export const getMachines = () => request("/api/ai/machines");
 
 // Start Claude Code on `machine` with `prompt` as it is, on no task, in the home folder there;

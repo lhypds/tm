@@ -457,7 +457,11 @@
     "run": "执行",
     "runHint": "用这个 prompt 在勾选的机器上运行 Claude Code（⌘ / ctrl + enter）",
     "none": "还没有机器与这台服务器同步：在一台机器上启动 taskmgrd，并在 .env 里设 AI_RUNNER=1。",
-    "commandStarted": "已在 {{machines}} 上启动 {{command}}"
+    "commandStarted": "已在 {{machines}} 上启动 {{command}}",
+    "here": "这台电脑是",
+    "hereNone": "都不是",
+    "hereHint": "这个浏览器所在的机器：它的文件夹会在这里用 Finder 或资源管理器打开，新建日程也在这里。通过询问本机的 tm 自动识别；识别不到时请手动选择。",
+    "commandsOnly": "只能执行 /命令：在它的 .env 里设 AI_RUNNER=1 才能运行 Claude Code"
   },
   "calendar": {
     "title": "日历"

@@ -27,7 +27,9 @@ and the web UI), `run.js` is `tm run` (the `run.js` at the root only requires it
 web UI through the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`, which brings its own copy of Claude Code and uses  
 the login in `~/.claude`), keeping the runs and relaying what Claude asks, and `record.js` writes a run that is over into  
 the task folder (`.claude_<time>/`: run.json, task.txt, prompt.txt, transcript.md) and reads those records back. A task pushed from another machine runs on  
-that machine: `runner.js` is the runner in its taskmgrd (`AI_RUNNER=1`), which holds a connection to the server, carries  
+that machine: `runner.js` is the runner in its taskmgrd (every daemon keeps its connection, for the tm commands and for  
+a folder or a new calendar event opened on the machine the browser is on, see `src/utils/here.js`; with `AI_RUNNER=1` it runs  
+Claude Code too), which holds a connection to the server, carries  
 out the commands it gets on its own `session.js` and sends the session's events back, and `remote.js` is the server's  
 side, which keeps those runs as it gets them and hands the browsers' commands over, so `server/ai/ai.js` serves both kinds  
 of run as one. `window.js` is the runner's terminal window (`AI_RUNNER_WINDOW=1`): it appends the session's events of  

@@ -74,8 +74,19 @@ after the server's host at the right end of its status bar: green while the last
 `POLLING_INTERVAL` (three minutes at least), red when it failed or when none came in time, which means the daemon is  
 not running. The tooltip says which, with the time and the error (see `GET /api/polling` in [Server.md](Server.md)).  
 
-Running Claude Code for the server: with `AI_RUNNER=1` in `.env`, the daemon keeps one connection open to the server  
-(`GET /api/sync/ai/commands`, see [Server.md](Server.md)) and runs Claude Code here when the server's web UI asks: the  
+The server's commands: the daemon keeps one connection open to the server (`GET /api/sync/ai/commands`, see  
+[Server.md](Server.md)), whatever else it does, and carries out here what the server's web UI asks over it. A tm  
+command typed in its Machines dialog (`/restart`, below). And, when the server's web UI is open in a browser on this  
+very computer, what has to happen in front of you: the open folder button of a folder synced from here opens it here,  
+in Finder or Explorer (the folder as this machine's `taskmgr.json` has it, a repository's `source_path` for its row in  
+the tree), and the plus of the calendar makes the new event in Apple's Calendar here (macOS). The page finds out that  
+it is on this computer by asking the web UI here (`GET /api/machine` on `http://127.0.0.1:<PORT>`, answered to that  
+server's pages only), so the web UI has to be running here too; a browser may ask you to allow that the first time, and  
+where it does not allow it at all (Safari, from an https page), say which machine the computer is at the bottom of the  
+Machines dialog, once. Only folders of `taskmgr.json` and the tasks in them can be opened this way.  
+
+Running Claude Code for the server: with `AI_RUNNER=1` in `.env`, the daemon also runs Claude Code here, over that  
+connection, when the server's web UI asks: the  
 run button beside the prompt of a task pushed from here starts the run on this machine, where the tasks, the source  
 code (a repository's task runs in its `source_path`, as `tm run` does) and the claude login are, with this machine's  
 `AI_PERMISSION_MODE`. The transcript goes back to the server as it grows and shows in its dialog as a run of this  

@@ -457,7 +457,11 @@
     "run": "実行",
     "runHint": "チェックしたマシンでこのプロンプトの Claude Code を実行（⌘ / ctrl + enter）",
     "none": "このサーバーと同期しているマシンはまだありません：マシンで .env を AI_RUNNER=1 にして taskmgrd を起動してください。",
-    "commandStarted": "{{machines}} で {{command}} を開始しました"
+    "commandStarted": "{{machines}} で {{command}} を開始しました",
+    "here": "このコンピュータは",
+    "hereNone": "どれでもない",
+    "hereHint": "このブラウザがあるマシン：そのフォルダはここで Finder やエクスプローラーで開き、新規イベントもここで作成されます。このコンピュータの tm に問い合わせて自動判別します。判別できないときは手動で選んでください。",
+    "commandsOnly": "/コマンドのみ：Claude Code を実行するには .env で AI_RUNNER=1 にしてください"
   },
   "calendar": {
     "title": "カレンダー"

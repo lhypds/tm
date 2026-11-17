@@ -28,7 +28,9 @@
 // (409 otherwise). A machine whose runner is connected can also be given a prompt of its own, on no
 // task (the Machines dialog): such a run has `task.free`, no task folder and so no record. A run that is over is kept in the task folder by the machine that ran it (ai/record.js;
 // GET /api/task lists a task's records), and comes here with the task when it is pushed; removing a
-// record of a pushed copy goes through that machine too. The runner's own routes, with the sync token
+// record of a pushed copy goes through that machine too. The same connection carries what is not
+// about Claude Code, for index.js and calendar.js: a folder opened, a new event made, on the machine
+// the browser is on (openOnMachine, newEventOnMachine). The runner's own routes, with the sync token
 // rather than a login (createAiRunnerApp):
 //
 //   GET    /api/sync/ai/commands     the commands for this machine, live: a text/event-stream of `command` events
@@ -132,12 +134,15 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
   });
 
   // The machines Claude Code can be run on from here: those that sync with this server and those whose
-  // runner is connected, by name, each { name, seenAt, online, runner } as GET /api/spaces says a
-  // machine (`runner`: connected, so it can be given a prompt; in touch then).
+  // taskmgrd is connected, by name, each { name, seenAt, online, runner, linked, port } as GET
+  // /api/spaces says a machine, and: `linked`, its taskmgrd is connected, so it can be given a tm
+  // command (in touch then); `runner`, it runs Claude Code too (AI_RUNNER=1 there), so it can be given
+  // a prompt; `port`, the port of the web UI there (null when not known), where a browser on that
+  // machine finds it (see src/utils/here.js).
   app.get('/api/ai/machines', (req, res) => {
-    const byName = new Map(machines().map(m => [m.name, { ...m, runner: false }]));
+    const byName = new Map(machines().map(m => [m.name, { ...m, runner: false, linked: false, port: null }]));
     for (const c of remote.connected()) {
-      byName.set(c.name, { name: c.name, seenAt: null, ...byName.get(c.name), online: true, runner: true });
+      byName.set(c.name, { name: c.name, seenAt: null, ...byName.get(c.name), online: true, runner: c.ai, linked: true, port: c.port });
     }
     res.json({ machines: [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)) });
   });
@@ -215,7 +220,12 @@ function createAiRunnerApp({ auth }) {
   app.get('/api/sync/ai/commands', (req, res) => {
     let off = () => {};
     const send = eventStream(req, res, () => off());
-    off = remote.connect(req.machine, (command) => send('command', command), () => res.end());
+    // A runner that does not say whether it runs Claude Code is one from before it said so: it does.
+    const port = Number(req.headers['x-web-port']);
+    off = remote.connect(req.machine, (command) => send('command', command), () => res.end(), {
+      ai: String(req.headers['x-ai-runner'] ?? '1') !== '0',
+      port: Number.isInteger(port) && port > 0 && port < 65536 ? port : null
+    });
   });
 
   // The events of the machine's session, and its acks, in order.
@@ -229,4 +239,4 @@ function createAiRunnerApp({ auth }) {
   return app;
 }
 
-module.exports = { createAiApp, createAiRunnerApp, isRunnerConnected: remote.isConnected };
+module.exports = { createAiApp, createAiRunnerApp, isRunnerConnected: remote.isConnected, isMachineLinked: remote.isLinked, openOnMachine: remote.openFolder, newEventOnMachine: remote.newEvent };

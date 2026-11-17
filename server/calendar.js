@@ -22,7 +22,7 @@
 
 const express = require('express');
 const ICAL = require('ical.js');
-const { execFile } = require('child_process');
+const { newEvent: defaultNewEvent } = require('../utils/calendar');
 
 const CACHE_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 15 * 1000;
@@ -198,7 +198,7 @@ function eventsOf(text, { date, until = date, from, to }) {
 
 // `calendars()` answers the calendars of taskmgr.json as they are now ([{ name, type, url, color }]);
 // `fetchText(url)` resolves to a feed's text (the tests give their own).
-function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, newEvent = defaultNewEvent, log = () => {} } = {}) {
+function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, newEvent = defaultNewEvent, newEventOn = () => null, log = () => {} } = {}) {
   const app = express.Router();
   const cache = new Map(); // url -> { at, text } or { at, promise }
 
@@ -253,10 +253,12 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, new
     res.json({ configured: list.length > 0, events, errors });
   });
 
-  // { date: "2026-11-17", title }: a new event on that day in Apple's Calendar, on this machine
-  // (the server's, a Mac), which comes to the front with it open, for its time (and the rest) to
-  // be set (see defaultNewEvent). The event is Calendar's own, in the first calendar it can write:
-  // it is seen here once its feed has it.
+  // { date: "2026-11-17", title, here? }: a new event on that day in Apple's Calendar, which comes
+  // to the front with it open, for its time (and the rest) to be set (see utils/calendar.js). On this
+  // machine (the server's, a Mac), or, when the browser says which machine it is on (`here`, see
+  // src/utils/here.js) and that is one of the machines in touch with this server, on that one:
+  // `newEventOn(machine, date, title)` asks it to, null when it is no such machine. The event is
+  // Calendar's own, in the first calendar it can write: it is seen here once its feed has it.
   app.post('/api/calendar/new-event', express.json(), async (req, res) => {
     const date = String((req.body || {}).date || '');
     const title = String((req.body || {}).title || '').trim().slice(0, 200) || 'New Event';
@@ -265,7 +267,10 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, new
       return;
     }
     try {
-      await newEvent(date, title);
+      const here = String((req.body || {}).here || '');
+      const there = here ? newEventOn(here, date, title) : null;
+      if (there) await there;
+      else await newEvent(date, title);
       res.json({ ok: true });
     } catch (e) {
       const error = String((e && e.message) || e);
@@ -275,60 +280,6 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, new
   });
 
   return app;
-}
-
-// An event of an hour made in Calendar.app on the day asked (so the day is the right one whatever
-// Calendar was showing), in the first calendar that can be written, then shown there and opened
-// (its "Edit Event", cmd E), where its time is chosen, and its calendar and title changed. The
-// key is pressed by System Events, which macOS allows only once the program that runs the server
-// (the terminal, node) is let control the computer (System Settings > Privacy & Security >
-// Accessibility); without it the event is still there, chosen in Calendar, and the error says
-// what to allow. argv: year, month, day, the minutes of its start in the day, its title.
-const NEW_EVENT_SCRIPT = `on run argv
-  set d to current date
-  set day of d to 1
-  set year of d to (item 1 of argv) as integer
-  set month of d to (item 2 of argv) as integer
-  set day of d to (item 3 of argv) as integer
-  set time of d to ((item 4 of argv) as integer) * minutes
-  set wasRunning to application "Calendar" is running
-  tell application "Calendar"
-    activate
-    set cal to first calendar whose writable is true
-    set ev to make new event at end of events of cal with properties {summary:(item 5 of argv), start date:d, end date:d + 1 * hours}
-    show ev
-  end tell
-  if wasRunning then
-    delay 0.5
-  else
-    delay 2
-  end if
-  tell application "System Events"
-    tell process "Calendar" to set frontmost to true
-    keystroke "e" using command down
-  end tell
-end run`;
-
-// The start (minutes in the day) of an event made on `date`: the next whole hour today (the last
-// hour of the day at most), 09:00 on any other day.
-function startOf(date, now = new Date()) {
-  const p2 = (n) => String(n).padStart(2, '0');
-  const today = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
-  return date === today ? Math.min(now.getHours() + 1, 23) * 60 : 9 * 60;
-}
-
-function defaultNewEvent(date, title) {
-  return new Promise((resolve, reject) => {
-    if (process.platform !== 'darwin') {
-      reject(new Error('Apple Calendar is on macOS only.'));
-      return;
-    }
-    execFile('osascript', ['-e', NEW_EVENT_SCRIPT, ...date.split('-'), String(startOf(date)), title], { timeout: 30 * 1000 }, (err, stdout, stderr) => {
-      if (!err) resolve();
-      else if (/1002|not allowed to send keystrokes|assistive/i.test(String(stderr))) reject(new Error('The event is in Calendar, but macOS did not let the server open it (cmd E): allow the program that runs it in System Settings > Privacy & Security > Accessibility.'));
-      else reject(new Error(String(stderr).trim().split('\n').pop() || err.message));
-    });
-  });
 }
 
 // A feed's text. A request that does not get through (the connection refused, reset or timed out
