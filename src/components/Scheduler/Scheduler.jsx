@@ -201,6 +201,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   const [cards, setCards] = useState([]); // in the page's order (see arrange)
   const [mark, setMark] = useState(null); // where a drag would drop: the page's y of that line
   const pending = useRef(null); // { date, text } changed and not written yet: the page as one text (see compose)
+  const changes = useRef(0); // how many changes were made here (see change)
   const dateRef = useRef(date); // the day shown now, for what comes back later
   dateRef.current = date;
   const [all, setAll] = useState(false); // the whole page is selected (cmd + a), to be copied
@@ -210,18 +211,24 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   const lines = text.split("\n");
 
-  const flush = useCallback(async () => {
+  // What is pending is written, after whatever is still being written (one at a time, in their
+  // order): resolves once it is all on the server.
+  const saving = useRef(Promise.resolve());
+  const flush = useCallback(() => {
     clearTimeout(timer.current);
     const p = pending.current;
-    if (!p) return;
+    if (!p) return saving.current;
     pending.current = null;
-    try {
-      const day = await api.saveSchedulerPage(p.date, p.text);
-      // a task pasted in as its line is now known as it is
-      if (day.date === dateRef.current) setCards((was) => withLive(was, day.tasks));
-    } catch (e) {
-      showToast(e.message, 4000);
-    }
+    saving.current = saving.current.then(async () => {
+      try {
+        const day = await api.saveSchedulerPage(p.date, p.text);
+        // a task pasted in as its line is now known as it is
+        if (day.date === dateRef.current) setCards((was) => withLive(was, day.tasks));
+      } catch (e) {
+        showToast(e.message, 4000);
+      }
+    });
+    return saving.current;
   }, []);
 
   const show = (day) => {
@@ -235,10 +242,13 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     (async () => {
       await flush();
       try {
+        const was = changes.current;
         const day = await api.getSchedulerDay(date);
         if (stale) return;
         setLoaded(true);
-        if (!pending.current) show(day); // what is being typed is not written over
+        // what was changed here meanwhile (typed, or a task dropped on the page) is not written
+        // over by the day as it was read before
+        if (changes.current === was && !pending.current) show(day);
       } catch (e) {
         if (!stale) showToast(e.message, 4000);
       }
@@ -270,6 +280,7 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
     const arranged = arrange(nextCards, nextText.split("\n").length);
     setText(nextText);
     setCards(arranged);
+    changes.current += 1;
     pending.current = { date, text: compose(nextText, arranged) };
     clearTimeout(timer.current);
     if (now) flush();
