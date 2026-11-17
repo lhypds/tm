@@ -34,7 +34,7 @@
 //       "/o/gcc3/gcc3.com": { "month": "all", "showDone": false, "showPending": true, "showAbort": false }
 //     },
 //     "calendars": [                              // optional, the calendars under the scheduler's page (see server/calendar.js)
-//       { "name": "work", "type": "google", "url": "https://calendar.google.com/calendar/ical/.../basic.ics" },
+//       { "name": "work", "type": "google", "url": "https://calendar.google.com/calendar/ical/.../basic.ics", "color": "#93c5fd" },
 //       { "name": "home", "type": "apple", "url": "webcal://p12-caldav.icloud.com/published/2/..." }
 //     ]
 //   }
@@ -359,11 +359,12 @@ function normalizeFilter(v) {
   return Object.keys(f).length ? f : null;
 }
 
-// The calendars under the scheduler's page: [{ name, type, url }], each the ICS feed of one calendar
+// The calendars under the scheduler's page: [{ name, type, url, color }], each the ICS feed of one calendar
 // (see server/calendar.js), as many as there are accounts and calendars. `type` is "google" or
 // "apple" (told from the address when not given, "" when it is neither), `name` what the calendar
-// is called on the page (the feed's own name when not given). Not part of the works: an entry
-// without an address is dropped rather than refused.
+// is called on the page (the feed's own name when not given), `color` the color of its events
+// ("#rrggbb" as an origin's, "" for none or for one that is not a color). Not part of the works:
+// an entry without an address is dropped rather than refused.
 function normalizeCalendars(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((c) => {
@@ -372,7 +373,8 @@ function normalizeCalendars(raw) {
     if (!/^https?:\/\//i.test(url)) return [];
     const given = typeof c.type === 'string' ? c.type.trim().toLowerCase() : '';
     const type = ['google', 'apple'].includes(given) ? given : /icloud\.com/i.test(url) ? 'apple' : /google\.com/i.test(url) ? 'google' : '';
-    return [{ name: typeof c.name === 'string' ? c.name.trim() : '', type, url }];
+    const color = typeof c.color === 'string' && /^#[0-9a-f]{6}$/i.test(c.color.trim()) ? c.color.trim().toLowerCase() : '';
+    return [{ name: typeof c.name === 'string' ? c.name.trim() : '', type, url, color }];
   });
 }
 
@@ -786,8 +788,23 @@ function resolveConfig() {
     write(raw);
   }
 
+  // Replace the calendars under the scheduler's page ([{ name, type, url, color }], see normalizeCalendars).
+  // Unlike a list typed into the file, one given here is refused when an entry of it would be
+  // dropped (no address, or not an http(s):// or webcal:// one), so nothing typed is lost silently.
+  function setCalendars(list) {
+    if (!Array.isArray(list)) throw new Error('"calendars" must be a list.');
+    const calendars = list.map((c, i) => {
+      const one = normalizeCalendars([c])[0];
+      if (!one) throw new Error(`calendars[${i}]: the address must start with https://, http:// or webcal://.`);
+      return { ...(one.name && { name: one.name }), type: one.type, url: one.url, ...(one.color && { color: one.color }) };
+    });
+    const raw = readRaw();
+    raw.calendars = calendars;
+    write(raw);
+  }
+
   return {
-    configPath, port, host, dataDir, usersPath, getWorks, getOrigins, getFilters, getCalendars, setFilter, readText, writeText,
+    configPath, port, host, dataDir, usersPath, getWorks, getOrigins, getFilters, getCalendars, setCalendars, setFilter, readText, writeText,
     addOrigin, addWork, addRepository, updateWork, updateOrigin, updateRepository, removeOrigin, removeWork, removeRepository,
     moveOrigin, moveWork, moveRepository
   };

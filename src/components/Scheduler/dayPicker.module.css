@@ -1,0 +1,89 @@
+/* The days to pick one from: a box under the day shown, its top line on the day's bottom one. */
+.picker {
+  position: absolute;
+  left: 0;
+  top: calc(100% - var(--line));
+  z-index: 999;
+  padding: 8px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* The month on screen between its two steps. */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.month {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.step {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.step svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Seven days a row: the names of the days, then the weeks. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 26px);
+}
+
+.name {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+/* A day: a square, with no line around it. */
+.day {
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+/* The days of the months around the one on screen. */
+.day[data-other="true"] {
+  color: var(--faint);
+}
+
+.day[data-today="true"] {
+  font-weight: 700;
+}
+
+/* The day the scheduler shows is shaded; the one under the mouse is inverted, like a menu row. */
+.day[aria-pressed="true"] {
+  background: var(--bg-hover);
+}
+
+.step:hover,
+.day:hover {
+  background: var(--border);
+  color: var(--bg);
+}

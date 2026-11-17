@@ -221,6 +221,17 @@ export function CalendarIcon({ className }) {
   );
 }
 
+// How something is done: a question mark in a circle.
+export function HelpCircleIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-2.9 2.6-2.9 4" />
+      <line x1="12" y1="17.5" x2="12" y2="17.5" />
+    </Icon>
+  );
+}
+
 // The task panel (what the scheduler's button goes back to): a sheet with a ticked box and its lines.
 export function TaskIcon({ className }) {
   return (

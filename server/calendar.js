@@ -15,7 +15,8 @@
 //   apple   Calendar (iCloud) > the calendar > Share > "Public Calendar", its webcal:// link
 //
 // An address is a secret (who has it reads the calendar): the browser gets the events only, not
-// the address (but for the config editor, which shows taskmgr.json whole). A feed is kept for
+// the address (but for the config editor, which shows taskmgr.json whole, and the dialog that adds
+// and removes calendars, see /api/calendars in server/index.js). A feed is kept for
 // CACHE_MS, so a day asked again (another day, the page read again every few minutes) does not
 // fetch it each time; `fresh` reads it anew.
 
@@ -71,8 +72,51 @@ const tzidOf = (component, name) => {
   return (prop && prop.getParameter('tzid')) || null;
 };
 
+// What an event says besides its title, place and times, for its preview: `description`, `url`,
+// `conference` (the address of its online meeting), `organizer` and `attendees` (each { name, email,
+// status }, the status an attendee's answer: 'accepted', 'declined', 'tentative', 'needs-action'
+// or ''), `attachments` ([{ name, url }], those that are links), `status` ('confirmed',
+// 'tentative' or ''), `busy` (false for an event that leaves the time free), `repeats` (its rule
+// as the feed writes it, '' for an event that does not repeat), `created` and `updated` (ms, or
+// null). Anything the feed does not say is empty.
+function detailsOf(component) {
+  const text = (name) => {
+    const v = component.getFirstPropertyValue(name);
+    return v === null || v === undefined ? '' : String(v);
+  };
+  const person = (prop) => ({
+    name: String(prop.getParameter('cn') || ''),
+    email: String(prop.getFirstValue() || '').replace(/^mailto:/i, ''),
+    status: String(prop.getParameter('partstat') || '').toLowerCase(),
+  });
+  const ms = (name) => {
+    const v = component.getFirstPropertyValue(name);
+    try { return v && typeof v.toJSDate === 'function' ? v.toJSDate().getTime() : null; } catch (e) { return null; }
+  };
+  const organizer = component.getFirstProperty('organizer');
+  const rule = component.getFirstPropertyValue('rrule');
+  const status = text('status').toLowerCase();
+  return {
+    description: text('description'),
+    url: text('url'),
+    conference: text('x-google-conference') || text('x-microsoft-skypeteamsmeetingurl'),
+    organizer: organizer ? person(organizer) : null,
+    attendees: component.getAllProperties('attendee').map(person),
+    attachments: component.getAllProperties('attach').flatMap((prop) => {
+      const url = String(prop.getFirstValue() || '');
+      return /^https?:\/\//i.test(url) ? [{ name: String(prop.getParameter('filename') || ''), url }] : [];
+    }),
+    status: ['confirmed', 'tentative'].includes(status) ? status : '',
+    busy: text('transp').toUpperCase() !== 'TRANSPARENT',
+    repeats: rule ? String(rule) : '',
+    created: ms('created'),
+    updated: ms('last-modified'),
+  };
+}
+
 // The events of the ICS `text` on one day: `date` is the day ("2026-11-17") and `from` .. `to` its
-// bounds (ms) where it is asked from. Each is { id, title, location, allDay, start, end }: start
+// bounds (ms) where it is asked from. Each is { id, title, location, allDay, start, end } with
+// what detailsOf says of it: start
 // and end are ms, or for an event of whole days (`allDay`) its days, the last one not included.
 // An event that repeats is here once for each time it falls on the day; one time of it changed or
 // moved (its RECURRENCE-ID) is an event of its own, and a cancelled one is left out.
@@ -88,7 +132,7 @@ function eventsOf(text, { date, from, to }) {
   const add = (event, start, end, startTz, endTz) => {
     const component = event.component;
     if (String(component.getFirstPropertyValue('status') || '').toUpperCase() === 'CANCELLED') return true;
-    const base = { id: `${event.uid}/${start.toString()}`, title: String(event.summary || ''), location: String(event.location || '') };
+    const base = { id: `${event.uid}/${start.toString()}`, title: String(event.summary || ''), location: String(event.location || ''), ...detailsOf(component) };
     if (start.isDate) {
       const first = dayOf(start);
       let last = end ? dayOf(end) : first;
@@ -148,7 +192,7 @@ function eventsOf(text, { date, from, to }) {
   return out;
 }
 
-// `calendars()` answers the calendars of taskmgr.json as they are now ([{ name, type, url }]);
+// `calendars()` answers the calendars of taskmgr.json as they are now ([{ name, type, url, color }]);
 // `fetchText(url)` resolves to a feed's text (the tests give their own).
 function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, log = () => {} } = {}) {
   const app = express.Router();
@@ -172,7 +216,7 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, log
   // ?date=2026-11-17&from=&to= (the day's bounds, ms, in the browser's time zone), fresh=1 to read
   // the feeds anew. { configured, events, errors }: the events of every calendar in the order of
   // the day (those of whole days first), each with its `source` ('google' | 'apple' | '') and
-  // `calendar` (its name in taskmgr.json, or the feed's own); `errors` the calendars that could not
+  // `calendar` (its name in taskmgr.json, or the feed's own) and `color` (its calendar's, "" for none); `errors` the calendars that could not
   // be read, each { source, calendar, error }, the events of the others being there all the same.
   // `configured` is false with no calendar listed.
   app.get('/api/calendar', async (req, res) => {
@@ -186,12 +230,12 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, log
     const list = calendars();
     const events = [];
     const errors = [];
-    await Promise.all(list.map(async ({ name, type: source, url }, index) => {
+    await Promise.all(list.map(async ({ name, type: source, url, color = '' }, index) => {
       try {
         const text = await feedText(url, !!req.query.fresh);
         let calendar = name;
         if (!calendar) try { calendar = String(new ICAL.Component(ICAL.parse(text)).getFirstPropertyValue('x-wr-calname') || ''); } catch (e) { calendar = ''; }
-        for (const event of eventsOf(text, { date, from, to })) events.push({ ...event, id: `${index}:${event.id}`, source, calendar }); // the id is the event's in its feed
+        for (const event of eventsOf(text, { date, from, to })) events.push({ ...event, id: `${index}:${event.id}`, source, calendar, color }); // the id is the event's in its feed
       } catch (e) {
         // the address is a secret: the message alone, never the url
         const error = String((e && e.message) || e).replace(/https?:\/\/\S+/gi, '<url>');

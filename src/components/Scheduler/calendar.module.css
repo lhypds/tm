@@ -12,12 +12,17 @@
   border-bottom: var(--line) solid var(--border);
 }
 
+/* Shaded while the keyboard is on the calendar, as the scheduler's bar is. */
+.divider[data-focused="true"] {
+  background: var(--bg-hover);
+}
+
 .title {
   font-size: 12px;
   font-weight: 600;
 }
 
-/* Under the divider: no calendar is set, or one could not be read. */
+/* Under the divider: a calendar that could not be read. */
 .note {
   flex: none;
   padding: 6px 12px;
@@ -34,13 +39,22 @@
    themselves past three of them). */
 .whole {
   flex: none;
-  max-height: 116px;
+  max-height: 68px;
   padding: 4px 12px;
   overflow-y: auto;
   border-bottom: var(--line) solid var(--border);
 }
 
-/* The hours: the lower half of the pane (the page above takes the other), scrolling. */
+/* Under the divider: the lower half of the pane (the page above takes the other), whatever is in
+   it. */
+.body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The hours: what is left of that half under the whole days, scrolling. */
 .hours {
   flex: 1 1 0;
   min-height: 0;
@@ -73,6 +87,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A half hour: dashed. */
+.hour[data-half="true"] {
+  border-top-style: dashed;
+}
+
 /* Noon, the line the day opens on. */
 .hour[data-noon="true"] {
   border-top-color: var(--err);
@@ -91,23 +110,43 @@
   right: 12px;
 }
 
-/* An event: a card as a task's on the page (28px, one line cut short with an ellipsis). */
+/* An event: a card as thin as a tag of the task list (16px, its 10px type; one line cut short
+   with an ellipsis), in its calendar's color (`--event`) when it has one. */
 .card {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 28px;
-  margin: 4px 0;
-  padding: 0 8px;
+  gap: 6px;
+  height: 16px;
+  margin: 2px 0;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 14px; /* its texts cut what overflows them: room for the letters that go under the line */
   border: var(--line) solid var(--border);
-  background: var(--bg);
+  background: var(--event, var(--bg));
   white-space: nowrap;
   overflow: hidden;
 }
 
-.card:hover {
+/* Hovered, or the one the keyboard is on. */
+.card:hover,
+.card[data-chosen="true"] {
   background: var(--bg-hover);
+}
+
+/* The wheel over an event scrolls the hours (or the whole days) it is in. A card and its texts
+   cut what overflows them, which makes each a scroller of its own, and the app lets no scroller
+   pass a scroll on to the one around it (see global.css): these do. */
+.card,
+.card > * {
+  overscroll-behavior: auto;
+}
+
+/* Scrolled to by the keys (see Calendar), an event keeps the room it has around it: its own 2px
+   and the 4px of the box of the whole days, so the first and the last of them are not flush with
+   the box's edge. */
+.card {
+  scroll-margin: 6px 0;
 }
 
 .card[data-timed="true"] {
@@ -117,7 +156,6 @@
 
 .time {
   flex: none;
-  font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -134,6 +172,33 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 11px;
   color: var(--muted);
+}
+
+/* An event's details (see EventModal): a label and what it says, one under another. */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail dd {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* A link in the details: underlined; cmd + click opens it (see EventModal). */
+.link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

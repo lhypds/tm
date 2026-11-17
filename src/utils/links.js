@@ -6,6 +6,9 @@ import { isMac } from "@utils/keys";
 // is held. The texts are every textarea without the focus (focused, it is edited: a click places
 // the caret as ever) or read-only, and every element marked `data-links` (a <pre> showing a text).
 // Installed once, on the document (useTextLinks), so every text has it.
+// A link that is an element of its own (marked `data-link`: those of an event's preview, see
+// EventModal) opens itself; here it only gets the hand while the key is held, which the page is
+// told by `data-mod` on its root (see global.css).
 
 // http(s) up to a space, a quote, a bracket of markup or CJK punctuation.
 const URL_RE = /https?:\/\/[^\s<>"`　-〿＀-￯]+/g;
@@ -130,6 +133,11 @@ export function useTextLinks() {
     let frame = 0;
 
     const modOf = (e) => (isMac ? e.metaKey : e.ctrlKey);
+    // whether the key is held, for the links that are elements (see above)
+    const tell = () => {
+      if (mod) document.documentElement.dataset.mod = "true";
+      else delete document.documentElement.dataset.mod;
+    };
 
     function drop() {
       cur?.mirror?.remove();
@@ -224,6 +232,7 @@ export function useTextLinks() {
       x = e.clientX;
       y = e.clientY;
       mod = modOf(e);
+      tell();
       later();
     };
     const onOut = (e) => {
@@ -235,10 +244,12 @@ export function useTextLinks() {
       const held = modOf(e);
       if (held === mod) return;
       mod = held;
+      tell();
       later();
     };
     const onBlur = () => {
       mod = false;
+      tell();
       later();
     };
     // A press with the key on a link is the link's: it neither focuses the text nor selects in it.
@@ -288,6 +299,7 @@ export function useTextLinks() {
       window.removeEventListener("resize", later);
       window.removeEventListener("blur", onBlur);
       cancelAnimationFrame(frame);
+      delete document.documentElement.dataset.mod;
       unmark();
       hand(null);
       drop();

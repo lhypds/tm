@@ -319,8 +319,11 @@ The calendars are listed in `taskmgr.json` under `calendars` (see [Web UI.md](We
 A feed read is kept for five minutes. Repeating events are expanded (`ical.js`), a cancelled one is left out.
 
 `GET /api/calendar?date=&from=&to=&fresh=1` the events of the day `date` (`from` and `to` its bounds in ms, in the browser's time zone; `fresh` reads the feeds anew): `{ configured, events, errors }`,  
-each event `{ id, title, location, allDay, start, end, source, calendar }`, `start` and `end` in ms (the days, the last one not included, of an `allDay` one), `source` `google`, `apple` or empty, `calendar` its name in `taskmgr.json` (the feed's own without one);  
+each event `{ id, title, location, allDay, start, end, source, calendar, color }` with its details for the preview (`description`, `url`, `conference`, `organizer`, `attendees`, `attachments`, `status`, `busy`, `repeats`, `created`, `updated`: see `detailsOf`) (`color` its calendar's, `""` for none), `start` and `end` in ms (the days, the last one not included, of an `allDay` one), `source` `google`, `apple` or empty, `calendar` its name in `taskmgr.json` (the feed's own without one);  
 `errors` the calendars that could not be read, each `{ source, calendar, error }`; `configured` is false when none is listed.
+
+`GET /api/calendars` the calendars as `taskmgr.json` lists them, for the dialog that adds and removes them: `{ calendars }`, each `{ name, type, url, color }`.  
+`PUT /api/calendars` `{ calendars }` replaces the list in `taskmgr.json` (an entry whose address is not an `https://`, `http://` or `webcal://` one is refused) and answers it as it is kept.
 
 
 Sync

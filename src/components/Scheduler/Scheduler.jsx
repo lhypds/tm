@@ -9,6 +9,7 @@ import { copyText } from "@utils/clipboard";
 import { dragTitle } from "@utils/drag";
 import { TASKS_DRAG_TYPE, describe } from "@utils/task";
 import Calendar from "./Calendar";
+import DayPicker from "./DayPicker";
 import styles from "./scheduler.module.css";
 
 // A day as its file is named: "2026-11-17", in local time.
@@ -173,14 +174,6 @@ function caretBox(el, p) {
   return box;
 }
 
-// How wide a character of the text box `el` is (the page is written in a fixed-width font).
-function charWidth(el) {
-  const cs = getComputedStyle(el);
-  const ctx = document.createElement("canvas").getContext("2d");
-  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  return ctx.measureText("0").width;
-}
-
 // A run of the page's text, between two cards (or an end of the page): as tall as what is in it,
 // so the page scrolls, not the text. `fill` is the last one, which takes what is left of the page.
 function Lines({ value, fill, ...props }) {
@@ -193,8 +186,9 @@ function Lines({ value, fill, ...props }) {
   return <textarea ref={ref} className={styles.text} data-fill={fill} rows={1} value={value} spellCheck={false} {...props} />;
 }
 
-// The scheduler, in place of the task panel: one page a day. Under its title, a row steps a day back, goes to
-// today, steps a day forward, and says which day is shown. The page is squared paper to write on
+// The scheduler, in place of the task panel: one page a day. Under its title, a row says which day is shown, between
+// the buttons that step a day back and a day forward (a click on the day picks another, see DayPicker), and at its right end goes to
+// today. The page is squared paper to write on
 // (saved as it is typed; kept as one text, a task a line of it, see compose) with the tasks dragged onto it from the list or the board (`tasks` are
 // those, found by the keys the drag carries), each a card of one line: the status box the list has (a click
 // marks the task done, or todo again: `onStatus(entry, status)`) and its title. A card sits on
@@ -202,9 +196,9 @@ function Lines({ value, fill, ...props }) {
 // go under it, and close up again when it is dragged to another line (a line across the page shows
 // where it would go). A click on a card chooses it, a double click (or space) opens the task (`onOpen(entry)`), its × takes it off the
 // day. The text is edited as in vim, in a NORMAL and an INSERT mode (see
-// `normalKey`), the cards being stops on the way: j / k (the arrows, while typing) walk the cursor
+// `normalKey`; the cursor is only where there is text), the cards being stops on the way: j / k (the arrows, while typing) walk the cursor
 // from the text onto a card and off it again, and backspace, delete and x take a card off the day
-// (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere); while `loading` (the page's refresh) the pane under its bar is covered and says "Loading...", as the task list does.
+// (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere); while `loading` (the page's refresh) the pane under its bar is covered and says "Loading...", as the task list does, and the day shown is today again.
 // The days are synced between the machines (see server/scheduler.js), so a page may have a task that is not on this one: its card is as any other, with the title of its line, but has no box and opens nothing.
 // See server/scheduler.js for what is kept.
 // The calendar at the right of the title (c; `onToggleCalendar`) shows and hides the day's calendar
@@ -224,6 +218,8 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   const [all, setAll] = useState(false); // the whole page is selected (cmd + a), to be copied
   const timer = useRef(null);
   const pageRef = useRef(null);
+  const [picking, setPicking] = useState(false); // the days to pick one from are shown (see DayPicker)
+  const closePicker = useCallback(() => setPicking(false), []);
   const slotsRef = useRef(null); // the lines a drag can drop on, measured once per drag
 
   const lines = text.split("\n");
@@ -319,6 +315,12 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     setDate(next);
   };
 
+  // The page's refresh (its button, r: `loading` while it lasts) is back on today, as a page
+  // opened anew is.
+  useEffect(() => {
+    if (loading) go(today());
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The page as changed here: shown at once, written `now` or a moment after the last key.
   const change = (nextText, nextCards, now = false) => {
     const arranged = arrange(nextCards, nextText.split("\n").length);
@@ -383,16 +385,17 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     change(next.join("\n"), moved);
   };
 
-  // Up on the first character of a run goes to the end of the run above the card, down on the last
-  // one to the start of the run under it.
-  // The text is edited as in vim, in two modes. NORMAL: the
-  // keys move the cursor (the caret, before its character) and nothing is typed: h and
-  // l along the line and on past its end, j and k to the line under and above, and under the last
-  // one (the paper is written anywhere: see `virt`), backspace back as h and up to the end of the line above, enter to the start of the line under (off the run onto the card beside it,
-  // see below), 0 and $ to the ends of the line; i and a start typing before and after the cursor,
-  // I and A at the ends of the line, o and O on a new line under and above; x deletes the
-  // character, u undoes; esc leaves the text (h / l are then the page's again). INSERT: the keys
-  // type, esc is back to NORMAL. The arrows do as h j k l in NORMAL. A click in the text types.
+  // The text is edited as in vim, in two modes. NORMAL: the keys move the cursor (the caret, before
+  // its character) and nothing is typed. The cursor is only where there is text, as in vim: on a
+  // character of a line (the start of an empty one), never past the end of a line nor under the
+  // last one. h and l go along the line and stop at its ends, j and k to the line under and above
+  // (at the column the cursor had before it went through shorter lines) and off the run onto the
+  // card beside it, backspace back as h and up to the end of the line above, enter to the start of
+  // the line under, 0 and $ to the ends of the line; i and a start typing before and after the
+  // cursor, I and A at the ends of the line, o and O on a new line under and above; x deletes the
+  // character, u undoes; esc leaves the text (the keys are then the page's again, see below).
+  // INSERT: the keys type, esc is back to NORMAL. The arrows do as h j k l in NORMAL. A click in
+  // the text types.
   const [mode, setModeState] = useState("normal");
   const modeRef = useRef("normal"); // the mode now, for what runs before the next render
   const setMode = (m) => {
@@ -404,34 +407,16 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   // caretBox), following whatever moves the text (see below).
   const [cursorBox, setCursorBox] = useState(null);
   const [inText, setInText] = useState(false); // the keyboard is in the text
-  // The cursor goes anywhere on the paper, not only where there is text: `virt` is how far it is
-  // past the text, `cols` columns after the end of its line and `rows` rows under the last line
-  // of the page (the caret is then at the end of the text). Typing there first fills the way with
-  // spaces and new lines (see normalKey).
-  const virt = useRef({ cols: 0, rows: 0 });
-  const boxAt = (el) => {
-    const { cols, rows } = virt.current;
-    const base = caretBox(el, rows ? el.value.length : Math.min(el.selectionStart, el.value.length));
-    if (!cols && !rows) return base;
-    const row = parseFloat(getComputedStyle(el).lineHeight) || base.height;
-    return {
-      left: (rows ? el.offsetLeft : base.left) + cols * charWidth(el),
-      top: base.top + rows * row,
-      height: base.height,
-    };
-  };
-  const block1 = (el, p, cols = 0, rows = 0) => {
-    const at = Math.max(0, Math.min(p, el.value.length));
-    const was = virt.current;
-    virt.current = { cols, rows };
-    if (cols || rows) {
-      // not off the paper: the box's right and bottom edges are where it ends
-      const box = boxAt(el);
-      if (box.left + charWidth(el) > el.offsetLeft + el.clientWidth || box.top + box.height > el.offsetTop + el.offsetHeight) {
-        virt.current = was;
-        return;
-      }
-    }
+  const boxAt = (el) => caretBox(el, Math.min(el.selectionStart, el.value.length));
+  // The column j and k keep to while they go through shorter lines (Infinity after $: the end of
+  // each line); null once anything else has moved the cursor.
+  const want = useRef(null);
+  // The NORMAL cursor to `p`, or to the last character of its line when `p` is past it.
+  const block1 = (el, p) => {
+    const v = el.value;
+    let at = Math.max(0, Math.min(p, v.length));
+    const start = v.lastIndexOf("\n", at - 1) + 1;
+    if (at > start && (at === v.length || v[at] === "\n")) at -= 1;
     el.setSelectionRange(at, at);
     setCursorBox(boxAt(el));
   };
@@ -467,80 +452,55 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     const p = Math.min(el.selectionStart, v.length);
     const start = v.lastIndexOf("\n", p - 1) + 1; // of the cursor's line
     const end = v.indexOf("\n", p) < 0 ? v.length : v.indexOf("\n", p); // its line break, or the end
-    const { cols: vcols, rows: vrows } = virt.current; // how far the cursor is past the text
-    const col = (vrows ? 0 : p - start) + vcols; // its column on the paper
+    const col = want.current ?? p - start; // the column j and k keep to
+    want.current = k === "j" || k === "k" ? col : k === "$" ? Infinity : null;
     const block = blocks[at];
     const above = blocks[at - 1]?.card;
     const under = blocks[at + 1]?.card;
     const choose = (card) => {
-      virt.current = { cols: 0, rows: 0 };
       setChosen(cardKey(card));
       el.blur();
     };
     const insert = (pos) => {
-      virt.current = { cols: 0, rows: 0 };
       setMode("insert");
       el.setSelectionRange(pos, pos);
     };
     const edit = (value, pos, typing) => {
       record();
-      virt.current = { cols: 0, rows: 0 };
       cursorTo.current = { block: at, pos, insert: typing };
       if (typing) setMode("insert");
       type(block, value, true);
     };
-    // onto the line from..to at the paper's column `c`: in its text, or past its end
-    const place = (from, to, c) => (c <= to - from ? block1(el, from + c) : block1(el, to, c - (to - from), 0));
-    // typing where there is no text: the way there is filled first, with new lines down to the
-    // row and spaces along it (`c` columns)
-    const typeAt = (c) => {
-      const value = vrows ? `${v}${"\n".repeat(vrows)}${" ".repeat(c)}` : `${v.slice(0, end)}${" ".repeat(c)}${v.slice(end)}`;
-      edit(value, vrows ? value.length : end + c, true);
-    };
-    if (k === "h") {
-      if (vcols > 0) block1(el, p, vcols - 1, vrows);
-      else if (!vrows) block1(el, Math.max(start, p - 1));
-    } else if (k === "Backspace") {
+    // onto the line from..to at the column kept, or on its last character when it is shorter
+    const place = (from, to) => block1(el, Math.min(from + col, to));
+    if (k === "h") block1(el, Math.max(start, p - 1));
+    else if (k === "Backspace") {
       // back one place, as h, and from the start of a line up to the end of the one above it (the
       // card above, from the first line)
-      if (vcols > 0) block1(el, p, vcols - 1, vrows);
-      else if (vrows > 1) block1(el, v.length, 0, vrows - 1);
-      else if (vrows === 1) block1(el, v.length);
-      else if (p > start) block1(el, p - 1);
+      if (p > start) block1(el, p - 1);
       else if (start > 0) block1(el, start - 1);
       else if (above) choose(above);
     } else if (k === "Enter") {
-      // to the start of the next line (the card under the last one of a run, or the blank under the page's)
-      if (vrows) block1(el, v.length, 0, vrows + 1);
-      else if (end < v.length) block1(el, end + 1);
+      // to the start of the next line (the card under the last one of a run)
+      if (end < v.length) block1(el, end + 1);
       else if (under) choose(under);
-      else if (block.last) block1(el, v.length, 0, 1);
-    } else if (k === "l") {
-      if (!vrows && p < end) block1(el, p + 1);
-      else block1(el, vrows ? v.length : end, vcols + 1, vrows);
-    } else if (k === "0") block1(el, vrows ? v.length : start, 0, vrows);
-    else if (k === "$") block1(el, vrows ? v.length : end, 0, vrows);
+    } else if (k === "l") block1(el, Math.min(end, p + 1));
+    else if (k === "0") block1(el, start);
+    else if (k === "$") block1(el, end);
     else if (k === "j") {
-      if (vrows) block1(el, v.length, col, vrows + 1);
-      else if (end < v.length) place(end + 1, v.indexOf("\n", end + 1) < 0 ? v.length : v.indexOf("\n", end + 1), col);
+      if (end < v.length) place(end + 1, v.indexOf("\n", end + 1) < 0 ? v.length : v.indexOf("\n", end + 1));
       else if (under) choose(under);
-      else if (block.last) block1(el, v.length, col, 1); // under the last line: the blank of the page
     } else if (k === "k") {
-      if (vrows > 1) block1(el, v.length, col, vrows - 1);
-      else if (vrows === 1) place(v.lastIndexOf("\n") + 1, v.length, col);
-      else if (start > 0) place(v.lastIndexOf("\n", start - 2) + 1, start - 1, col);
+      if (start > 0) place(v.lastIndexOf("\n", start - 2) + 1, start - 1);
       else if (above) choose(above);
-    } else if (k === "i" || k === "a") {
-      if (vrows || vcols) typeAt(vcols);
-      else insert(k === "a" ? Math.min(end, p + 1) : p);
-    } else if (k === "I" || k === "A" || k === "o" || k === "O") {
-      if (vrows) typeAt(0);
-      else if (k === "I") insert(start);
-      else if (k === "A") insert(end);
-      else if (k === "o") edit(`${v.slice(0, end)}\n${v.slice(end)}`, end + 1, true);
-      else edit(`${v.slice(0, start)}\n${v.slice(start)}`, start, true);
-    } else if (k === "x") {
-      if (!vrows && !vcols && p < end) edit(v.slice(0, p) + v.slice(p + 1), p, false);
+    } else if (k === "i") insert(p);
+    else if (k === "a") insert(Math.min(end, p + 1));
+    else if (k === "I") insert(start);
+    else if (k === "A") insert(end);
+    else if (k === "o") edit(`${v.slice(0, end)}\n${v.slice(end)}`, end + 1, true);
+    else if (k === "O") edit(`${v.slice(0, start)}\n${v.slice(start)}`, start, true);
+    else if (k === "x") {
+      if (p < end) edit(v.slice(0, p) + v.slice(p + 1), p, false);
     } else if (k === "u") {
       cursorTo.current = { block: at, pos: p, insert: false }; // the cursor stays about where it was
       travel(history, undone);
@@ -705,6 +665,13 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   // key is taking off the day ({ key, line }): once it is gone, the caret goes to the start of the
   // line it was on.
   const [chosen, setChosen] = useState(null);
+  // The keyboard is on the calendar under the page (see the page's keys), while it is shown.
+  const [inCalendar, setInCalendar] = useState(false);
+  const calendarKeys = useRef(null); // the calendar's keys (see Calendar)
+  const onCalendar = inCalendar && !!calendarOpen;
+  useEffect(() => {
+    if (!calendarOpen) setInCalendar(false);
+  }, [calendarOpen]);
   const chosenIndex = cards.findIndex((c) => cardKey(c) === chosen);
   const backTo = useRef(null);
   // The cursor into a run of the text, on `line` of the page (past the run's last line: its end)
@@ -724,12 +691,13 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   const leave = (e, block) => {
     const before = e.currentTarget.value.slice(0, e.currentTarget.selectionStart).split("\n");
     spot.current = { line: block.from + before.length - 1, col: before[before.length - 1].length };
-    virt.current = { cols: 0, rows: 0 };
+    want.current = null;
     flush();
   };
   // Into the text where the cursor was, in mode `m` (`after`: one character on, as vim's a).
   const enter = (m, after = 0) => {
     setChosen(null);
+    setInCalendar(false);
     setMode(m);
     const line = Math.min(spot.current.line, lines.length - 1);
     caretTo(
@@ -754,8 +722,12 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
 
   // The page's keys, as Home names them, while the keyboard is on the pane and not in the text;
   // true when the key was one of them. With no card chosen (the keyboard just came onto the pane,
-  // or esc left the text; no cursor is shown): j, k, l and enter go
-  // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; h is
+  // or esc left the text; no cursor is shown): k, l and enter go
+  // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; j (and down)
+  // goes on to the calendar under the page when it is shown (`inCalendar`: the keys are then the
+  // calendar's, see Calendar, until k on the calendar itself, above its events, or esc is back here;
+  // h and l there step a day back and forward), and into the
+  // text as k does when it is not; h is
   // the page's (back to the list). On a card (j / k and the arrows get there from the text): k and
   // up go into the text above it, j and down into the text under it, or on to the next card when
   // there is no text between, in the mode the text was left in; a card is a line of its own, so h
@@ -766,9 +738,21 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
+      if (onCalendar) {
+        // h and l (and the arrows) step a day back and forward, the keyboard staying on the calendar
+        const days = ["h", "left"].includes(name) ? -1 : ["l", "right"].includes(name) ? 1 : 0;
+        if (days) {
+          go(shift(date, days));
+          return true;
+        }
+        const did = calendarKeys.current?.(name);
+        if (did === "leave") setInCalendar(false);
+        return !!did;
+      }
       const card = cards[chosenIndex];
       if (!card) {
-        if (["j", "k", "l", "enter", "down", "up", "right"].includes(name)) enter("normal");
+        if (calendarOpen && ["j", "down"].includes(name)) setInCalendar(true);
+        else if (["j", "k", "l", "enter", "down", "up", "right"].includes(name)) enter("normal");
         else if (["i", "e"].includes(name)) enter("insert");
         else if (name === "a") enter("insert", 1);
         else return false;
@@ -912,7 +896,8 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
       className={styles.scheduler}
       aria-label={t("scheduler.title")}
     >
-      <div className={styles.bar} data-focused={focused}>
+      {/* not shaded while the keyboard is on the calendar: its divider is then */}
+      <div className={styles.bar} data-focused={focused && !onCalendar}>
         <h2 className={styles.barTitle}>{t("scheduler.title")}</h2>
         {/* let go after the click, so space and enter are the page's again (as the panel's buttons) */}
         <button
@@ -932,19 +917,43 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
       </div>
       <div className={styles.days}>
         <div className={styles.steps}>
-          <button type="button" className={styles.step} onClick={() => go(shift(date, -1))} title={t("scheduler.prev")} aria-label={t("scheduler.prev")}>
+          {/* let go after the click, as the bar's button: space and enter stay the page's (and the calendar's) */}
+          <button type="button" className={styles.step} tabIndex={-1} onClick={(e) => (e.currentTarget.blur(), go(shift(date, -1)))} title={t("scheduler.prev")} aria-label={t("scheduler.prev")}>
             <ChevronLeftIcon />
           </button>
-          <button type="button" className={styles.today} data-current={isToday} onClick={() => go(today())}>
-            {t("scheduler.today")}
-          </button>
-          <button type="button" className={styles.step} onClick={() => go(shift(date, 1))} title={t("scheduler.next")} aria-label={t("scheduler.next")}>
+          {/* the day shown: a click shows the days to pick another from, under it (see DayPicker) */}
+          <span className={styles.dayBox}>
+            <button
+              type="button"
+              className={styles.day}
+              tabIndex={-1}
+              title={t("scheduler.pick")}
+              aria-expanded={picking}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                setPicking((v) => !v);
+              }}
+            >
+              {date} {weekday}
+            </button>
+            {picking && (
+              <DayPicker
+                date={date}
+                onClose={closePicker}
+                onPick={(day) => {
+                  setPicking(false);
+                  go(day);
+                }}
+              />
+            )}
+          </span>
+          <button type="button" className={styles.step} tabIndex={-1} onClick={(e) => (e.currentTarget.blur(), go(shift(date, 1)))} title={t("scheduler.next")} aria-label={t("scheduler.next")}>
             <ChevronRightIcon />
           </button>
         </div>
-        <span className={styles.date}>
-          {date} {weekday}
-        </span>
+        <button type="button" className={styles.today} tabIndex={-1} data-current={isToday} onClick={(e) => (e.currentTarget.blur(), go(today()))}>
+          {t("scheduler.today")}
+        </button>
       </div>
       <div
         ref={pageRef}
@@ -952,7 +961,10 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         data-mode={mode}
         data-all={all}
         // a press anywhere but on a card (the text, the blank of the page) lets the chosen card go
-        onMouseDown={(e) => !e.target.closest("[data-card]") && setChosen(null)}
+        onMouseDown={(e) => {
+          setInCalendar(false);
+          if (!e.target.closest("[data-card]")) setChosen(null);
+        }}
         onFocus={(e) => e.target.tagName === "TEXTAREA" && setInText(true)}
         onBlur={(e) => e.target.tagName === "TEXTAREA" && setInText(false)}
         onDragOver={(e) => {
@@ -1045,7 +1057,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
         {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
-      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} />}
+      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} focused={focused && onCalendar} keysRef={calendarKeys} />}
       {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
     </section>
   );

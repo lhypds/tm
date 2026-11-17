@@ -450,6 +450,23 @@ app.use(createSchedulerApp({
 // the Google and Apple calendars listed in taskmgr.json ("calendars").
 app.use(createCalendarApp({ calendars: config.getCalendars, log: (line) => console.error(line) }));
 
+// The calendars themselves, for the dialog that adds and removes them (the pencil beside "Calendar"):
+// { calendars }, each { name, type, url }. The addresses are secrets, and are given only here and
+// in the config editor.
+app.get('/api/calendars', (req, res) => {
+  res.json({ calendars: config.getCalendars() });
+});
+
+// Replace the list in taskmgr.json; an entry without a usable address is refused.
+app.put('/api/calendars', (req, res) => {
+  try {
+    config.setCalendars((req.body || {}).calendars);
+  } catch (e) {
+    throw new HttpError(400, e.message);
+  }
+  res.json({ calendars: config.getCalendars() });
+});
+
 // A change made here (a task moved, edited, deleted, a file added...) leaves the pushed copies no
 // longer what taskmgrd pushed: the hashes of its snapshots are forgotten, or the next push, finding
 // its folder the same as at the last one, would send nothing and leave the change here in place.

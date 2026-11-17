@@ -285,3 +285,9 @@ p {
   background: currentColor;
   pointer-events: none;
 }
+
+/* A link that is an element (marked `data-link`), opened by cmd + click: the hand while the key is
+   held, which @utils/links says on the root. */
+:root[data-mod="true"] [data-link] {
+  cursor: pointer;
+}

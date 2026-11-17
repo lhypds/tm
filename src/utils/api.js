@@ -176,9 +176,19 @@ export const getSchedulerDay = (date, carry = false) => request(`/api/scheduler?
 // Write the page: its text. Resolves to the day after it.
 export const saveSchedulerPage = (date, text) => request("/api/scheduler", json("PUT", { date, text }));
 
+// The calendars under the scheduler's page as taskmgr.json lists them: { calendars }, each
+// { name, type, url, color } (`type` "google", "apple" or "", `url` the address of its ICS feed,
+// `color` that of its events, "#rrggbb" or "").
+export const getCalendars = () => request("/api/calendars");
+
+// Replace that list. Resolves to it as it is kept.
+export const saveCalendars = (calendars) => request("/api/calendars", json("PUT", { calendars }));
+
 // The events of the day `date` ("YYYY-MM-DD", here: its bounds are sent with it) in the Google and
 // Apple calendars the server is given (see server/calendar.js): { configured, events, errors },
-// each event { id, title, location, allDay, start, end, source, calendar } with start and end in
+// each event { id, title, location, allDay, start, end, source, calendar, color } and its details
+// (description, url, conference, organizer, attendees, attachments, status, busy, repeats, created,
+// updated: see detailsOf in server/calendar.js), with start and end in
 // ms (the days, "YYYY-MM-DD", the last one not included, of an `allDay` one). `fresh` reads the
 // calendars anew, not the copy the server keeps for a few minutes.
 export const getCalendarDay = (date, fresh = false) => {
