@@ -1700,6 +1700,11 @@ export default function Home({ all = false }) {
         }
         if (name === "space") return true; // the preview is for the list; here nothing is chosen to open
         if (name === "d" && detailSection === "prompt") return true; // not the task: the prompt is not deleted
+        // esc on the prompt (a first esc took the caret out of it, see PromptText): hidden, as g does
+        if (name === "escape" && detailSection === "prompt") {
+          showPrompt(false);
+          return true;
+        }
       }
     }
 
@@ -1715,6 +1720,8 @@ export default function Home({ all = false }) {
     const moveFrom = view === "board" ? movable.findIndex((task) => task.key === selectedKey) : selectedIndex;
     const move = moveIndex(name, moveFrom, movable.length);
     if (move !== null) {
+      // j / k over the tasks are on to the tasks: the task is back in place of the scheduler
+      if (pane !== "detail" && wantScheduler) setScheduler(false);
       if (view === "list") stepListSelection(name); // with the "nothing chosen" state above the first row
       else if (move >= 0) {
         setGroupKeys([]);
