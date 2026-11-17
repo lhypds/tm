@@ -96,7 +96,7 @@ export default function EventModal({ event, onClose }) {
   const rows = [
     [t("scheduler.eventTime"), time],
     [t("scheduler.eventLocation"), event.location && linked(event.location)],
-    [t("scheduler.calendar"), [SOURCES[event.source], event.calendar].filter(Boolean).join(" · ")],
+    [t("scheduler.eventCalendar"), [SOURCES[event.source], event.calendar].filter(Boolean).join(" · ")],
     [t("scheduler.eventMeeting"), event.conference && linked(event.conference)],
     [t("scheduler.eventOrganizer"), event.organizer && person(event.organizer)],
     [

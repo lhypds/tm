@@ -29,7 +29,7 @@
   font-weight: 600;
 }
 
-/* Under the title: the day shown between its two buttons at the left, "Today" at the right. */
+/* Under the title: the day shown between its two buttons. */
 .days {
   flex: none;
   display: flex;
@@ -47,8 +47,7 @@
 }
 
 .step,
-.day,
-.today {
+.day {
   height: 22px;
   border: var(--line) solid var(--border);
   background: var(--bg);
@@ -71,11 +70,6 @@
   height: 10px;
 }
 
-.today {
-  flex: none;
-  padding: 0 12px;
-}
-
 /* The day shown, between the two steps (their borders on one another's): a click picks a day. */
 .dayBox {
   position: relative;
@@ -89,17 +83,16 @@
   white-space: nowrap;
 }
 
-.step:hover,
-.day:hover,
-.day[aria-expanded="true"],
-.today:hover {
-  background: var(--border);
-  color: var(--bg);
+/* The day shown is today: shaded. */
+.day[data-current="true"] {
+  background: var(--bg-hover);
 }
 
-/* Today is on the page already: the button is shaded, as the month on screen is in its list. */
-.today[data-current="true"]:not(:hover) {
-  background: var(--bg-hover);
+.step:hover,
+.day:hover,
+.day[aria-expanded="true"] {
+  background: var(--border);
+  color: var(--bg);
 }
 
 /* The page: squared paper, a square two characters wide and a line high, scrolling with what is

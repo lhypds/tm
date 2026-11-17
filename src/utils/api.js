@@ -176,6 +176,15 @@ export const getSchedulerDay = (date, carry = false) => request(`/api/scheduler?
 // Write the page: its text. Resolves to the day after it.
 export const saveSchedulerPage = (date, text) => request("/api/scheduler", json("PUT", { date, text }));
 
+// The same for the days from `date` to `until` (both "YYYY-MM-DD", here), a month of the calendar view.
+export const getCalendarDays = (date, until, fresh = false) => {
+  const [y, m, d] = date.split("-").map(Number);
+  const [y2, m2, d2] = until.split("-").map(Number);
+  const from = new Date(y, m - 1, d).getTime();
+  const to = new Date(y2, m2 - 1, d2 + 1).getTime();
+  return request(`/api/calendar?${q({ date, until, from, to, ...(fresh ? { fresh: "1" } : {}) })}`);
+};
+
 // The calendars under the scheduler's page as taskmgr.json lists them: { calendars }, each
 // { name, type, url, color } (`type` "google", "apple" or "", `url` the address of its ICS feed,
 // `color` that of its events, "#rrggbb" or "").

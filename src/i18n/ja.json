@@ -45,7 +45,8 @@
     "showDetails": "詳細を表示",
     "location": "場所",
     "listView": "リスト表示",
-    "boardView": "進捗表示"
+    "boardView": "進捗表示",
+    "calendarView": "カレンダー表示"
   },
   "month": {
     "all": "全タスク",
@@ -234,12 +235,16 @@
       "desc": "選択中のタスクを削除"
     },
     "scheduler": {
-      "keys": "t",
-      "desc": "右のペインをタスクとスケジューラで切り替える（スケジューラの文字は vim 風に編集：h j k l で移動、i / a で入力、esc で戻る；タスク上では space で開く、enter でその下に改行、x / p / w で状態を変える、backspace / d で外す）"
+      "keys": "t / s",
+      "desc": "t で右のペインにタスク、s でスケジューラを表示（スケジューラの文字は vim 風に編集：h j k l で移動、i / a で入力、esc で戻る；タスク上では space で開く、enter でその下に改行、x / p / w で状態を変える、backspace / d で外す）"
     },
     "calendar": {
       "keys": "c",
-      "desc": "スケジューラのページの下に、その日のカレンダー（Google と Apple カレンダーの予定）を表示／非表示"
+      "desc": "中央のタスクの代わりに 1 か月のカレンダーを表示し、右にスケジューラを表示（t でタスクに戻る；v でリスト、進捗表示、カレンダーを切り替え；カレンダー上では j で月に入り、h j k l で日を選び、enter でその日に入り、j / k で予定を選び、space で表示；esc で戻る）"
+    },
+    "timetable": {
+      "keys": "d",
+      "desc": "スケジューラ上で：ページの下にその日のタイムテーブル（Google と Apple カレンダーの予定）を表示／非表示（esc の後 j でそこへ移動：j / k で予定を移動、h / l で日付を移動、space で予定を表示）"
     },
     "refresh": {
       "keys": "r",
@@ -347,16 +352,15 @@
     "title": "スケジューラ",
     "show": "スケジューラ",
     "hide": "タスク",
-    "today": "今日",
     "pick": "日付を選択",
     "prev": "前の日",
     "next": "次の日",
     "notes": "その日のメモ",
     "remove": "この日から外す",
     "missing": "このタスクはこのマシンにありません",
-    "calendar": "カレンダー",
-    "showCalendar": "カレンダーを表示",
-    "hideCalendar": "カレンダーを隠す",
+    "calendar": "タイムテーブル",
+    "showCalendar": "タイムテーブルを表示",
+    "hideCalendar": "タイムテーブルを隠す",
     "allDay": "終日",
     "calendarError": "{{source}} カレンダーを読み込めません：{{error}}",
     "eventTime": "日時",
@@ -386,7 +390,8 @@
     "calendarHelpIntro": "カレンダーは ICS フィードのアドレスで追加します：アドレスを貼り付けて保存します。Google か Apple かはアドレスから自動で判定されます。名前は任意です（空のときはカレンダー自身の名前を使います）。カレンダーごとに 1 行、複数アカウントのものも追加できます。",
     "calendarHelpGoogle": "ウェブ版 Google カレンダー > 設定 > 左側でカレンダーを選択 > 「カレンダーの統合」 > 「iCal 形式の非公開 URL」をコピー。",
     "calendarHelpApple": "カレンダー（Mac、iPhone または iCloud.com）> カレンダーを選択 > 共有 > 「公開カレンダー」をオン > webcal:// のリンクをコピー。",
-    "calendarHelpSecret": "アドレスは秘密情報です：知っている人は誰でもカレンダーを読めます。一覧は taskmgr.json に保存され、一緒に同期されます。"
+    "calendarHelpSecret": "アドレスは秘密情報です：知っている人は誰でもカレンダーを読めます。一覧は taskmgr.json に保存され、一緒に同期されます。",
+    "eventCalendar": "カレンダー"
   },
   "analysis": {
     "title": "収入分析",
@@ -451,5 +456,8 @@
     "runHint": "チェックしたマシンでこのプロンプトの Claude Code を実行（⌘ / ctrl + enter）",
     "none": "このサーバーと同期しているマシンはまだありません：マシンで .env を AI_RUNNER=1 にして taskmgrd を起動してください。",
     "commandStarted": "{{machines}} で {{command}} を開始しました"
+  },
+  "calendar": {
+    "title": "カレンダー"
   }
 }

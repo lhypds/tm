@@ -45,7 +45,8 @@
     "showDetails": "Show the details",
     "location": "Location",
     "listView": "List view",
-    "boardView": "Progress view"
+    "boardView": "Progress view",
+    "calendarView": "Calendar view"
   },
   "month": {
     "all": "All tasks",
@@ -234,12 +235,16 @@
       "desc": "delete the selected task"
     },
     "scheduler": {
-      "keys": "t",
-      "desc": "swap the right pane between the task and the scheduler (its text is edited as in vim: h j k l move, i / a type, esc goes back; on a task, space opens it, enter starts a new line under it, x / p / w mark it and backspace / d removes it)"
+      "keys": "t / s",
+      "desc": "t shows the task in the right pane, s the scheduler (its text is edited as in vim: h j k l move, i / a type, esc goes back; on a task, space opens it, enter starts a new line under it, x / p / w mark it and backspace / d removes it)"
     },
     "calendar": {
       "keys": "c",
-      "desc": "show or hide the day's calendar under the scheduler's page (the day's events in Google and Apple Calendar)"
+      "desc": "show the calendar, a whole month, in the middle in place of the tasks, with the scheduler at the right (t is back on the tasks; v goes through the list, the progress view and the calendar; on the calendar, j goes into the month, h j k l choose a day, enter goes into the day, where j / k choose an event and space shows it; esc goes back out)"
+    },
+    "timetable": {
+      "keys": "d",
+      "desc": "on the scheduler: show or hide the day's timetable under its page (the day's events in Google and Apple Calendar; after esc, j goes down to it: j / k walk its events, h / l step a day, space shows an event)"
     },
     "refresh": {
       "keys": "r",
@@ -347,16 +352,15 @@
     "title": "Scheduler",
     "show": "Scheduler",
     "hide": "Task",
-    "today": "Today",
     "pick": "Pick a day",
     "prev": "Previous day",
     "next": "Next day",
     "notes": "Notes of the day",
     "remove": "Remove from this day",
     "missing": "This task is not on this machine",
-    "calendar": "Calendar",
-    "showCalendar": "Show calendar",
-    "hideCalendar": "Hide calendar",
+    "calendar": "Timetable",
+    "showCalendar": "Show timetable",
+    "hideCalendar": "Hide timetable",
     "allDay": "All day",
     "calendarError": "Could not read the {{source}} calendar: {{error}}",
     "eventTime": "Time",
@@ -386,7 +390,8 @@
     "calendarHelpIntro": "A calendar is added by the address of its ICS feed: paste the address and save; whether it is a Google or an Apple one is told from the address. The name is optional (the calendar's own is used when it is left empty). Add a row for each calendar, of as many accounts as needed.",
     "calendarHelpGoogle": "Google Calendar on the web > Settings > the calendar at the left > \"Integrate calendar\" > copy \"Secret address in iCal format\".",
     "calendarHelpApple": "Calendar (on a Mac, an iPhone or iCloud.com) > the calendar > Share > turn on \"Public Calendar\" > copy its webcal:// link.",
-    "calendarHelpSecret": "An address is a secret: whoever has it can read the calendar. The list is kept in taskmgr.json and synced with it."
+    "calendarHelpSecret": "An address is a secret: whoever has it can read the calendar. The list is kept in taskmgr.json and synced with it.",
+    "eventCalendar": "Calendar"
   },
   "analysis": {
     "title": "Income analysis",
@@ -451,5 +456,8 @@
     "runHint": "Run Claude Code with this prompt on the machines ticked (⌘ / ctrl + enter)",
     "none": "No machine syncs with this server yet: start taskmgrd on one, with AI_RUNNER=1 in its .env.",
     "commandStarted": "{{command}} started on {{machines}}"
+  },
+  "calendar": {
+    "title": "Calendar"
   }
 }

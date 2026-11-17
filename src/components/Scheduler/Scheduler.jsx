@@ -187,8 +187,7 @@ function Lines({ value, fill, ...props }) {
 }
 
 // The scheduler, in place of the task panel: one page a day. Under its title, a row says which day is shown, between
-// the buttons that step a day back and a day forward (a click on the day picks another, see DayPicker), and at its right end goes to
-// today. The page is squared paper to write on
+// the buttons that step a day back and a day forward (a click on the day picks another, see DayPicker); the page's refresh (r) is back on today. The page is squared paper to write on
 // (saved as it is typed; kept as one text, a task a line of it, see compose) with the tasks dragged onto it from the list or the board (`tasks` are
 // those, found by the keys the drag carries), each a card of one line: the status box the list has (a click
 // marks the task done, or todo again: `onStatus(entry, status)`) and its title. A card sits on
@@ -201,12 +200,18 @@ function Lines({ value, fill, ...props }) {
 // (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere); while `loading` (the page's refresh) the pane under its bar is covered and says "Loading...", as the task list does, and the day shown is today again.
 // The days are synced between the machines (see server/scheduler.js), so a page may have a task that is not on this one: its card is as any other, with the title of its line, but has no box and opens nothing.
 // See server/scheduler.js for what is kept.
-// The calendar at the right of the title (c; `onToggleCalendar`) shows and hides the day's calendar
+// The calendar at the right of the title (d, for the day, while the keyboard is on this pane and
+// not on a card; `onToggleCalendar`) shows and hides the day's timetable
 // (`calendarOpen`): the pane is then split in two, as the task panel is with its prompt, the page
-// above and under it the events the day has in Google and Apple Calendar (see Calendar).
-export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar }) {
+// above and under it the events the day has in Google and Apple Calendar (see Calendar, which is
+// called "Timetable" on the page: "Calendar" is the month in the middle, see MonthCalendar).
+// `goTo` ({ date }, a new one each time) is a day asked for from outside, a day clicked in the
+// calendar view: the scheduler shows it, and starts on it when it comes on screen with one;
+// `onDate(date)` is told the day shown, whenever it changes. `onCommand()` opens the page's command
+// line: ":" in the text in NORMAL mode, as in vim (elsewhere on the pane the key is the page's own).
+export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar, goTo, onDate, onCommand }) {
   const { t, i18n } = useTranslation();
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(() => goTo?.date || today());
   const [loaded, setLoaded] = useState(false); // the day shown has been read
   const [text, setText] = useState("");
   const [cards, setCards] = useState([]); // in the page's order (see arrange)
@@ -315,6 +320,13 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     setDate(next);
   };
 
+  useEffect(() => {
+    if (goTo) go(goTo.date);
+  }, [goTo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onDate?.(date);
+  }, [date]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The page's refresh (its button, r: `loading` while it lasts) is back on today, as a page
   // opened anew is.
   useEffect(() => {
@@ -393,7 +405,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   // card beside it, backspace back as h and up to the end of the line above, enter to the start of
   // the line under, 0 and $ to the ends of the line; i and a start typing before and after the
   // cursor, I and A at the ends of the line, o and O on a new line under and above; x deletes the
-  // character, u undoes; esc leaves the text (the keys are then the page's again, see below).
+  // character, u undoes; : opens the page's command line; esc leaves the text (the keys are then the page's again, see below).
   // INSERT: the keys type, esc is back to NORMAL. The arrows do as h j k l in NORMAL. A click in
   // the text types.
   const [mode, setModeState] = useState("normal");
@@ -448,6 +460,11 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     }
     if (k.length !== 1 && !["Backspace", "Delete", "Enter"].includes(k)) return; // tab and the like
     e.preventDefault(); // nothing is typed
+    if (k === ":" || k === "：") {
+      // the page's command line (:h for the help), which takes the keyboard
+      onCommand?.();
+      return;
+    }
     const v = el.value;
     const p = Math.min(el.selectionStart, v.length);
     const start = v.lastIndexOf("\n", p - 1) + 1; // of the cursor's line
@@ -672,6 +689,11 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   useEffect(() => {
     if (!calendarOpen) setInCalendar(false);
   }, [calendarOpen]);
+  // An event of the timetable clicked: the keyboard is on the timetable, off the page's card.
+  const chooseInCalendar = () => {
+    setChosen(null);
+    setInCalendar(true);
+  };
   const chosenIndex = cards.findIndex((c) => cardKey(c) === chosen);
   const backTo = useRef(null);
   // The cursor into a run of the text, on `line` of the page (past the run's last line: its end)
@@ -738,6 +760,12 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
+      // d (the day) shows and hides the timetable under the page, as the button in the bar does;
+      // on a card it is the card's (it takes it off the day, see below)
+      if (name === "d" && !cards[chosenIndex]) {
+        onToggleCalendar();
+        return true;
+      }
       if (onCalendar) {
         // h and l (and the arrows) step a day back and forward, the keyboard staying on the calendar
         const days = ["h", "left"].includes(name) ? -1 : ["l", "right"].includes(name) ? 1 : 0;
@@ -888,7 +916,6 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
 
   const [y, m, d] = date.split("-").map(Number);
   const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(new Date(y, m - 1, d));
-  const isToday = date === today();
 
   return (
     <section
@@ -897,7 +924,8 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
       aria-label={t("scheduler.title")}
     >
       {/* not shaded while the keyboard is on the calendar: its divider is then */}
-      <div className={styles.bar} data-focused={focused && !onCalendar}>
+      {/* a press on the bar or the day's row, as one on the page, takes the keyboard back from the timetable */}
+      <div className={styles.bar} data-focused={focused && !onCalendar} onMouseDown={() => setInCalendar(false)}>
         <h2 className={styles.barTitle}>{t("scheduler.title")}</h2>
         {/* let go after the click, so space and enter are the page's again (as the panel's buttons) */}
         <button
@@ -909,13 +937,13 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
             e.currentTarget.blur();
             onToggleCalendar();
           }}
-          title={withKey(t(calendarOpen ? "scheduler.hideCalendar" : "scheduler.showCalendar"), "c")}
+          title={withKey(t(calendarOpen ? "scheduler.hideCalendar" : "scheduler.showCalendar"), "d")}
           aria-label={t(calendarOpen ? "scheduler.hideCalendar" : "scheduler.showCalendar")}
         >
           <CalendarIcon />
         </button>
       </div>
-      <div className={styles.days}>
+      <div className={styles.days} onMouseDown={() => setInCalendar(false)}>
         <div className={styles.steps}>
           {/* let go after the click, as the bar's button: space and enter stay the page's (and the calendar's) */}
           <button type="button" className={styles.step} tabIndex={-1} onClick={(e) => (e.currentTarget.blur(), go(shift(date, -1)))} title={t("scheduler.prev")} aria-label={t("scheduler.prev")}>
@@ -928,6 +956,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
               className={styles.day}
               tabIndex={-1}
               title={t("scheduler.pick")}
+              data-current={date === today()} // shaded on today
               aria-expanded={picking}
               onClick={(e) => {
                 e.currentTarget.blur();
@@ -951,9 +980,6 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
             <ChevronRightIcon />
           </button>
         </div>
-        <button type="button" className={styles.today} tabIndex={-1} data-current={isToday} onClick={(e) => (e.currentTarget.blur(), go(today()))}>
-          {t("scheduler.today")}
-        </button>
       </div>
       <div
         ref={pageRef}
@@ -1057,7 +1083,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
         {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
-      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} focused={focused && onCalendar} keysRef={calendarKeys} />}
+      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} loading={loading} focused={focused && onCalendar} keysRef={calendarKeys} onChoose={chooseInCalendar} />}
       {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
     </section>
   );

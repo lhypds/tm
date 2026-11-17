@@ -6,16 +6,10 @@ import styles from "./dayPicker.module.css";
 const p2 = (n) => String(n).padStart(2, "0");
 const keyOf = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 
-// The first day of the week where `language` is spoken (0 Sunday .. 6 Saturday): Monday when the
-// browser does not say.
-function firstDayOf(language) {
-  try {
-    const locale = new Intl.Locale(language);
-    const info = locale.getWeekInfo?.() || locale.weekInfo;
-    return info ? info.firstDay % 7 : 1;
-  } catch {
-    return 1;
-  }
+// The first day of the week (0 Sunday .. 6 Saturday): Sunday in every language of the app, Chinese
+// too, where the browser would say Monday, so a month looks the same whatever the language.
+export function firstDayOf() {
+  return 0;
 }
 
 // The days to pick one from, under the day the scheduler shows (a click on it): a month, its year

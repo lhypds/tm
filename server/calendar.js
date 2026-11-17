@@ -25,6 +25,7 @@ const ICAL = require('ical.js');
 
 const CACHE_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 15 * 1000;
+const MAX_DAYS = 62; // asked at once: a month of the calendar view, with the weeks it starts and ends in
 const MAX_OCCURRENCES = 50000; // of one repeating event, from its first day: a daily one of a century
 
 // The moment (ms) the clock of the time zone `tzid` shows y-mo-d h:mi:s, or null when the zone is
@@ -114,13 +115,14 @@ function detailsOf(component) {
   };
 }
 
-// The events of the ICS `text` on one day: `date` is the day ("2026-11-17") and `from` .. `to` its
-// bounds (ms) where it is asked from. Each is { id, title, location, allDay, start, end } with
+// The events of the ICS `text` on one day, or on the days from one to another: `date` is the day
+// ("2026-11-17"), `until` the last one when there are several (the day itself when not given) and
+// `from` .. `to` their bounds (ms) where they are asked from. Each is { id, title, location, allDay, start, end } with
 // what detailsOf says of it: start
 // and end are ms, or for an event of whole days (`allDay`) its days, the last one not included.
 // An event that repeats is here once for each time it falls on the day; one time of it changed or
 // moved (its RECURRENCE-ID) is an event of its own, and a cancelled one is left out.
-function eventsOf(text, { date, from, to }) {
+function eventsOf(text, { date, until = date, from, to }) {
   const root = new ICAL.Component(ICAL.parse(text));
   for (const zone of root.getAllSubcomponents('vtimezone')) {
     try { ICAL.TimezoneService.register(zone); } catch (e) { /* the times in it fall back to Intl's zone */ }
@@ -141,7 +143,7 @@ function eventsOf(text, { date, from, to }) {
         next.adjust(1, 0, 0, 0);
         last = dayOf(next);
       }
-      if (first > date) return false;
+      if (first > until) return false;
       if (last > date) out.push({ ...base, allDay: true, start: first, end: last });
       return true;
     }
@@ -183,7 +185,7 @@ function eventsOf(text, { date, from, to }) {
       if (!next) break;
       const details = master.getOccurrenceDetails(next);
       if (details.item !== master) { // changed: counted above, where it is now
-        if (next.isDate ? dayOf(next) > date : msOf(next, tz) >= to) break;
+        if (next.isDate ? dayOf(next) > until : msOf(next, tz) >= to) break;
         continue;
       }
       if (!add(master, details.startDate, details.endDate, tz, tz)) break;
@@ -214,7 +216,8 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, log
   }
 
   // ?date=2026-11-17&from=&to= (the day's bounds, ms, in the browser's time zone), fresh=1 to read
-  // the feeds anew. { configured, events, errors }: the events of every calendar in the order of
+  // the feeds anew; with until=2026-12-06 too, the days from `date` to that one (a month and the
+  // days around it, for the calendar view: MAX_DAYS at most), `from` and `to` then their bounds. { configured, events, errors }: the events of every calendar in the order of
   // the day (those of whole days first), each with its `source` ('google' | 'apple' | '') and
   // `calendar` (its name in taskmgr.json, or the feed's own) and `color` (its calendar's, "" for none); `errors` the calendars that could not
   // be read, each { source, calendar, error }, the events of the others being there all the same.
@@ -223,7 +226,8 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, log
     const date = String(req.query.date || '');
     const from = Number(req.query.from);
     const to = Number(req.query.to);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+    const until = String(req.query.until || date);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{4}-\d{2}-\d{2}$/.test(until) || until < date || !Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > MAX_DAYS * 25 * 60 * 60 * 1000) {
       res.status(400).json({ error: 'Invalid day.' });
       return;
     }
@@ -235,7 +239,7 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, log
         const text = await feedText(url, !!req.query.fresh);
         let calendar = name;
         if (!calendar) try { calendar = String(new ICAL.Component(ICAL.parse(text)).getFirstPropertyValue('x-wr-calname') || ''); } catch (e) { calendar = ''; }
-        for (const event of eventsOf(text, { date, from, to })) events.push({ ...event, id: `${index}:${event.id}`, source, calendar, color }); // the id is the event's in its feed
+        for (const event of eventsOf(text, { date, until, from, to })) events.push({ ...event, id: `${index}:${event.id}`, source, calendar, color }); // the id is the event's in its feed
       } catch (e) {
         // the address is a secret: the message alone, never the url
         const error = String((e && e.message) || e).replace(/https?:\/\/\S+/gi, '<url>');

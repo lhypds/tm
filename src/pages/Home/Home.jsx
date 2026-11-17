@@ -17,6 +17,7 @@ import {
   RepositoryEditModal,
   IncomeAnalysisModal,
   Scheduler,
+  MonthCalendar,
   LanguageSwitcher,
   UserMenu,
 } from "@components";
@@ -30,6 +31,7 @@ import {
   PieIcon,
   ListIcon,
   BoardIcon,
+  CalendarIcon,
   MonitorIcon,
   SundialIcon,
   TaskIcon,
@@ -107,10 +109,13 @@ function readFilters() {
 
 const isDefaultFilter = (f) => Object.keys(FILTER_DEFAULTS).every((k) => f[k] === FILTER_DEFAULTS[k]);
 
-// The task view: "list", or "board" (the progress view).
+// The view in the middle: "list", "board" (the progress view) or "calendar" (a month of the
+// calendars, see MonthCalendar), in the order v goes through them.
+const VIEWS = ["list", "board", "calendar"];
 function readView() {
   try {
-    return localStorage.getItem("tasks.view") === "board" ? "board" : "list";
+    const view = localStorage.getItem("tasks.view");
+    return VIEWS.includes(view) ? view : "list";
   } catch {
     return "list";
   }
@@ -179,6 +184,15 @@ export default function Home({ all = false }) {
   const [wantScheduler, setScheduler] = useState(() => readFlag("panel.scheduler", false)); // the right pane shows the scheduler, not the task (see `scheduler`)
   const [calendarOpen, setCalendarOpen] = useState(() => readFlag("panel.calendar", false)); // the scheduler shows the day's calendar under its page
   const schedulerKeys = useRef(null); // the scheduler's keys while the keyboard is on it (see Scheduler)
+  const calendarKeys = useRef(null); // the calendar view's, while the keyboard is on the middle (see MonthCalendar)
+  // The day the scheduler shows (it says so, see Scheduler), and a day asked of it: one clicked in
+  // the calendar view ({ date }), let go once the scheduler has moved on to another.
+  const [schedulerDay, setSchedulerDay] = useState(null);
+  const [askedDay, setAskedDay] = useState(null);
+  const tellSchedulerDay = useCallback((date) => {
+    setSchedulerDay(date);
+    setAskedDay((asked) => (asked && asked.date !== date ? null : asked));
+  }, []);
   const [pane, setPane] = useState("tasks"); // where j / k and friends go: "tree" or "tasks"
   // The list last loaded and the path it is for. On any other path `data` is empty and `loading`
   // until this path's own list arrives. That is decided while rendering, not in an effect after a
@@ -888,16 +902,19 @@ export default function Home({ all = false }) {
       showToast(e.message);
     }
   }
-  // The sundial in the header: the scheduler takes the right pane (opened when it was folded), and
-  // gives it back to the task on the next click.
-  function toggleScheduler() {
-    const next = !(scheduler && detailOpen);
-    if (schedulerAsked) setScheduler(next);
-    else setEmptyTask(!next);
+  // The right pane (opened when it was folded) shows the scheduler (s) or the task (t).
+  function showScheduler(on) {
+    if (schedulerAsked) setScheduler(on);
+    else setEmptyTask(!on);
     setDetailOpen(true);
   }
-  // The calendar in the scheduler's bar, and c: the day's calendar under the scheduler's page, shown
-  // and hidden. With the scheduler not on screen, c brings it there with its calendar.
+  // The sundial in the header: the scheduler takes the right pane, and gives it back to the task
+  // on the next click.
+  function toggleScheduler() {
+    showScheduler(!(scheduler && detailOpen));
+  }
+  // The calendar in the scheduler's bar, and d on the scheduler: the day's timetable under the
+  // scheduler's page, shown and hidden. With the scheduler not on screen, it comes with its timetable.
   function toggleCalendar() {
     if (scheduler && detailOpen) setCalendarOpen((v) => !v);
     else {
@@ -1337,10 +1354,23 @@ export default function Home({ all = false }) {
     else if (canAdd) setCreating({ space, dir, status, parent: null });
   }
 
-  function toggleView() {
-    const next = view === "board" ? "list" : "board";
+  // A day clicked in the calendar view: the scheduler takes the right pane, on that day, with its
+  // timetable shown.
+  function showDay(date) {
+    setAskedDay({ date });
+    setCalendarOpen(true);
+    showScheduler(true);
+  }
+  // The view in the middle, and the keyboard on it. The calendar brings the scheduler to the right
+  // pane with it (c, v or the header's button): the days beside their month.
+  function showView(next) {
     setView(next);
+    if (next === "calendar") showScheduler(true);
     setPane(next === "board" ? (selected ? boardStatus(selected) : boardStatuses[0]) : "tasks");
+  }
+  // v, and the header's button: the next view, list > progress > calendar > list.
+  function toggleView() {
+    showView(VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.length]);
   }
 
   const boardPane = boardStatuses.includes(pane) ? pane : selected ? boardStatus(selected) : boardStatuses[0];
@@ -1634,17 +1664,22 @@ export default function Home({ all = false }) {
       toggleView();
       return true;
     }
-    // t swaps the right pane between the task and the scheduler, as the sundial in the header does
-    if (name === "t") {
-      toggleScheduler();
+    // t shows the task in the right pane and s the scheduler, as the sundial in the header swaps them
+    // (t also puts the task list back in the middle when the calendar is there; with no task
+    // selected there is none to show, and the scheduler stays in the right pane)
+    if (name === "t" || name === "s") {
+      showScheduler(name === "s" || !selected);
+      if (name === "t" && view === "calendar") showView("list");
       return true;
     }
-    // c shows and hides the day's calendar under the scheduler's page, as the calendar in its bar does
+    // c puts the calendar (a month) in the middle, in place of the tasks; again, it stays (t, or
+    // v, is back on the tasks)
     if (name === "c") {
-      toggleCalendar();
+      showView("calendar");
       return true;
     }
-    if (name === ":") {
+    // (the wide colon too: the one a Chinese or Japanese input method types)
+    if (name === ":" || name === "：") {
       setCommand("");
       return true;
     }
@@ -1652,16 +1687,21 @@ export default function Home({ all = false }) {
       openCreator(view === "board" && boardStatuses.includes(pane) ? pane : "todo");
       return true;
     }
+    // On the calendar its keys come first (into the month and through its days and their events,
+    // see MonthCalendar): h and l are its own once the keyboard is in the month, the page's else.
+    if (view === "calendar" && pane !== "detail" && pane !== "tree" && calendarKeys.current?.(name)) return true;
     // esc drops the selection, so the next a / n adds a task at the top, not a subtask
     if (name === "escape" && selected && pane !== "detail") {
       unselectAll();
       return true;
     }
-    if (view === "list" && ["h", "left", "l", "right"].includes(name)) {
+    if (view !== "board" && ["h", "left", "l", "right"].includes(name)) {
       moveListPane(["h", "left"].includes(name) ? -1 : 1);
       return true;
     }
     if (pane === "tree") return treeKey(name);
+    // On the calendar the keys of the tasks, which are not on screen, do nothing.
+    if (view === "calendar" && pane !== "detail") return true;
 
     if (pane === "detail" && !scheduler) {
       // j / k walk the attachments; with the prompt shown, the task's text first, then its prompt
@@ -2015,7 +2055,7 @@ export default function Home({ all = false }) {
               e.currentTarget.blur();
               toggleScheduler();
             }}
-            title={withKey(t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show"), "t")}
+            title={withKey(t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show"), scheduler && detailOpen ? "t" : "s")}
             aria-label={t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show")}
           >
             {scheduler && detailOpen ? <TaskIcon /> : <SundialIcon />}
@@ -2026,10 +2066,11 @@ export default function Home({ all = false }) {
             tabIndex={-1}
             onMouseDown={(e) => e.preventDefault()}
             onClick={toggleView}
-            title={withKey(t(view === "board" ? "header.listView" : "header.boardView"), "v")}
-            aria-label={t(view === "board" ? "header.listView" : "header.boardView")}
+            // what the click shows: the next view
+            title={withKey(t({ list: "header.boardView", board: "header.calendarView", calendar: "header.listView" }[view]), "v")}
+            aria-label={t({ list: "header.boardView", board: "header.calendarView", calendar: "header.listView" }[view])}
           >
-            {view === "board" ? <ListIcon /> : <BoardIcon />}
+            {{ list: <BoardIcon />, board: <CalendarIcon />, calendar: <ListIcon /> }[view]}
           </button>
           <button type="button" className="btn" onClick={refresh} title={withKey(t("header.refresh"), "r")} aria-label={t("header.refresh")}>
             <RefreshIcon />
@@ -2104,7 +2145,11 @@ export default function Home({ all = false }) {
         </button>
 
         <main className={styles.main} onMouseDown={() => setPane("tasks")}>
-          {(all || origin || space) && (
+          {/* the calendar view is the whole middle: a month, of no space in particular */}
+          {view === "calendar" && (
+            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} chosenDay={scheduler && detailOpen ? schedulerDay : null} onDay={showDay} />
+          )}
+          {view !== "calendar" && (all || origin || space) && (
             <nav className={styles.section} aria-label={t("header.location")}>
               {(all || origin) && (
                 <button
@@ -2149,7 +2194,7 @@ export default function Home({ all = false }) {
               })}
             </nav>
           )}
-          {spaceTo && (
+          {view !== "calendar" && spaceTo && (
             <div className={styles.listBar}>
               <MonthPicker months={months} index={monthIndex} label={(m) => monthLabel(m.key, t)} onChange={setMonth} />
               {view !== "board" && (
@@ -2177,7 +2222,7 @@ export default function Home({ all = false }) {
               </button>
             </div>
           )}
-          {content}
+          {view !== "calendar" && content}
         </main>
 
         <button
@@ -2194,7 +2239,7 @@ export default function Home({ all = false }) {
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
         <aside className={styles.detail} data-open={detailOpen} onMouseDown={() => setPane("detail")} onFocus={() => setPane("detail")}>
-          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} />}
+          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} goTo={askedDay} onDate={tellSchedulerDay} onCommand={() => setCommand("")} />}
           {!scheduler && spaceTo && (
             <TaskPanel
               task={selected}
@@ -2492,6 +2537,7 @@ function CommandLine({ value, onChange, onCancel, onRun }) {
         onChange={(e) => onChange(e.target.value)}
         onBlur={onCancel}
         onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return; // an input method's own keys (its enter takes what it wrote)
           if (e.key === "Enter") {
             e.preventDefault();
             onRun();

@@ -1,0 +1,308 @@
+/* The calendar view fills the middle of the page: its title bar, the month's buttons, the names of
+   the days, then the month. */
+.calendar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg);
+  border-bottom: var(--line) solid var(--border);
+}
+
+/* Shaded while the keyboard is on the calendar, as the scheduler's bar is. */
+.bar[data-focused="true"] {
+  background: var(--bg-hover);
+}
+
+.barTitle {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Under the title: the month shown between its two buttons (as the scheduler's day is). */
+.months {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: var(--line) solid var(--border);
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+}
+
+.step,
+.month {
+  box-sizing: border-box;
+  height: 22px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.step,
+.month {
+  cursor: pointer;
+}
+
+.step {
+  flex: none;
+  width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.step svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* The month, between the two steps, their borders on one another's: a click picks a month. */
+.monthBox {
+  position: relative;
+  display: inline-flex;
+  margin: 0 calc(-1 * var(--line));
+}
+
+.month {
+  padding: 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The month shown is this month: shaded. */
+.month[data-current="true"] {
+  background: var(--bg-hover);
+}
+
+.step:hover,
+.month:hover,
+.month[aria-expanded="true"] {
+  background: var(--border);
+  color: var(--bg);
+}
+
+/* The months to pick one from: a box under the month shown, its top line on the month's bottom
+   one (as the scheduler's days are, see DayPicker). */
+.select {
+  position: absolute;
+  left: 0;
+  top: calc(100% - var(--line));
+  z-index: 999;
+  padding: 8px;
+  border: var(--line) solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+.selectHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.year {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Four months a row. */
+.selectGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 36px);
+}
+
+.selectMonth {
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.selectMonth[data-now="true"] {
+  font-weight: 700;
+}
+
+/* The month shown is shaded; the one under the mouse is inverted, like a menu row. */
+.selectMonth[aria-pressed="true"] {
+  background: var(--bg-hover);
+}
+
+.selectMonth:hover {
+  background: var(--border);
+  color: var(--bg);
+}
+
+/* A calendar that could not be read. */
+.note {
+  flex: none;
+  padding: 6px 12px;
+  border-bottom: var(--line) solid var(--border);
+  color: var(--err);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* The names of the days, over their columns. */
+.names {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: var(--line) solid var(--border);
+}
+
+.name {
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+/* The month: seven days a row, the weeks sharing the height that is left. */
+.grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+/* A day: its number, then its events, which scroll when there are more than fit. A line at its
+   right and under it (none at the right of the last day of a week). */
+.day {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: var(--line) solid var(--soft-line);
+  border-bottom: var(--line) solid var(--soft-line);
+}
+
+.day:nth-child(7n) {
+  border-right: 0;
+}
+
+/* A click on a day shows it in the scheduler; the day the scheduler shows is shaded. */
+.day {
+  cursor: pointer;
+}
+
+.day[data-chosen="true"] {
+  background: var(--bg-hover);
+}
+
+
+.number {
+  flex: none;
+  align-self: flex-start;
+  min-width: 16px;
+  margin: 4px 4px 2px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The days of the months around the one shown. */
+.day[data-other="true"] .number {
+  color: var(--faint);
+}
+
+/* Today's number: framed, the line inside its box so it does not move. */
+.day[data-today="true"] .number {
+  box-shadow: inset 0 0 0 var(--line) var(--border);
+}
+
+.events {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 4px 2px;
+}
+
+/* An event: as thin as a tag of the task list (16px, its 10px type), one line cut short with an
+   ellipsis, in its calendar's color (`--event`) when it has one. */
+.event {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 16px;
+  margin: 0 0 2px;
+  padding: 0 5px;
+  border: var(--line) solid var(--border);
+  background: var(--event, var(--bg));
+  color: var(--fg);
+  font: inherit;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* Hovered, or the one chosen (a click, the keys): grey, a little darker than the shade of the day
+   the scheduler shows, which may be under it. */
+.event:hover,
+.event[data-chosen="true"] {
+  background: color-mix(in srgb, var(--fg) 14%, var(--bg));
+}
+
+/* Scrolled to by the keys, an event keeps a little room around it. */
+.event {
+  scroll-margin: 2px 0;
+}
+
+/* The wheel over an event scrolls its day: an event and its texts cut what overflows them, which
+   makes each a scroller of its own, and the app lets no scroller pass a scroll on (see global.css). */
+.event,
+.event > * {
+  overscroll-behavior: auto;
+}
+
+.time {
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* During a refresh, covers the view under its bar (the bar's 32px), as the scheduler's does. */
+.loading {
+  position: absolute;
+  inset: 32px 0 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}

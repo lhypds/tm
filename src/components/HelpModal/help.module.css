@@ -1,5 +1,6 @@
+/* Wide enough for the longer descriptions (the scheduler's, the timetable's) to take few lines. */
 .modal {
-  max-width: 420px;
+  max-width: 640px;
 }
 
 .list {

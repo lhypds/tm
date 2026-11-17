@@ -19,3 +19,4 @@ export { default as TaskBoard } from "./TaskBoard";
 export { default as MonthPicker } from "./MonthPicker";
 export { default as ColorPicker } from "./ColorPicker";
 export { default as Scheduler } from "./Scheduler";
+export { default as MonthCalendar } from "./MonthCalendar";

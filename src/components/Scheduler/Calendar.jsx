@@ -49,25 +49,26 @@ function place(events, from) {
   return placed;
 }
 
-// The calendar under the scheduler's page, the lower half of the pane, as the prompt is under a
-// task's text: a divider that says "Calendar", then the events of the day `date` in the Google and
+// The timetable under the scheduler's page, the lower half of the pane, as the prompt is under a
+// task's text: a divider that says "Timetable", then the events of the day `date` in the Google and
 // Apple calendars the server is given (see server/calendar.js). The day is a column of 24 hours, a
 // line across for each with its time at the left, noon's in red, and a dashed one at each half hour; it scrolls, and starts with noon
 // in the middle. An event is a card as thin as a tag of the task list, in its small type, on the line of its start: its
 // times and its title (the rest, where it is and which calendar it is from, on hover), in the
 // color its calendar was given, as light as an origin's is on a task's tag. The events
 // of whole days stay above the hours. They are read again whenever `reloadKey` changes (the page's
-// refresh, which reads the calendars anew) and every few minutes.
+// refresh, which reads the calendars anew, and puts noon back in the middle) and every few minutes.
 // While `focused` (the keyboard came down from the page, see Scheduler) its divider is shaded, as
 // the scheduler's bar, and the keys are its own (`keysRef` is given them; each answers true when
 // it was one of them, "leave" when the keyboard goes back to the page): the keyboard is first on
 // the calendar itself, on no event; j / k and the arrows walk the events from there, those of
 // whole days first, the one the keyboard is on shaded and scrolled to; k above the first one is
 // back on the calendar itself, and k there, and esc, leave; space shows the event's details (see EventModal), as a
-// double click on an event does.
+// double click on an event does; a click on an event chooses it, and a press anywhere on the
+// timetable puts the keyboard on it (`onChoose()` tells the scheduler so).
 // The pencil at the right of the divider (as the one beside "Origins") opens the dialog that adds and removes calendars (see
 // CalendarsModal); the day is read anew once it has saved.
-export default function Calendar({ date, reloadKey, focused, keysRef }) {
+export default function Calendar({ date, reloadKey, loading, focused, keysRef, onChoose }) {
   const { t } = useTranslation();
   const [day, setDay] = useState(null); // { date, configured, events, errors } as read last
   const hoursRef = useRef(null);
@@ -99,10 +100,11 @@ export default function Calendar({ date, reloadKey, focused, keysRef }) {
   const above = (shown?.errors.length || 0) + events.filter((e) => e.allDay).length; // what is over the hours
 
   // noon in the middle, on each day shown (again once what is over the hours has taken its room)
+  // and on the page's refresh (`loading` while it lasts)
   useLayoutEffect(() => {
     const el = hoursRef.current;
     el.scrollTop = PAD + 12 * HOUR - el.clientHeight / 2;
-  }, [date, above]);
+  }, [date, above, loading]);
 
   const [y, m, d] = date.split("-").map(Number);
   const from = new Date(y, m - 1, d).getTime();
@@ -120,7 +122,10 @@ export default function Calendar({ date, reloadKey, focused, keysRef }) {
   const order = ordered.map(eventKey);
   const [looked, setLooked] = useState(null); // the event whose details are shown
   const [chosen, setChosen] = useState(null);
-  useEffect(() => setChosen(null), [focused, date]);
+  useEffect(() => {
+    if (!focused) setChosen(null);
+  }, [focused]);
+  useEffect(() => setChosen(null), [date]);
   const chosenRef = useRef(null);
   useEffect(() => {
     if (chosen) chosenRef.current?.scrollIntoView({ block: "nearest" });
@@ -150,10 +155,17 @@ export default function Calendar({ date, reloadKey, focused, keysRef }) {
   });
   const mark = (e) => (focused && eventKey(e) === chosen ? { "data-chosen": "true", ref: chosenRef } : {});
   const tint = (e) => (e.color ? { "--event": lightColor(e.color) } : undefined);
+  // a click on an event chooses it, as the keys do: the keyboard is then on the timetable
+  // (`onChoose()` says so to the scheduler)
+  const choose = (e) => {
+    onChoose?.();
+    setChosen(eventKey(e));
+  };
 
   return (
     <>
-      <div className={styles.divider} data-focused={!!focused}>
+      {/* a press anywhere on the timetable, its divider or what is under it, puts the keyboard on it */}
+      <div className={styles.divider} data-focused={!!focused} onMouseDown={() => onChoose?.()}>
         <span className={styles.title}>{t("scheduler.calendar")}</span>
         {/* let go after the click, so the keys are the page's again (as the bar's buttons) */}
         <button
@@ -181,7 +193,7 @@ export default function Calendar({ date, reloadKey, focused, keysRef }) {
       />
       {/* what is under the divider is one box, half the pane with the page: the events of whole
           days (and what could not be read) take their room from the hours, not from the page */}
-      <div className={styles.body}>
+      <div className={styles.body} onMouseDown={() => onChoose?.()}>
         {shown?.errors.map((err, i) => (
           <div key={i} className={styles.note} data-error="true">
             {t("scheduler.calendarError", { source: [SOURCES[err.source], err.calendar].filter(Boolean).join(" · "), error: err.error })}
@@ -190,8 +202,7 @@ export default function Calendar({ date, reloadKey, focused, keysRef }) {
         {whole.length > 0 && (
           <div className={styles.whole}>
             {whole.map((e) => (
-              <div key={eventKey(e)} className={styles.card} {...mark(e)} style={tint(e)} onDoubleClick={() => setLooked(e)} title={[e.title, e.location, from1(e)].filter(Boolean).join("\n")}>
-                <span className={styles.time}>{t("scheduler.allDay")}</span>
+              <div key={eventKey(e)} className={styles.card} {...mark(e)} style={tint(e)} onClick={() => choose(e)} onDoubleClick={() => setLooked(e)} title={[e.title, e.location, from1(e)].filter(Boolean).join("\n")}>
                 <span className={styles.name}>{e.title || t("common.untitled")}</span>
               </div>
             ))}
@@ -215,7 +226,8 @@ export default function Calendar({ date, reloadKey, focused, keysRef }) {
                   className={styles.card}
                   {...mark(e)}
                   data-timed="true"
-                  onDoubleClick={() => setLooked(e)}
+                  onClick={() => choose(e)}
+                onDoubleClick={() => setLooked(e)}
                   style={{ ...tint(e), top: top + 2, left: `${(col / cols) * 100}%`, width: `calc(${100 / cols}% - ${col < cols - 1 ? 4 : 0}px)` }}
                   title={[e.title, `${formatDateTime(e.start)} – ${formatDateTime(e.end)}`, e.location, from1(e)].filter(Boolean).join("\n")}
                 >
