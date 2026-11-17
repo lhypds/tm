@@ -47,8 +47,9 @@ function readPicked() {
 // The machine this computer is (see @utils/here: found by itself, where the browser lets the page
 // ask) says so beside its name, "this device": its folders are opened on it. A machine that is not
 // in touch has a cross at the right end of its row, which forgets it once confirmed (DELETE
-// /api/ai/machines/<name>): gone for good, it would stay in the list otherwise.
-export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onClose }) {
+// /api/ai/machines/<name>): gone for good, it would stay in the list otherwise. onForget(name) then
+// tells the page, whose tree named the machine beside the folders it synced.
+export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, onForget, onClose }) {
   const { t } = useTranslation();
   const [machines, setMachines] = useState(null); // null until first answered
   const [error, setError] = useState("");
@@ -138,6 +139,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     try {
       await api.forgetMachine(forgetting);
       setMachines((list) => list && list.filter((m) => m.name !== forgetting));
+      onForget?.(forgetting); // the folders it synced are the server's own now: the page says so
     } catch (e) {
       showToast(e.message, 6000, "bottom", "error");
       loadRef.current?.(); // gone already: as it is now

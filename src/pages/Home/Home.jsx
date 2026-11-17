@@ -2540,6 +2540,7 @@ export default function Home({ all = false }) {
         onRun={ai.startOn}
         onOpenRun={(r) => setMachineRunId(r.id)}
         onStop={ai.stop}
+        onForget={reload}
         onClose={() => {
           setMachinesOpen(false);
           closeMachineRun();
