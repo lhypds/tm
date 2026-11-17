@@ -253,24 +253,26 @@ function createCalendarApp({ calendars = () => [], fetchText = defaultFetch, new
     res.json({ configured: list.length > 0, events, errors });
   });
 
-  // { date: "2026-11-17", title, here? }: a new event on that day in Apple's Calendar, which comes
-  // to the front with it open, for its time (and the rest) to be set (see utils/calendar.js). On this
+  // { date: "2026-11-17", title, until?, here? }: a new event on that day in Apple's Calendar, which comes
+  // to the front with it open, for its time (and the rest) to be set (see utils/calendar.js); with
+  // `until` (a later day), one of whole days, from `date` through it. On this
   // machine (the server's, a Mac), or, when the browser says which machine it is on (`here`, see
   // src/utils/here.js) and that is one of the machines in touch with this server, on that one:
-  // `newEventOn(machine, date, title)` asks it to, null when it is no such machine. The event is
+  // `newEventOn(machine, date, title, until)` asks it to, null when it is no such machine. The event is
   // Calendar's own, in the first calendar it can write: it is seen here once its feed has it.
   app.post('/api/calendar/new-event', express.json(), async (req, res) => {
     const date = String((req.body || {}).date || '');
     const title = String((req.body || {}).title || '').trim().slice(0, 200) || 'New Event';
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const until = String((req.body || {}).until || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) {
       res.status(400).json({ error: 'Invalid day.' });
       return;
     }
     try {
       const here = String((req.body || {}).here || '');
-      const there = here ? newEventOn(here, date, title) : null;
+      const there = here ? newEventOn(here, date, title, until) : null;
       if (there) await there;
-      else await newEvent(date, title);
+      else await newEvent(date, title, until);
       res.json({ ok: true });
     } catch (e) {
       const error = String((e && e.message) || e);

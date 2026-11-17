@@ -211,7 +211,7 @@ export const saveCalendars = (calendars) => request("/api/calendars", json("PUT"
 // A new event named `title` on the day `date` ("YYYY-MM-DD") in Apple's Calendar, on the machine this
 // browser is on when that is one of the server's machines, else on the server's (a Mac either way),
 // which comes to the front with it open, for its time to be chosen (see utils/calendar.js).
-export const newCalendarEvent = (date, title) => request("/api/calendar/new-event", json("POST", { date, title, ...here() }));
+export const newCalendarEvent = (date, title, until) => request("/api/calendar/new-event", json("POST", { date, title, ...(until ? { until } : {}), ...here() }));
 
 // The events of the day `date` ("YYYY-MM-DD", here: its bounds are sent with it) in the Google and
 // Apple calendars the server is given (see server/calendar.js): { configured, events, errors },

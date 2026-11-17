@@ -213,9 +213,12 @@
   border-right: 0;
 }
 
-/* A click on a day shows it in the scheduler; the day the scheduler shows is shaded. */
+/* A click on a day shows it in the scheduler; the day the scheduler shows is shaded. A double
+   click makes a new event on it, and a drag over days one of those days (neither must select
+   the numbers). */
 .day {
   cursor: pointer;
+  user-select: none;
 }
 
 .day[data-chosen="true"] {

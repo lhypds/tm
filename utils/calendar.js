@@ -12,7 +12,10 @@ const { execFile } = require('child_process');
 // key is pressed by System Events, which macOS allows only once the program that runs tm
 // (the terminal, node) is let control the computer (System Settings > Privacy & Security >
 // Accessibility); without it the event is still there, chosen in Calendar, and the error says
-// what to allow. argv: year, month, day, the minutes of its start in the day, its title.
+// what to allow. argv: year, month, day, the minutes of its start in the day, its title; then,
+// for an event of whole days (the days dragged over in the web UI's month), the year, month and
+// day of its last one: the event is then of all day, from the first day through that one (its end
+// is written as the last second of the last day, so that day is in it however Calendar counts).
 const NEW_EVENT_SCRIPT = `on run argv
   set d to current date
   set day of d to 1
@@ -24,7 +27,18 @@ const NEW_EVENT_SCRIPT = `on run argv
   tell application "Calendar"
     activate
     set cal to first calendar whose writable is true
-    set ev to make new event at end of events of cal with properties {summary:(item 5 of argv), start date:d, end date:d + 1 * hours}
+    if (count of argv) > 5 then
+      set time of d to 0
+      set e to current date
+      set day of e to 1
+      set year of e to (item 6 of argv) as integer
+      set month of e to (item 7 of argv) as integer
+      set day of e to (item 8 of argv) as integer
+      set time of e to 86399
+      set ev to make new event at end of events of cal with properties {summary:(item 5 of argv), start date:d, end date:e, allday event:true}
+    else
+      set ev to make new event at end of events of cal with properties {summary:(item 5 of argv), start date:d, end date:d + 1 * hours}
+    end if
     show ev
   end tell
   if wasRunning then
@@ -46,14 +60,16 @@ function startOf(date, now = new Date()) {
   return date === today ? Math.min(now.getHours() + 1, 23) * 60 : 9 * 60;
 }
 
-// Resolves once the event is made and open; rejects with what to show.
-function newEvent(date, title) {
+// Resolves once the event is made and open; rejects with what to show. With `until` (a day after
+// `date`, "YYYY-MM-DD") the event is of whole days, from `date` through it.
+function newEvent(date, title, until) {
   return new Promise((resolve, reject) => {
     if (process.platform !== 'darwin') {
       reject(new Error('Apple Calendar is on macOS only.'));
       return;
     }
-    execFile('osascript', ['-e', NEW_EVENT_SCRIPT, ...date.split('-'), String(startOf(date)), title], { timeout: 30 * 1000 }, (err, stdout, stderr) => {
+    const last = until && until > date ? until.split('-') : [];
+    execFile('osascript', ['-e', NEW_EVENT_SCRIPT, ...date.split('-'), String(startOf(date)), title, ...last], { timeout: 30 * 1000 }, (err, stdout, stderr) => {
       if (!err) resolve();
       else if (/1002|not allowed to send keystrokes|assistive/i.test(String(stderr))) reject(new Error('The event is in Calendar, but macOS did not let tm open it (cmd E): allow the program that runs it in System Settings > Privacy & Security > Accessibility.'));
       else reject(new Error(String(stderr).trim().split('\n').pop() || err.message));

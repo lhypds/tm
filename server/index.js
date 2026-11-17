@@ -495,7 +495,7 @@ app.use(createCalendarApp({
   calendars: config.getCalendars,
   log: (line) => console.error(line),
   // a new event for a browser on one of the machines: made there (see `here` in server/calendar.js)
-  newEventOn: (machine, date, title) => (isMachineLinked(machine) || syncApp.allMachines().some(m => m.name === machine) ? newEventOnMachine(machine, date, title) : null)
+  newEventOn: (machine, date, title, until) => (isMachineLinked(machine) || syncApp.allMachines().some(m => m.name === machine) ? newEventOnMachine(machine, date, title, until) : null)
 }));
 
 // The calendars themselves, for the dialog that adds and removes them (the pencil beside "Calendar"):

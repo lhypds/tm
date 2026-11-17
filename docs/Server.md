@@ -349,7 +349,7 @@ each event `{ id, title, location, allDay, start, end, source, calendar, color }
 `GET /api/calendars` the calendars as `taskmgr.json` lists them, for the dialog that adds and removes them: `{ calendars }`, each `{ name, type, url, color }`.  
 `PUT /api/calendars` `{ calendars }` replaces the list in `taskmgr.json` (an entry whose address is not an `https://`, `http://` or `webcal://` one is refused) and answers it as it is kept.
 
-`POST /api/calendar/new-event` `{ date, title, here? }` a new event of an hour on that day in Apple's Calendar (`utils/calendar.js`), which comes to the front with it open: on the server's machine (a Mac), or, with `here` (the machine the browser is on, see `GET /api/machine`) naming a machine in touch with this server, on that one, by its taskmgrd. `{ ok: true }`; 500 with the reason otherwise (not a Mac, the machine not connected, macOS not letting tm press the keys).
+`POST /api/calendar/new-event` `{ date, title, until?, here? }` a new event of an hour on that day in Apple's Calendar (`utils/calendar.js`), which comes to the front with it open (with `until`, a later day, an event of whole days from `date` through it): on the server's machine (a Mac), or, with `here` (the machine the browser is on, see `GET /api/machine`) naming a machine in touch with this server, on that one, by its taskmgrd. `{ ok: true }`; 500 with the reason otherwise (not a Mac, the machine not connected, macOS not letting tm press the keys).
 
 
 Sync

@@ -261,9 +261,10 @@ function startRunner({ server, token, machineId, log, warn, logFile, ai = true, 
         }
         case 'calendar': {
           const date = String(cmd.date || '');
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw httpError(400, 'Invalid day.');
-          await calendar(date, String(cmd.title || '').trim().slice(0, 200) || 'New Event');
-          log(`runner: new event on ${date} in Calendar for the server`);
+          const until = String(cmd.until || '');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || (until && !/^\d{4}-\d{2}-\d{2}$/.test(until))) throw httpError(400, 'Invalid day.');
+          await calendar(date, String(cmd.title || '').trim().slice(0, 200) || 'New Event', until);
+          log(`runner: new event on ${date}${until ? ` to ${until}` : ''} in Calendar for the server`);
           break;
         }
         default:

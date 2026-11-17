@@ -177,7 +177,7 @@ function MonthSelect({ month, onPick, onClose }) {
 // or null while it is not on screen) is shaded. The pencil at the right of the title adds and removes calendars (see
 // CalendarsModal), and the plus at its left makes a new event in Apple's Calendar (on the server's
 // machine, a Mac), open there for its time to be chosen, on the day the keyboard is on, else the one the scheduler shows,
-// else today (the first of another month); n does the same. The events are read again whenever `reloadKey` changes (the page's refresh,
+// else today (the first of another month); n does the same, and a double click on a day (anywhere but on an event of it) makes one on that day; a press on a day dragged to another makes one of whole days, from the first of the days dragged over (shaded meanwhile) through the last (esc lets it go). The events are read again whenever `reloadKey` changes (the page's refresh,
 // which reads the calendars anew) and every few minutes. While `focused` (the keyboard is on the
 // middle of the page) the title is shaded (and the row of the weekdays while h j k l move a day) and the keys are its own (`keysRef` is given them; each
 // answers true when it was one of them). The keyboard is in the month from the start, and whenever
@@ -249,6 +249,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
   const onWheel = (e) => {
     if (!e.deltaY || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
     e.preventDefault(); // not the events of the day under it too, which would scroll (see the listener)
+    if (dragging.current) return; // days are being dragged over
     const w = wheel.current;
     // A day every WHEEL_DAY px of it, as many as it turns: turned fast, the days go by fast.
     const at = Date.now();
@@ -337,14 +338,65 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
   useEffect(() => {
     if (eventId) chosenRef.current?.scrollIntoView({ block: "nearest" });
   }, [eventId]);
-  // A new event in Apple's Calendar (the plus of the bar, a): on the day the keyboard is on, else
-  // the one the scheduler shows, else today (the first of another month).
-  const addEvent = () => {
+  // A new event in Apple's Calendar (the plus of the bar, n): on `on` (the day double clicked),
+  // else the day the keyboard is on, else the one the scheduler shows, else today (the first of
+  // another month). With `until` (a later day: the days dragged over), one of whole days, from
+  // `on` through it.
+  const addEvent = (on, until) => {
     const inMonth = (day) => !!day && days.includes(day);
     const now1 = new Date();
-    const day = cursorShown || (inMonth(chosenDay) ? chosenDay : month.y === now1.getFullYear() && month.m === now1.getMonth() ? keyOf(now1) : keyOf(new Date(month.y, month.m, 1)));
-    api.newCalendarEvent(day, t("scheduler.newEventTitle")).catch((err) => showToast(err.message, 6000));
+    const day = on || cursorShown || (inMonth(chosenDay) ? chosenDay : month.y === now1.getFullYear() && month.m === now1.getMonth() ? keyOf(now1) : keyOf(new Date(month.y, month.m, 1)));
+    api.newCalendarEvent(day, t("scheduler.newEventTitle"), until).catch((err) => showToast(err.message, 6000));
   };
+  // The days dragged over: a press on a day (not on an event of it), held and moved onto another,
+  // shades the days from one to the other (`drag`, { from, to }), and letting go makes an event of
+  // those whole days (the scheduler then shows the first, where the keyboard is too); let go on the
+  // day it was pressed on, it is a click as any other, and esc lets the drag go. The day under the
+  // pointer is told from where it is over the grid (its weeks are as high as one another, as its
+  // days are wide): the bars of the events of several days are over the days.
+  const [drag, setDrag] = useState(null);
+  const dragging = useRef(null); // lets go of the drag that is going on, if any
+  useEffect(() => () => dragging.current?.(), []);
+  const startDrag = (from) => {
+    const weeks = days.length / 7;
+    const within = (n, max) => Math.min(max, Math.max(0, Math.floor(n)));
+    let to = from;
+    const onMove = (e) => {
+      const box = gridRef.current.getBoundingClientRect();
+      const day = days[within(((e.clientY - box.top) / box.height) * weeks, weeks - 1) * 7 + within(((e.clientX - box.left) / box.width) * 7, 6)];
+      if (day === to) return;
+      to = day;
+      setDrag({ from, to });
+    };
+    const stop = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("keydown", onKey, true);
+      dragging.current = null;
+      setDrag(null);
+    };
+    const onUp = () => {
+      stop();
+      if (to === from) return;
+      const [a, b] = from < to ? [from, to] : [to, from];
+      onDay?.(a);
+      setCursor(a);
+      setInDay(false);
+      onEvent?.(null);
+      addEvent(a, b);
+    };
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation(); // not the page's esc too
+      stop();
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("keydown", onKey, true);
+    dragging.current = stop;
+  };
+  const dragged = (day) => (drag.from < drag.to ? drag.from <= day && day <= drag.to : drag.to <= day && day <= drag.from);
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
@@ -506,7 +558,8 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
             style={{ gridRow: Math.floor(i / 7) + 1, gridColumn: (i % 7) + 1 }}
             data-other={d.getMonth() !== month.m}
             data-today={days[i] === today}
-            data-chosen={days[i] === shadedDay}
+            data-chosen={drag ? dragged(days[i]) : days[i] === shadedDay} // the days dragged over, while they are
+            onMouseDown={(e) => e.button === 0 && !e.target.closest("button") && startDrag(days[i])}
             // anywhere on the day but on an event of it, which shows itself; the keyboard is then
             // on that day, as after the keys came onto it
             onClick={(e) => {
@@ -515,6 +568,11 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
               setCursor(days[i]);
               setInDay(false);
               onEvent?.(null);
+            }}
+            // a double click there (its first click has chosen the day) makes a new event on it
+            onDoubleClick={(e) => {
+              if (e.target.closest("button")) return;
+              addEvent(days[i]);
             }}
           >
             <span className={styles.number}>{d.getDate()}</span>

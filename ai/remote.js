@@ -270,9 +270,10 @@ function openCode(machine, { work, repository }) {
 }
 
 // Have `machine` (a Mac) make an event named `title` on the day `date` ("YYYY-MM-DD") in its Apple
-// Calendar and bring it to the front, open (utils/calendar.js). Resolves once it is there.
-function newEvent(machine, date, title) {
-  return command(machine, { type: 'calendar', date, title }, CALENDAR_MS);
+// Calendar and bring it to the front, open (utils/calendar.js); with `until` (a later day), an
+// event of whole days, from `date` through it. Resolves once it is there.
+function newEvent(machine, date, title, until) {
+  return command(machine, { type: 'calendar', date, title, ...(until ? { until } : {}) }, CALENDAR_MS);
 }
 
 // A run as the machine tells it (its publicRun, items included in a snapshot), kept as this machine's.
