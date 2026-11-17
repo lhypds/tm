@@ -96,7 +96,7 @@
     "allOrigins": "すべての origin",
     "noOrigins": "taskmgr.json に origin がありません。",
     "openFolder": "フォルダを開く",
-    "programming": "プログラミング：ソースコードを VS Code で開く",
+    "programming": "VS Code で開く",
     "showHidden": "非表示の work を表示（{{count}}）"
   },
   "board": {
@@ -391,7 +391,7 @@
     "eventConfirmed": "確定",
     "eventFree": "予定なし",
     "calendars": "カレンダー設定",
-    "newEvent": "Apple カレンダーで新規イベント",
+    "newEvent": "新規イベント",
     "newEventTitle": "新規イベント",
     "addCalendar": "追加",
     "removeCalendar": "削除",

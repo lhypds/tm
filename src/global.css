@@ -286,17 +286,24 @@ p {
   pointer-events: none;
 }
 
-/* The tooltip of whatever has a `title` (see @utils/tooltip): one box under the pointer, over
-   everything, a title's lines kept as they are. */
+/* The tooltip of whatever has a `title` (see @utils/tooltip): one box over everything, a title's
+   lines kept as they are. It looks as the system's own tooltip does, not as the rest of the app:
+   the system font on a light grey, a thin grey edge, a soft shadow. */
 .tooltip {
   position: fixed;
+  left: 0;
+  top: 0;
   z-index: 10000;
   max-width: min(320px, calc(100vw - 8px));
   padding: 2px 6px;
-  border: var(--line) solid var(--border);
-  background: var(--bg);
+  border: var(--line) solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: #ececec;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  color: #262626;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.4;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   pointer-events: none;

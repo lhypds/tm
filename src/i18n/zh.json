@@ -96,7 +96,7 @@
     "allOrigins": "所有 origin",
     "noOrigins": "taskmgr.json 中没有 origin。",
     "openFolder": "打开文件夹",
-    "programming": "编程：在 VS Code 中打开源码",
+    "programming": "在 VS Code 中打开",
     "showHidden": "显示已隐藏的 work（{{count}}）"
   },
   "board": {
@@ -391,7 +391,7 @@
     "eventConfirmed": "已确认",
     "eventFree": "空闲",
     "calendars": "日历设置",
-    "newEvent": "在 Apple 日历中新建日程",
+    "newEvent": "新建日程",
     "newEventTitle": "新建日程",
     "addCalendar": "添加",
     "removeCalendar": "移除",

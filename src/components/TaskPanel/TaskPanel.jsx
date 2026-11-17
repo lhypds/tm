@@ -43,7 +43,8 @@ export default function TaskPanel({
   onFocused,
   onSave,
   onOpenFolder,
-  onCode, // (task): its repository's source code in VS Code; left out when it has none, and so is the button
+  canCode, // whether the task is a repository's with source code to open: the button is grey when not
+  onCode, // (task): its repository's source code in VS Code
   onDelete,
   onPreview,
   onDeleteFile,
@@ -100,22 +101,20 @@ export default function TaskPanel({
       <div className={styles.bar} data-focused={focused && section !== "prompt"}>
         <span className={styles.barTitle}>{t("panel.heading")}</span>
         <div className={styles.barActions}>
-          {onCode && (
-            <button
-              type="button"
-              className="btn"
-              tabIndex={-1}
-              disabled={!task}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                onCode(task);
-              }}
-              title={withKey(t("tree.programming"), "e")}
-              aria-label={t("tree.programming")}
-            >
-              <CodeIcon />
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn"
+            tabIndex={-1}
+            disabled={!task || !canCode}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onCode(task);
+            }}
+            title={withKey(t("tree.programming"), "e")}
+            aria-label={t("tree.programming")}
+          >
+            <CodeIcon />
+          </button>
           <button
             type="button"
             className="btn"

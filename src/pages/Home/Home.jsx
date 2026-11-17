@@ -2328,7 +2328,8 @@ export default function Home({ all = false }) {
               onFocused={() => setFocusing(null)}
               onSave={saveText}
               onOpenFolder={openFolder}
-              onCode={canCode(selected?.space) ? openTaskCode : undefined}
+              canCode={canCode(selected?.space)}
+              onCode={openTaskCode}
               onDelete={setConfirm}
               onPreview={(file) => selected && setPreview({ ...file, space: selected.space })}
               onDeleteFile={(file) => deleteFile(attachments, fileList, file, setFileRel)}

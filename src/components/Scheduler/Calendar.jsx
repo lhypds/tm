@@ -1,11 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { EditIcon, PlusIcon } from "@components/icons";
+import { PlusIcon } from "@components/icons";
 import { showToast } from "@ui";
 import * as api from "@utils/api";
 import { lightColor } from "@utils/colors";
 import { formatDateTime } from "@utils/task";
-import CalendarsModal from "./CalendarsModal";
 import EventModal from "./EventModal";
 import styles from "./calendar.module.css";
 
@@ -67,15 +66,12 @@ function place(events, from) {
 // back on the calendar itself, and k there, and esc, leave; space shows the event's details (see EventModal), as a
 // double click on an event does; a click on an event chooses it, and a press anywhere on the
 // timetable puts the keyboard on it (`onChoose()` tells the scheduler so).
-// The pencil at the right of the divider (as the one beside "Origins") opens the dialog that adds and removes calendars (see
-// CalendarsModal); the day is read anew once it has saved.
+// The calendars themselves are added and removed in the calendar view (see MonthCalendar).
 export default function Calendar({ date, reloadKey, loading, focused, keysRef, onChoose, chosenEvent, onEvent }) {
   const { t } = useTranslation();
   const [day, setDay] = useState(null); // { date, configured, events, errors } as read last
   const hoursRef = useRef(null);
-  const readKey = useRef(`${reloadKey}/0`);
-  const [editing, setEditing] = useState(false); // the calendars dialog is open
-  const [edits, setEdits] = useState(0); // how many times it saved
+  const readKey = useRef(reloadKey);
 
   useEffect(() => {
     let stale = false;
@@ -87,14 +83,14 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
         if (!stale) setDay({ date, configured: true, events: [], errors: [{ source: "", error: e.message }] });
       }
     };
-    read(readKey.current !== `${reloadKey}/${edits}`);
-    readKey.current = `${reloadKey}/${edits}`;
+    read(readKey.current !== reloadKey);
+    readKey.current = reloadKey;
     const id = setInterval(() => document.visibilityState === "visible" && read(false), READ_EVERY);
     return () => {
       stale = true;
       clearInterval(id);
     };
-  }, [date, reloadKey, edits]);
+  }, [date, reloadKey]);
 
   const shown = day?.date === date ? day : null;
   const events = shown?.events || [];
@@ -190,30 +186,9 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
           >
             <PlusIcon />
           </button>
-          <button
-            type="button"
-            className="btn"
-            tabIndex={-1}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              setEditing(true);
-            }}
-            title={t("scheduler.calendars")}
-            aria-label={t("scheduler.calendars")}
-          >
-            <EditIcon />
-          </button>
         </span>
       </div>
       <EventModal event={looked} onClose={() => setLooked(null)} />
-      <CalendarsModal
-        isOpen={editing}
-        onClose={() => setEditing(false)}
-        onSaved={() => {
-          setEditing(false);
-          setEdits((n) => n + 1);
-        }}
-      />
       {/* what is under the divider is one box, half the pane with the page: the events of whole
           days (and what could not be read) take their room from the hours, not from the page */}
       <div className={styles.body} onMouseDown={() => onChoose?.()}>

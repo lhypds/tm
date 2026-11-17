@@ -4,8 +4,9 @@
 //
 // The element under the pointer that has a `title` (the nearest one, as the browser takes it) loses
 // the attribute while the pointer is in it, which is what keeps the browser's tooltip away, and
-// gets it back when the pointer leaves; meanwhile the text is kept in `data-tip`. The box comes up
-// under the pointer a moment after it came in, at once when another tooltip was up just before.
+// gets it back when the pointer leaves; meanwhile the text is kept in `data-tip`. The box, which
+// looks as the system's tooltip does, comes up a moment after the pointer came in, at once when
+// another tooltip was up just before.
 // A key, a scroll or the window losing focus takes it away until the pointer moves again; a press
 // on the element takes it away until the pointer has left.
 //
@@ -15,6 +16,9 @@ const DELAY = 500; // from the pointer coming in to the tooltip
 const WARM = 300; // after a tooltip went, the next one comes at once for this long
 const BELOW = 20; // from the pointer down to the box: the height of the cursor
 const ABOVE = 8; // from the box down to the pointer, where there is no room below
+const SMALL_W = 240; // an element no bigger than this has its tooltip under itself, not the pointer
+const SMALL_H = 48;
+const GAP = 6; // between such an element and the box
 const EDGE = 4; // kept between the box and the window's edge
 
 export function installTooltips() {
@@ -29,11 +33,18 @@ export function installTooltips() {
   let x = 0;
   let y = 0;
 
+  // A small element (a button, a name) has its tooltip in one place, whatever spot of it the pointer
+  // is on: centered under it, above it where there is no room below. Anything bigger (a row, a
+  // card) has it under the pointer, as the browser's is.
   const place = () => {
     const { width, height } = box.getBoundingClientRect();
-    const left = Math.max(EDGE, Math.min(x, window.innerWidth - width - EDGE));
-    const top = y + BELOW + height > window.innerHeight - EDGE ? y - ABOVE - height : y + BELOW;
-    box.style.left = `${Math.round(left)}px`;
+    const r = current.getBoundingClientRect();
+    const small = r.width <= SMALL_W && r.height <= SMALL_H;
+    const left = small ? r.left + (r.width - width) / 2 : x;
+    const below = small ? r.bottom + GAP : y + BELOW;
+    const above = (small ? r.top - GAP : y - ABOVE) - height;
+    const top = below + height > window.innerHeight - EDGE ? above : below;
+    box.style.left = `${Math.round(Math.max(EDGE, Math.min(left, window.innerWidth - width - EDGE)))}px`;
     box.style.top = `${Math.round(Math.max(EDGE, top))}px`;
   };
 

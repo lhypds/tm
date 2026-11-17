@@ -96,7 +96,7 @@
     "allOrigins": "All origins",
     "noOrigins": "No origins in taskmgr.json.",
     "openFolder": "Open folder",
-    "programming": "Programming: open the source code in VS Code",
+    "programming": "Open in VS Code",
     "showHidden": "Show hidden works ({{count}})"
   },
   "board": {
@@ -391,7 +391,7 @@
     "eventConfirmed": "Confirmed",
     "eventFree": "Free",
     "calendars": "Calendars",
-    "newEvent": "New event in Apple Calendar",
+    "newEvent": "New event",
     "newEventTitle": "New Event",
     "addCalendar": "Add",
     "removeCalendar": "Remove",
