@@ -232,7 +232,7 @@
     },
     "scheduler": {
       "keys": "t",
-      "desc": "swap the right pane between the task and the scheduler (on it: j / k choose a task, space / enter open it, e / i write)"
+      "desc": "swap the right pane between the task and the scheduler (its text is edited as in vim: h j k l move, i / a type, esc goes back; on a task, space / enter open it and x removes it)"
     },
     "machines": {
       "keys": "r",

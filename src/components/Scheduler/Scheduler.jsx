@@ -90,6 +90,34 @@ function caretRows(el) {
   return rows;
 }
 
+// Where the caret before the character at `p` of the text box `el` is drawn, in the box's parent:
+// { left, top, height }. Measured in a hidden copy, as lineHeights does.
+function caretBox(el, p) {
+  const cs = getComputedStyle(el);
+  const copy = document.createElement("div");
+  Object.assign(copy.style, {
+    position: "absolute",
+    visibility: "hidden",
+    left: "0",
+    top: "0",
+    width: `${el.clientWidth}px`,
+    fontFamily: cs.fontFamily,
+    fontSize: cs.fontSize,
+    fontWeight: cs.fontWeight,
+    letterSpacing: cs.letterSpacing,
+    lineHeight: cs.lineHeight,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+  });
+  const at = document.createElement("span");
+  at.textContent = "\u200b";
+  copy.append(el.value.slice(0, p), at, `${el.value.slice(p)}\u200b`);
+  el.parentNode.appendChild(copy);
+  const box = { left: el.offsetLeft + at.offsetLeft, top: el.offsetTop + at.offsetTop, height: at.offsetHeight };
+  copy.remove();
+  return box;
+}
+
 // A run of the page's text, between two cards (or an end of the page): as tall as what is in it,
 // so the page scrolls, not the text. `fill` is the last one, which takes what is left of the page.
 function Lines({ value, fill, ...props }) {
@@ -110,9 +138,10 @@ function Lines({ value, fill, ...props }) {
 // the line it was dropped on, the text flowing around it: the lines above it stay above, the rest
 // go under it, and close up again when it is dragged to another line (a line across the page shows
 // where it would go). A click on a card opens the task (`onOpen(entry)`), its × takes it off the
-// day. The page is edited as a document with pictures in it: the arrows walk the caret from the
-// text onto a card and off it again, backspace and delete take a card off the day (see `cross` and
-// the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere).
+// day. The text is edited as in vim, in a NORMAL and an INSERT mode (see
+// `normalKey`), the cards being stops on the way: j / k (the arrows, while typing) walk the cursor
+// from the text onto a card and off it again, and backspace, delete and x take a card off the day
+// (see `cross` and the page's keys, which `keysRef` is given). `focused` says the keyboard is on this pane (its bar is shaded, as the task panel's is). The day is read again whenever `reloadKey` changes (a task renamed or deleted elsewhere).
 // See server/scheduler.js for what is kept.
 export default function Scheduler({ tasks, works, origins, reloadKey, focused, keysRef, onOpen }) {
   const { t, i18n } = useTranslation();
@@ -224,10 +253,10 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   blocks.push({ from: at, to: lines.length, before: cards.length, last: true });
 
   // A run typed in: its lines replace those it had, and the cards under it move with the text.
-  const type = (block, value) => {
-    // typing is one change until it pauses for a second
+  const type = (block, value, recorded = false) => {
+    // typing is one change until it pauses for a second (`recorded`: the caller recorded it)
     const now = Date.now();
-    if (now - typedAt.current > 1000) record();
+    if (!recorded && now - typedAt.current > 1000) record();
     typedAt.current = now;
     const typed = block.from === block.to && value === "" ? [] : value.split("\n");
     const next = [...lines.slice(0, block.from), ...typed, ...lines.slice(block.to)];
@@ -240,7 +269,109 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
 
   // Up on the first character of a run goes to the end of the run above the card, down on the last
   // one to the start of the run under it.
-  // The keys of a run of the text. The page is edited as a document with pictures in it is: the
+  // The text is edited as in vim, in two modes. NORMAL: the
+  // keys move the cursor (the caret, before its character) and nothing is typed: h and
+  // l along the line, j and k to the line under and above (off the run onto the card beside it,
+  // see below), 0 and $ to the ends of the line; i and a start typing before and after the cursor,
+  // I and A at the ends of the line, o and O on a new line under and above; x deletes the
+  // character, u undoes; esc leaves the text (h / l are then the page's again). INSERT: the keys
+  // type, esc is back to NORMAL. The arrows do as h j k l in NORMAL. A click in the text types.
+  const [mode, setModeState] = useState("normal");
+  const modeRef = useRef("normal"); // the mode now, for what runs before the next render
+  const setMode = (m) => {
+    modeRef.current = m;
+    setModeState(m);
+  };
+  // The NORMAL cursor before the character at `p` of a text box: the box's own caret goes there,
+  // unseen (it blinks), and a line that does not blink is drawn in its place (`cursorBox`, see
+  // caretBox), following whatever moves the text (see below).
+  const [cursorBox, setCursorBox] = useState(null);
+  const [inText, setInText] = useState(false); // the keyboard is in the text
+  const block1 = (el, p) => {
+    const at = Math.max(0, Math.min(p, el.value.length));
+    el.setSelectionRange(at, at);
+    setCursorBox(caretBox(el, at));
+  };
+  useLayoutEffect(() => {
+    const el = document.activeElement;
+    const box = modeRef.current === "normal" && el?.tagName === "TEXTAREA" && pageRef.current?.contains(el) ? caretBox(el, el.selectionStart) : null;
+    setCursorBox((was) => (JSON.stringify(was) === JSON.stringify(box) ? was : box));
+  });
+  // Where the cursor goes once an edit made in NORMAL mode is on the page: { block, pos, insert }.
+  const cursorTo = useRef(null);
+  useLayoutEffect(() => {
+    const to = cursorTo.current;
+    if (!to) return;
+    cursorTo.current = null;
+    const el = pageRef.current?.querySelector(`textarea[data-block="${to.block}"]`);
+    if (!el) return;
+    el.focus();
+    if (to.insert) el.setSelectionRange(to.pos, to.pos);
+    else block1(el, to.pos);
+  });
+  const normalKey = (e, at) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // cmd + s and the like
+    const el = e.currentTarget;
+    const k = { ArrowLeft: "h", ArrowRight: "l", ArrowUp: "k", ArrowDown: "j" }[e.key] || e.key;
+    if (k === "Escape") {
+      e.preventDefault();
+      el.blur();
+      return;
+    }
+    if (k.length !== 1 && !["Backspace", "Delete", "Enter"].includes(k)) return; // tab and the like
+    e.preventDefault(); // nothing is typed
+    const v = el.value;
+    const p = Math.min(el.selectionStart, v.length);
+    const start = v.lastIndexOf("\n", p - 1) + 1; // of the cursor's line
+    const end = v.indexOf("\n", p) < 0 ? v.length : v.indexOf("\n", p); // its line break, or the end
+    const col = p - start;
+    const last = (from, to) => Math.max(from, to - 1); // the last character of a line
+    const block = blocks[at];
+    const above = blocks[at - 1]?.card;
+    const under = blocks[at + 1]?.card;
+    const choose = (card) => {
+      setChosen(cardKey(card));
+      el.blur();
+    };
+    const insert = (pos) => {
+      setMode("insert");
+      el.setSelectionRange(pos, pos);
+    };
+    const edit = (value, pos, typing) => {
+      record();
+      cursorTo.current = { block: at, pos, insert: typing };
+      if (typing) setMode("insert");
+      type(block, value, true);
+    };
+    if (k === "h") block1(el, Math.max(start, p - 1));
+    else if (k === "l") block1(el, Math.min(last(start, end), p + 1));
+    else if (k === "0") block1(el, start);
+    else if (k === "$") block1(el, last(start, end));
+    else if (k === "j") {
+      if (end < v.length) {
+        const to = v.indexOf("\n", end + 1) < 0 ? v.length : v.indexOf("\n", end + 1);
+        block1(el, Math.min(end + 1 + col, last(end + 1, to)));
+      } else if (under) choose(under);
+    } else if (k === "k") {
+      if (start > 0) {
+        const from = v.lastIndexOf("\n", start - 2) + 1;
+        block1(el, Math.min(from + col, last(from, start - 1)));
+      } else if (above) choose(above);
+    } else if (k === "i") insert(p);
+    else if (k === "a") insert(end > start ? p + 1 : p);
+    else if (k === "I") insert(start);
+    else if (k === "A") insert(end);
+    else if (k === "o") edit(`${v.slice(0, end)}\n${v.slice(end)}`, end + 1, true);
+    else if (k === "O") edit(`${v.slice(0, start)}\n${v.slice(start)}`, start, true);
+    else if (k === "x") {
+      if (p < end) edit(v.slice(0, p) + v.slice(p + 1), Math.min(p, last(start, end - 1)), false);
+    } else if (k === "u") {
+      cursorTo.current = { block: at, pos: p, insert: false }; // the cursor stays about where it was
+      travel(history, undone);
+    }
+  };
+
+  // The keys of a run of the text while typing (INSERT). The page is edited as a document with pictures in it is: the
   // caret walks off the run onto the card beside it, which is then chosen (the text loses the
   // caret, and the page's keys below go on from the card): up on the first row and left at the very
   // start for the card above, down on the last row and right at the very end for the card under
@@ -251,9 +382,13 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   const cross = (e, at) => {
     const el = e.currentTarget;
     if (e.nativeEvent.isComposing || e.keyCode === 229) return; // an input method's own keys
+    if (modeRef.current === "normal") return normalKey(e, at);
     if (e.key === "Escape") {
+      // insert -> normal, the cursor on the character before the caret, as in vim
       e.preventDefault();
-      el.blur();
+      const p = el.selectionStart;
+      setMode("normal");
+      block1(el, Math.max(el.value.lastIndexOf("\n", p - 1) + 1, p - 1));
       return;
     }
     if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || el.selectionStart !== el.selectionEnd) return;
@@ -393,14 +528,44 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   const [chosen, setChosen] = useState(null);
   const chosenIndex = cards.findIndex((c) => cardKey(c) === chosen);
   const backTo = useRef(null);
-  const caretTo = (blockIndex, line) => {
+  // The cursor into a run of the text, on `line` of the page (past the run's last line: its end)
+  // at `col`: a caret while typing, the NORMAL cursor else.
+  const caretTo = (blockIndex, line, col = 0) => {
     const el = pageRef.current?.querySelector(`textarea[data-block="${blockIndex}"]`);
     if (!el) return;
     const block = blocks[blockIndex];
-    const at = Math.min(lines.slice(block.from, line).reduce((n, l) => n + l.length + 1, 0), el.value.length);
+    const start = Math.min(lines.slice(block.from, line).reduce((n, l) => n + l.length + 1, 0), el.value.length);
+    const length = line < block.to ? lines[line].length : 0;
     el.focus();
-    el.setSelectionRange(at, at);
+    if (modeRef.current === "insert") el.setSelectionRange(start + Math.min(col, length), start + Math.min(col, length));
+    else block1(el, start + Math.max(0, Math.min(col, length - 1)));
   };
+  // Where the cursor was when the text lost it ({ line, col }), for the keys that go back in.
+  const spot = useRef({ line: 0, col: 0 });
+  const leave = (e, block) => {
+    const before = e.currentTarget.value.slice(0, e.currentTarget.selectionStart).split("\n");
+    spot.current = { line: block.from + before.length - 1, col: before[before.length - 1].length };
+    flush();
+  };
+  // Into the text where the cursor was, in mode `m` (`after`: one character on, as vim's a).
+  const enter = (m, after = 0) => {
+    setChosen(null);
+    setMode(m);
+    const line = Math.min(spot.current.line, lines.length - 1);
+    caretTo(
+      blocks.findIndex((b) => !b.card && line >= b.from && (b.last || line < b.to)),
+      line,
+      spot.current.col + after,
+    );
+  };
+  // The keyboard coming onto the pane (l from the list, t) goes straight into the text, in NORMAL
+  // mode; a click does not (it lands where it lands).
+  const pressedAt = useRef(0);
+  useEffect(() => {
+    if (!focused || !loaded || Date.now() - pressedAt.current < 500) return;
+    if (sectionRef.current?.contains(document.activeElement)) return;
+    enter("normal");
+  }, [focused, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const back = backTo.current;
     if (!back) return;
@@ -416,58 +581,59 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   }, [chosen, chosenIndex]);
 
   // The page's keys, as Home names them, while the keyboard is on the pane and not in the text;
-  // true when the key was one of them. j / k walk the cards. On a card, up and left go back into
-  // the text above it (its end), down and right into the text under it (its start), or on to the
-  // next card when there is no text between; backspace and delete take the card off the day, space
-  // and enter open its task, esc lets it go. e and i (enter too, with no card chosen) put the caret
-  // at the end of the text.
+  // true when the key was one of them. With no card chosen (esc left the text): j, k and enter go
+  // back into the text in NORMAL mode, i (or e) and a typing, where the cursor was; h and l are
+  // the page's (to the pane beside). On a card (j / k and the arrows get there from the text): k,
+  // up and left go into the text above it, j, down and right into the text under it, or on to the
+  // next card when there is no text between, in the mode the text was left in; backspace, delete
+  // and x take the card off the day, space and enter open its task, esc lets it go.
   useEffect(() => {
     if (!keysRef) return undefined;
     keysRef.current = (name) => {
       const card = cards[chosenIndex];
-      const step = ["j", "down", "right"].includes(name) ? 1 : ["k", "up", "left"].includes(name) ? -1 : 0;
-      if (step && !card) {
-        if (["left", "right"].includes(name)) return false; // the page's: to the pane beside
-        if (cards.length) setChosen(cardKey(cards[step > 0 ? 0 : cards.length - 1])); // j starts at the first card, k at the last
+      if (!card) {
+        if (["j", "k", "enter", "down", "up"].includes(name)) enter("normal");
+        else if (["i", "e"].includes(name)) enter("insert");
+        else if (name === "a") enter("insert", 1);
+        else return false;
         return true;
       }
+      const step = ["j", "down", "right"].includes(name) ? 1 : ["k", "up", "left"].includes(name) ? -1 : 0;
       if (step) {
         const at = blocks.findIndex((b) => b.card === card);
         const beside = blocks[at + step];
-        if (!["j", "k"].includes(name) && beside && !beside.card) {
+        if (beside && !beside.card) {
           setChosen(null);
-          caretTo(at + step, step > 0 ? beside.from : beside.to); // past its last line: the end
+          // under the card: the first line; above it: the last line (its end, while typing)
+          if (step > 0) caretTo(at + step, beside.from);
+          else if (modeRef.current === "insert") caretTo(at + step, beside.to);
+          else caretTo(at + step, Math.max(beside.from, beside.to - 1));
         } else {
           const next = cards[chosenIndex + step];
           if (next) setChosen(cardKey(next));
         }
         return true;
       }
-      if (card && ["space", "enter"].includes(name)) {
+      if (["space", "enter"].includes(name)) {
         if (!card.missing) onOpen(card);
         return true;
       }
-      if (card && name === "escape") {
+      if (name === "escape") {
         setChosen(null);
         return true;
       }
-      if (["backspace", "Delete"].includes(name)) {
-        if (!card) return false;
+      if (["backspace", "Delete", "x"].includes(name)) {
         backTo.current = { key: cardKey(card), line: card.line };
         remove(card);
         return true;
       }
-      if (["e", "i", "enter"].includes(name)) {
-        setChosen(null);
-        caretTo(blocks.length - 1, lines.length);
-        return true;
-      }
-      return false;
+      return ["i", "a", "e"].includes(name); // nothing to type on a card
     };
     return () => {
       keysRef.current = null;
     };
   });
+
 
   // cmd / ctrl + s, in the text or with the keyboard on the pane, writes the page as it is now (the
   // text and where the cards sit) and says so; cmd / ctrl + z and its redo go through the page's
@@ -507,7 +673,14 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
   const isToday = date === today();
 
   return (
-    <section ref={sectionRef} className={styles.scheduler} aria-label={t("scheduler.title")}>
+    <section
+      ref={sectionRef}
+      className={styles.scheduler}
+      aria-label={t("scheduler.title")}
+      onMouseDownCapture={() => {
+        pressedAt.current = Date.now();
+      }}
+    >
       <div className={styles.bar} data-focused={focused}>
         <h2 className={styles.barTitle}>{t("scheduler.title")}</h2>
       </div>
@@ -530,6 +703,9 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
       <div
         ref={pageRef}
         className={styles.page}
+        data-mode={mode}
+        onFocus={(e) => e.target.tagName === "TEXTAREA" && setInText(true)}
+        onBlur={(e) => e.target.tagName === "TEXTAREA" && setInText(false)}
         onDragOver={(e) => {
           if (!isOurs(e)) return;
           e.preventDefault();
@@ -584,13 +760,17 @@ export default function Scheduler({ tasks, works, origins, reloadKey, focused, k
               value={lines.slice(block.from, block.to).join("\n")}
               readOnly={!loaded}
               aria-label={t("scheduler.notes")}
-              onChange={(e) => type(block, e.target.value)}
+              // nothing is typed in NORMAL mode, by an input method or a paste either
+              onBeforeInput={(e) => modeRef.current === "normal" && e.preventDefault()}
+              onChange={(e) => modeRef.current === "insert" && type(block, e.target.value)}
               onKeyDown={(e) => cross(e, i)}
-              onBlur={flush}
+              onMouseDown={() => setMode("insert")} // a click in the text types
+              onBlur={(e) => leave(e, block)}
             />
           ),
         )}
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
+        {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
     </section>
   );

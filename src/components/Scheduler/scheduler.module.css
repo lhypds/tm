@@ -222,3 +222,16 @@
   background: var(--faint);
   pointer-events: none;
 }
+
+/* In NORMAL mode the text box's own caret, which blinks, is not shown: the cursor is a line drawn
+   where it is, steady. */
+.page[data-mode="normal"] .text {
+  caret-color: transparent;
+}
+
+.cursor {
+  position: absolute;
+  width: var(--line);
+  background: var(--fg);
+  pointer-events: none;
+}

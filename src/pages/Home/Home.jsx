@@ -1519,6 +1519,10 @@ export default function Home({ all = false }) {
       if (selected && pane !== "tree") enterTask(selected);
       return true;
     }
+    // On the scheduler (h / l get there as they get to the task panel) its keys come first: those
+    // that go into its text, and those of one of its tasks while it is chosen (see Scheduler). The
+    // rest are the page's, and the selected task's, as on the list.
+    if (pane === "detail" && scheduler && schedulerKeys.current?.(name)) return true;
     if (name === "cmd+up") {
       if (!data.isRoot) goUp();
       return true;
@@ -1527,8 +1531,6 @@ export default function Home({ all = false }) {
     // above, then from a repository to its work, from a work to its origin, and from an origin (or
     // a work without one) to "All origins", where it stops.
     if (name === "backspace") {
-      // on the scheduler, with one of its tasks chosen, it takes that task off the day
-      if (pane === "detail" && scheduler && schedulerKeys.current?.(name)) return true;
       if (!data.isRoot) goUp();
       else if (repository) selectSpace(api.spacePath(origin, work));
       else if (work && origin) selectSpace(api.originPath(origin));
@@ -1584,9 +1586,6 @@ export default function Home({ all = false }) {
       openCreator(view === "board" && boardStatuses.includes(pane) ? pane : "todo");
       return true;
     }
-    // on the scheduler with one of its tasks chosen, the arrows step off it into the text and
-    // delete takes it off the day (see Scheduler); with none chosen they are the page's keys
-    if (pane === "detail" && scheduler && ["left", "right", "Delete"].includes(name) && schedulerKeys.current?.(name)) return true;
     // esc drops the selection, so the next a / n adds a task at the top, not a subtask
     if (name === "escape" && selected && pane !== "detail") {
       unselectAll();
@@ -1598,12 +1597,7 @@ export default function Home({ all = false }) {
     }
     if (pane === "tree") return treeKey(name);
 
-    // On the scheduler (h / l get there as they get to the task panel) j / k walk the day's tasks,
-    // space or enter opens the one chosen, and e and i put the caret in the day's text (see
-    // Scheduler); the other keys are the selected task's, as on the list.
-    if (pane === "detail" && scheduler) {
-      if (schedulerKeys.current?.(name)) return true;
-    } else if (pane === "detail") {
+    if (pane === "detail" && !scheduler) {
       // j / k walk the attachments; with the prompt shown, the task's text first, then its prompt
       // and the run records listed under it last, as the panel shows them, so the keyboard moves
       // from the text (where enter, e and i put the caret) down through the attachments to the
