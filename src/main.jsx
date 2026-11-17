@@ -4,6 +4,7 @@ import "ress";
 import "./global.css";
 import "./i18n/index.js";
 import App from "./App.jsx";
+import { installTooltips } from "@utils/tooltip";
 
 // cmd / ctrl + s never opens the browser's "save page" dialog: where there is something to save
 // (a task's text, a file being edited) it saves that, and anywhere else it does nothing. The
@@ -11,6 +12,9 @@ import App from "./App.jsx";
 window.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "s") e.preventDefault();
 });
+
+// Every `title` in the page is shown by the app's own tooltip (see @utils/tooltip).
+installTooltips();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
