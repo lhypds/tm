@@ -218,7 +218,7 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "编辑任务的 prompt（在面板中，或在任务窗口按 esc 离开输入框之后）"
+      "desc": "显示任务的 prompt 并移到它上面，再按隐藏（在面板中，或在任务窗口按 esc 离开输入框之后）；enter 或 e 编辑"
     },
     "run": {
       "keys": "prompt 中 ⌘ / ctrl + enter；任务窗口中 r",

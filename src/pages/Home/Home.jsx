@@ -1679,14 +1679,17 @@ export default function Home({ all = false }) {
       setMachinesOpen(true);
       return true;
     }
-    // g shows the selected task's prompt in the panel and puts the caret in it, and hides it again (cmd/ctrl+enter
-    // in the prompt saves and runs it, see TaskPanel; m opens Machines Run here)
+    // g shows the selected task's prompt in the panel with the keyboard on it (not edited: enter
+    // puts the caret in it), and hides it again (cmd/ctrl+enter in the prompt saves and runs it,
+    // see TaskPanel; m opens Machines Run here)
     if (name === "g" || name === "G") {
-      if (promptOpen) showPrompt(false); // again (once esc left the prompt): hidden
+      if (promptOpen) showPrompt(false); // again: hidden
       else if (selected) {
         showPrompt(true);
         selectSection("prompt");
-        openEditor(selected, "prompt");
+        setScheduler(false); // the panel is back in place of the scheduler
+        setDetailOpen(true);
+        setPane("detail");
       }
       return true;
     }

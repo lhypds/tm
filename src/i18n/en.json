@@ -218,7 +218,7 @@
     },
     "promptEdit": {
       "keys": "g",
-      "desc": "edit the task's prompt (in the panel, or in the task dialog once esc left the text)"
+      "desc": "show the task's prompt and move to it, hide it again (in the panel, or in the task dialog once esc left the text); enter or e edits it"
     },
     "run": {
       "keys": "⌘ / ctrl + enter in the prompt; r in the task dialog",

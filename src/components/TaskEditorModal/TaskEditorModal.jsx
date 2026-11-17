@@ -50,7 +50,7 @@ function HeaderButton({ label, keys, dot, pressed, onClick, children }) {
 // what was typed is dropped), and the page's keys then work, handed over by Home through `keysRef`
 // (keysRef.current(name) says whether it used the key): j / k walk the task's text, the prompt
 // (when shown) and the attachments (onSelectRel(rel)), the one chosen shaded; e / i put the caret
-// in the text chosen; g shows the prompt and puts the caret in it, and hides it again; r (and cmd/ctrl+enter
+// in the text chosen; g shows the prompt and chooses it, and hides it again; r (and cmd/ctrl+enter
 // with the caret in the prompt) saves and executes, as the
 // button does (or shows the task's run, `run`, through onRun(task) while one is going; not while
 // `noRunner` says the task cannot run). On
@@ -131,12 +131,14 @@ export default function TaskEditorModal({
     onSelectRel?.(null);
   };
 
-  // The caret goes to the prompt when it is shown; hidden, back to a new task's text.
+  // The prompt is chosen when it is shown, not edited (e / i put the caret in it), unless the
+  // caret is in the task's text, which keeps it; hidden, the caret is back in a new task's text.
   function showPrompt(open) {
     setPromptOpen(open);
     if (task) onPromptOpen?.(open);
-    if (open) focusText("prompt");
-    else {
+    if (open) {
+      if (document.activeElement !== textRef.current) choose("prompt");
+    } else {
       setSection((s) => (s === "prompt" ? "task" : s));
       if (!task) focusText("task");
     }
@@ -191,7 +193,7 @@ export default function TaskEditorModal({
       return true;
     }
     if (name === "g") {
-      showPrompt(!promptOpen); // shown, with the caret in it; again (once esc left it), hidden
+      showPrompt(!promptOpen); // shown and chosen; again, hidden
       return true;
     }
     if (name === "r") {
