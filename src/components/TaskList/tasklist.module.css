@@ -24,6 +24,9 @@
   /* the sticky header (24px and its line) covers the top of the pane: a row scrolled into view
      stops under it, not behind it */
   scroll-margin-top: calc(24px + var(--line));
+  /* and above the pane's lower edge, by the table's bottom padding: the last row scrolled into
+     view keeps that gap under it */
+  scroll-margin-bottom: 12px;
 }
 
 .row > div {
