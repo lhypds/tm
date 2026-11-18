@@ -24,7 +24,9 @@
 // pushed has its text. A file right in the tasks folder, or in a status folder, and a folder there
 // named some other way are not tasks: not pushed, not looked at. The server brings its copy to the
 // snapshot, so after a push its copy is the tasks as they are here, and a renamed, moved or deleted
-// task or attachment is mirrored too. Lock and cache files (.DS_Store, ~$ Office locks, ...; see isSyncSkipped) are left out, and files over 5 MB and
+// task or attachment is mirrored too; but for the tasks not changed here since the last sync, which
+// stay as they are on the server (changed there or not: see baseOf, and "what the pushing machine
+// did not change" in server/sync.js), for the pull to bring. Lock and cache files (.DS_Store, ~$ Office locks, ...; see isSyncSkipped) are left out, and files over 5 MB and
 // folders over 10 MB or with more than 10 files (never a task folder itself) are not pushed. A tasks folder that does not exist
 // is left as it is on the server.
 // More threads for the file system calls, which go out side by side (see snapshot); must be set
@@ -405,6 +407,23 @@ async function mergeSpace(space, entries) {
   return tasks.size;
 }
 
+// What was last synced of a space (see server/syncstate.js), sent with its push so the server can
+// tell the tasks changed here from those that were not, and leave these as they are there: what is
+// here wins over a change made there, but a task not touched here must not undo one. A path that
+// is still here but not in the snapshot (a file too large to push) is left out, as it is from the
+// snapshot: it is not a deletion. {} for a space never synced: every task is then one changed here.
+function baseOf(space, entries) {
+  let known = null;
+  try { known = syncState.get(spaceKey(space)); } catch (e) { /* unreadable: as never synced */ }
+  if (!known) return {};
+  const pushed = new Set(entries.map(e => e.path));
+  const base = {};
+  for (const p of Object.keys(known)) {
+    if (pushed.has(p) || !space.root || !fs.existsSync(path.join(space.root, ...p.split('/')))) base[p] = known[p];
+  }
+  return base;
+}
+
 // Push one space's snapshot (see snapshot); resolves to the line to log about it. A folder the
 // server has tasks of its own in is merged with them first (see mergeSpace), then pushed as it is
 // after that (`merged`: how many tasks the merge brought, when this is that push).
@@ -430,7 +449,7 @@ async function pushSpace(space, { entries, blobs }, merged = null) {
     const { missing } = await request('POST', '/api/sync/blobs', { blobs: [...blobs.keys()] });
     await upload(missing);
   }
-  const body = { origin: space.origin, work: space.work, repository: space.repository, machine: MACHINE_ID, entries, ...(merged === null ? {} : { merged: true }) };
+  const body = { origin: space.origin, work: space.work, repository: space.repository, machine: MACHINE_ID, entries, base: baseOf(space, entries), ...(merged === null ? {} : { merged: true }) };
   let result;
   try {
     result = await request('PUT', '/api/sync/space', body);
@@ -443,10 +462,10 @@ async function pushSpace(space, { entries, blobs }, merged = null) {
     await upload(e.missing);
     result = await request('PUT', '/api/sync/space', body);
   }
-  const { files, dirs } = result;
+  const { files, dirs, left } = result;
   try { syncState.set(spaceKey(space), syncState.manifestOf(entries)); } catch (e) { warn(`could not record the sync state: ${e.message}`); }
   const n = (count, what) => `${count} ${what}${count === 1 ? '' : 's'}`;
-  return `${merged === null ? '' : `merged ${label(space)} with the server's (${n(merged, 'task')} brought here); `}pushed ${label(space)} (${n(files, 'file')}${dirs ? `, ${n(dirs, 'empty folder')}` : ''}${uploaded ? `, ${n(uploaded, 'attachment')} uploaded` : ''})`;
+  return `${merged === null ? '' : `merged ${label(space)} with the server's (${n(merged, 'task')} brought here); `}pushed ${label(space)} (${n(files, 'file')}${dirs ? `, ${n(dirs, 'empty folder')}` : ''}${uploaded ? `, ${n(uploaded, 'attachment')} uploaded` : ''}${left ? `; ${n(left, 'task')} not changed here left as on the server` : ''})`;
 }
 
 // ---------- the scheduler ----------
@@ -499,9 +518,8 @@ module.exports = { scheduler, schedulerChanged, pushScheduler, SERVER, TOKEN, MA
 
 // ---------- tm push ----------
 
-// Push taskmgr.json, then every tasks folder, whatever the server says it has: a change made on the
-// server since the last push leaves it a folder that is not the one pushed, which only a push
-// mends (the attachments it has are not sent again). Exit with an error at the first push that fails;
+// Push taskmgr.json, then every tasks folder, whatever the server says it has (the attachments it
+// has are not sent again; a task changed on the server and not here stays as it is there, see baseOf). Exit with an error at the first push that fails;
 // a folder the server refuses as synced by enough other machines already is told and skipped, and
 // the run ends with an error once the others are pushed.
 // The start and the end of the run go to the sync log, as does each folder pushed (see syncLog).

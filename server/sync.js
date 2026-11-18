@@ -41,7 +41,9 @@
 //   PUT /api/sync/blob/<sha1>   (the raw file)               -> { ok }
 //       stores one file by the sha1 of its content; refused when the content does not hash to it.
 //   PUT /api/sync/space   { origin, work, repository, machine, entries }  -> { ok, files, dirs }
-//       brings one space's folder to the snapshot (tasks that changed status moved first): entries are [{ path, content }] for task
+//       brings one space's folder to the snapshot (tasks that changed status moved first), a task
+//       the pushing machine did not change since its last sync staying as it is here (`base`, see
+//       "what the pushing machine did not change", below): entries are [{ path, content }] for task
 //       files (text), [{ path, blob: sha1 }] for every other file, taken from the blob store, and
 //       [{ path, dir: true }] for an empty folder, paths relative to the space's folder. When a blob
 //       is not in the store, nothing is written and the answer is 409 MISSING_BLOBS { missing }.
@@ -77,7 +79,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { parseConfig, upgradeRaw, shortPath, normalizeFilters } = require('./config');
 const { appendLog } = require('../utils/logfile');
-const { STATUS_DIRS, taskEntries, isSyncSkipped } = require('../utils/task');
+const { STATUS_DIRS, TASK_FOLDER_RE, taskEntries, isSyncSkipped } = require('../utils/task');
 const { schedulerStore, isDate } = require('./scheduler');
 
 const ORIGINS_DIR = 'origins';
@@ -820,8 +822,80 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     return { list: out, edited: Object.keys(edited).length ? edited : null };
   }
 
+  // ---------- what the pushing machine did not change ----------
+  //
+  // What is on a machine wins over what is here, but only what it changed: a push is the machine's
+  // whole folder, most of it what it had at its last sync, and that must not undo what was changed
+  // here since (a task marked done or edited in the web UI, moved, renamed, deleted or added there,
+  // or pushed by another machine). So a push says what the machine and this server last agreed on
+  // (`base`, { path: hash }, see server/syncstate.js), and the two are compared a task at a time (a
+  // task folder right in the tasks folder or in a status folder, by its id, with all in it):
+  //   - a task pushed as it is in the base was not changed there: it stays as it is here, wherever
+  //     it is now, and stays deleted when it was deleted here; the machine's pull brings that over;
+  //   - a task pushed another way (changed, added, moved or renamed there), or in the base and no
+  //     longer pushed (deleted there), is the machine's: written, or removed, as pushed, whatever
+  //     was done to it here;
+  //   - a task here that is neither pushed nor in the base was made here: it stays.
+  // A push without a base (an older tm) is written whole, as before.
+
+  // The id of the task a path of a tasks folder ("/"-separated) is in, '' for none (see taskEntries).
+  const taskIdOf = (p) => {
+    const parts = p.split('/');
+    const name = parts[STATUS_DIRS.includes(parts[0]) ? 1 : 0] || '';
+    return TASK_FOLDER_RE.test(name) ? name.slice(0, 12) : '';
+  };
+
+  // `list` (the pushed snapshot `pushed`, after withoutDeleted and withoutEdited) with the tasks the
+  // machine did not change since `base` as they are in `target`, and the tasks made here kept:
+  // { list, left }, `left` being how many tasks of the push were left as they are here.
+  function withoutUnchanged(target, pushed, base, list) {
+    const posix = (e) => e.rel.split(path.sep).join('/');
+    const byTask = (pairs) => {
+      const tasks = new Map();  // id -> { path: hash }
+      for (const [p, hash] of pairs) {
+        const id = taskIdOf(p);
+        if (!id) continue;
+        if (!tasks.has(id)) tasks.set(id, {});
+        tasks.get(id)[p] = hash;
+      }
+      return tasks;
+    };
+    const there = byTask(pushed.map(e => [posix(e), e.dir ? '' : e.blob || sha1(Buffer.from(e.content, 'utf8'))]));
+    const before = byTask(Object.entries(base).filter(([, hash]) => typeof hash === 'string'));
+    const same = (id) => {
+      const a = there.get(id);
+      const b = before.get(id);
+      if (!a || !b) return false;
+      const paths = Object.keys(a);
+      return paths.length === Object.keys(b).length && paths.every(p => a[p] === b[p]);
+    };
+    const out = list.filter(e => !same(taskIdOf(posix(e))));
+    // Everything in a task folder here, as it is: its files kept, its empty folders too.
+    const keep = (rel) => {
+      let names;
+      try { names = fs.readdirSync(path.join(target, rel)); } catch (e) { return; }
+      if (!names.length) out.push({ rel, dir: true });
+      for (const name of names) {
+        const r = path.join(rel, name);
+        if (isDir(path.join(target, r))) keep(r);
+        else out.push({ rel: r, keep: true });
+      }
+    };
+    for (const dir of ['', ...STATUS_DIRS]) {
+      let names;
+      try { names = fs.readdirSync(path.join(target, dir)); } catch (e) { continue; }
+      for (const name of names) {
+        if (!TASK_FOLDER_RE.test(name) || !isDir(path.join(target, dir, name))) continue;
+        const id = name.slice(0, 12);
+        if (!same(id) && (there.has(id) || before.has(id))) continue;  // the machine's: as pushed
+        keep(path.join(dir, name));
+      }
+    }
+    return { list: out, left: [...there.keys()].filter(same).length };
+  }
+
   app.put('/api/sync/space', json, (req, res) => {
-    const { origin = '', work, repository = '', machine, entries, merged } = req.body || {};
+    const { origin = '', work, repository = '', machine, entries, merged, base } = req.body || {};
     if (typeof origin !== 'string' || typeof repository !== 'string') throw new SyncError(400, 'origin and repository must be strings.');
     const target = spaceDir(dataDir, { origin, work, repository });
     if (!Array.isArray(entries)) throw new SyncError(400, '"entries" must be an array.');
@@ -831,19 +905,20 @@ function createSyncApp({ dataDir, logsDir = path.join(dataDir, '..', 'logs'), to
     if (merged !== true) pullFirst(key, machineName(machine), target, list, label({ origin, work, repository }));
     const kept = withoutDeleted(key, machineName(machine), list);
     const stay = withoutEdited(key, machineName(machine), target, kept.list);
-    const { files, dirs } = writeSnapshot(dataDir, target, stay.list);
+    const mine = base && typeof base === 'object' && !Array.isArray(base) ? withoutUnchanged(target, list, base, stay.list) : { list: stay.list, left: 0 };
+    const { files, dirs } = writeSnapshot(dataDir, target, mine.list);
     const state = readState();
     if (kept.deleted) state.deleted[key] = kept.deleted;
     else delete state.deleted[key];
     if (stay.edited) state.edited[key] = stay.edited;
     else delete state.edited[key];
     state.spaces[key] = sha1(JSON.stringify(entries));
-    state.blobs[key] = [...new Set(stay.list.filter(e => e.blob).map(e => e.blob))];
+    state.blobs[key] = [...new Set(mine.list.filter(e => e.blob).map(e => e.blob))];
     claim(state, key, machineName(machine), label({ origin, work, repository }));
     writeState(state);
     pruneBlobs(state);
-    machineLog(req, 'success', `pushed ${label({ origin, work, repository })} (${files} file${files === 1 ? '' : 's'}, ${dirs} empty folder${dirs === 1 ? '' : 's'})`);
-    res.json({ ok: true, files, dirs });
+    machineLog(req, 'success', `pushed ${label({ origin, work, repository })} (${files} file${files === 1 ? '' : 's'}, ${dirs} empty folder${dirs === 1 ? '' : 's'}${mine.left ? `, ${mine.left} task${mine.left === 1 ? '' : 's'} not changed there left as here` : ''})`);
+    res.json({ ok: true, files, dirs, left: mine.left });
   });
 
   // A push writes the folder as the pushing machine has it, so a task only here would go. That is

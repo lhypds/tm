@@ -516,8 +516,9 @@ app.put('/api/calendars', (req, res) => {
 });
 
 // A change made here (a task moved, edited, deleted, a file added...) leaves the pushed copies no
-// longer what taskmgrd pushed: the hashes of its snapshots are forgotten, or the next push, finding
-// its folder the same as at the last one, would send nothing and leave the change here in place.
+// longer what taskmgrd pushed: the hashes of its snapshots are forgotten, so the machine pushes its
+// folder again. That push leaves a task the machine did not change as it is here (see "what the
+// pushing machine did not change" in server/sync.js); a task it changed too is written over.
 app.use('/api', (req, res, next) => {
   if (req.method !== 'GET') res.on('finish', () => { if (res.statusCode < 400) syncApp.forgetPushed(); });
   next();

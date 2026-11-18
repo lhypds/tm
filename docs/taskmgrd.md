@@ -37,7 +37,7 @@ The server merges a pushed `taskmgr.json` into its own: origins, works and repos
 does not have are added, the ones it has take the pushed settings, and the ones it has that were not  
 pushed are kept, with their folders (so several machines can push to one server; a work or  
 repository renamed or removed on one machine stays on the server until removed there, shown by  
-its path from then on: no longer as that machine's, with its dot). A work or repository added in the server's web UI without a folder is kept under `data/origins/` too, where the copy of a machine pushing the same origin, work and repository goes: it is shown by its path until a machine syncs it. The first push of a machine into a folder that has tasks on the server already merges the two, by task id (the 12 digits a task folder's name starts with): a task only on the server is brought to the machine, whole; a task only on the machine is pushed; of a task whose id both have, the machine's is kept and the server's removed. From then on a push overwrites the server's copy as ever. In the  
+its path from then on: no longer as that machine's, with its dot). A work or repository added in the server's web UI without a folder is kept under `data/origins/` too, where the copy of a machine pushing the same origin, work and repository goes: it is shown by its path until a machine syncs it. The first push of a machine into a folder that has tasks on the server already merges the two, by task id (the 12 digits a task folder's name starts with): a task only on the server is brought to the machine, whole; a task only on the machine is pushed; of a task whose id both have, the machine's is kept and the server's removed. From then on a push overwrites the server's copy of what the machine changed, as ever. In the  
 merged file, the `tasks_path` of every pushed work (that has common tasks) and repository is its  
 copy under `data/origins/`, and a repository's `source_path` is left out, so the server's web UI  
 shows the pushed tasks. A work pushed without a `tasks_path` has none on the server either: the one  
@@ -123,8 +123,10 @@ On the server: set `SYNC_SERVER_TOKEN` in `.env` to a secret of your choice and 
 (`./start.sh`); its startup lines then say `sync : receiving from taskmgrd`. Without the token the  
 server refuses pushes. The copied files are git-ignored. What each machine pushes and polls is logged  
 on the server to `logs/<MACHINE_ID>.log`, in the form of the daemon's own log. Every one of these logs is kept  
-under 10 MB: past that, its oldest 2 MB are dropped. A task changed in the server's web UI is  
-changed in the copy only: the next push of its folder overwrites it.  
+under 10 MB: past that, its oldest 2 MB are dropped. A task changed in the server's web UI (marked done, edited, moved, renamed, deleted, or added there) is  
+changed in the copy only, and stays so: a push leaves a task the machine did not change since its last sync as it is  
+on the server, and the machine's pull (`tm pull`, or `POLLING=1`) brings the change over. Only a task changed on the  
+machine too is written over by its push: what is on the machine wins.  
 
 On the machine with the tasks: in `.env`, `SYNC_SERVER` is the server's URL (the one its web UI  
 answers at, e.g. `https://tm.example.com`) and `SYNC_SERVER_TOKEN` the same secret; `MACHINE_ID` names  
