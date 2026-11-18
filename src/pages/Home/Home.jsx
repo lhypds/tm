@@ -1417,11 +1417,12 @@ export default function Home({ all = false }) {
   }
 
   // A day clicked in the calendar view: the scheduler takes the right pane, on that day, with its
-  // timetable shown.
+  // timetable shown. A folded right pane stays folded: the day is there once it is opened.
   function showDay(date) {
     setAskedDay({ date });
     setCalendarOpen(true);
-    showScheduler(true);
+    if (schedulerAsked) setScheduler(true);
+    else setEmptyTask(false);
   }
   // The view in the middle, and the keyboard on it. The calendar brings the scheduler to the right
   // pane with it (c, v or the header's button): the days beside their month.
