@@ -60,11 +60,11 @@ function padToWidth(s, width) {
   return out;
 }
 
-// A list's order: todo at the top, then done, then pending, then aborted; newest first within a status.
+// A list's order: todo at the top, then pending, then done, then aborted; newest first within a status.
 function statusOrder(s) {
   const st = (s || '').toLowerCase();
-  if (st === 'done') return 1;
-  if (st === 'pending') return 2;
+  if (st === 'pending') return 1;
+  if (st === 'done') return 2;
   if (st === 'aborted') return 3;
   return 0;
 }

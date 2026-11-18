@@ -147,12 +147,12 @@ function firstDetailLine(details) {
   return (details || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)[0] || '';
 }
 
-// Same ordering as the CLI: todo first, then done, then pending, then aborted; newest id first
+// Same ordering as the CLI: todo first, then pending, then done, then aborted; newest id first
 // within a group.
 function statusOrder(s) {
   const st = (s || '').toLowerCase();
-  if (st === 'done') return 1;
-  if (st === 'pending') return 2;
+  if (st === 'pending') return 1;
+  if (st === 'done') return 2;
   if (st === 'aborted') return 3;
   return 0;
 }

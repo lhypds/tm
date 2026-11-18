@@ -7,7 +7,7 @@ import styles from "./board.module.css";
 
 // Every column the board can have, in order; the "aborted" column shows only when aborted tasks
 // are shown (`statuses` says which columns a board has).
-export const BOARD_STATUSES = ["todo", "done", "pending", "aborted"];
+export const BOARD_STATUSES = ["todo", "pending", "done", "aborted"];
 
 // The column a task sits in: that of its status; anything that is not done, pending or aborted is
 // still to do.

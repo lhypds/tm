@@ -22,7 +22,7 @@ p for pending.
 a for aborted.  
 
 Task order:  
-TODO tasks first, then done tasks, then pending tasks, then aborted tasks.  
+TODO tasks first, then pending tasks, then done tasks, then aborted tasks.  
 
 Subtasks are listed under their task as a tree (`├─`, `└─`).  
 The status bar shows the task counter, the work / repository, the task folder path, and the default text editor.  

@@ -152,7 +152,7 @@ Tasks
 -----
 
 `GET /api/tasks?work=&repository=&dir=`  
-The tasks in a folder, sorted todo, done, pending, aborted, each with its subtasks:  
+The tasks in a folder, sorted todo, pending, done, aborted, each with its subtasks:  
 `{ work, repository, dir, absDir, shownDir, remote, machine, machines, isRoot, parent, crumbs, tasks, counts }`; `counts` counts the subtasks too;  
 `remote` says whether the folder is a copy pushed by taskmgrd and `machines` / `machine` which machines sync it, as in `GET /api/spaces`.  
 
