@@ -21,6 +21,9 @@
   align-items: center;
   border-bottom: var(--line) solid var(--border);
   outline: none;
+  /* the sticky header (24px and its line) covers the top of the pane: a row scrolled into view
+     stops under it, not behind it */
+  scroll-margin-top: calc(24px + var(--line));
 }
 
 .row > div {
