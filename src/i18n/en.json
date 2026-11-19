@@ -166,8 +166,8 @@
       "desc": "back to the tasks"
     },
     "treeRow": {
-      "keys": "a / i / e / o / d on the tree",
-      "desc": "add into the row (a work into an origin, a repository into a work), edit it, programming on a repository (its source code in VS Code), open its folder, delete it"
+      "keys": "a / i / e / o / d / space on the tree",
+      "desc": "add into the row (a work into an origin, a repository into a work), edit it, programming on a repository (its source code in VS Code), open its folder, delete it, preview it (its description and what else it has)"
     },
     "tab": {
       "keys": "tab",
@@ -346,6 +346,13 @@
     "delete": "Delete work",
     "deleteMessage": "Remove “{{name}}” and its repositories from taskmgr.json? Their folders and tasks are kept.",
     "deleted": "Work deleted"
+  },
+  "space": {
+    "noDescription": "No description",
+    "income": "Income",
+    "hidden": "Hidden",
+    "yes": "Yes",
+    "machines": "Machines"
   },
   "add": {
     "title": "Add",

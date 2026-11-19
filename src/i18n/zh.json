@@ -166,8 +166,8 @@
       "desc": "回到任务列表"
     },
     "treeRow": {
-      "keys": "目录树上按 a / i / e / o / d",
-      "desc": "向该项追加（origin 下加 work，work 下加 repository）、编辑、编程（在 VS Code 中打开 repository 的源码）、打开文件夹、删除"
+      "keys": "目录树上按 a / i / e / o / d / space",
+      "desc": "向该项追加（origin 下加 work，work 下加 repository）、编辑、编程（在 VS Code 中打开 repository 的源码）、打开文件夹、删除、预览（描述及其他信息）"
     },
     "tab": {
       "keys": "tab",
@@ -346,6 +346,13 @@
     "delete": "删除 work",
     "deleteMessage": "从 taskmgr.json 中移除“{{name}}”及其 repository？它们的文件夹和任务会保留。",
     "deleted": "work 已删除"
+  },
+  "space": {
+    "noDescription": "没有描述",
+    "income": "收入",
+    "hidden": "隐藏",
+    "yes": "是",
+    "machines": "机器"
   },
   "add": {
     "title": "添加",

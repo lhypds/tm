@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { Modal } from "@ui";
+import { Modal, TextArea } from "@ui";
 import * as api from "@utils/api";
 import IncomeFields, { useIncomeFields, readIncome } from "@components/IncomeFields";
 import ColorPicker from "@components/ColorPicker";
@@ -11,7 +11,7 @@ const TYPES = ["origin", "work", "repository"];
 // Add an origin, a work or a repository to taskmgr.json, chosen at the top. `add` is what to start
 // with: { type, origin } (a work, into that origin) or { type, work } (a repository, into that
 // work), and may come with a `name`, a work with a `tasksPath`, a repository with a `sourcePath` (a
-// folder dropped on the tree). Each has a name and an optional description (its tooltip in the tree). An origin has a color and income; a work an origin, name, tasks folder and income; a
+// folder dropped on the tree). Each has a name and an optional description (several lines; shown in its preview). An origin has a color and income; a work an origin, name, tasks folder and income; a
 // repository a work, name, source folder and tasks folder (one of them at least; the tasks folder
 // defaults to the source folder's "tasks"). onSaved gets the new
 // { works, origins } and what was added ({ type, name, origin, work }).
@@ -77,6 +77,12 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
           e.preventDefault();
           if (!saving) save();
         }}
+        // cmd+s (ctrl+s) saves and closes, as Save does
+        onKeyDown={(e) => {
+          if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
+          e.preventDefault();
+          if (!saving) save();
+        }}
       >
         <div className={styles.choices} role="radiogroup" aria-label={t("add.type")}>
           {TYPES.map((x) => (
@@ -128,7 +134,7 @@ export default function AddSpaceModal({ add, origins, works, onClose, onSaved })
 
         <label className={styles.field}>
           <span className={styles.label}>{t("work.description")}</span>
-          <input className="input" value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
+          <TextArea rows={3} minHeight={48} value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
         </label>
 
         {type === "work" && (

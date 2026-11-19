@@ -98,7 +98,7 @@ export const addWork = ({ name, origin, tasksPath, income, description }) => req
 export const saveFilter = (space, filter) => request("/api/filters", json("PUT", { space, filter }));
 
 // Set one work's name, income ({ monthly, once }, lists of { amount, currency }; null clears it),
-// tasks folder, whether it is hidden and its description (the tooltip of its row in the tree; "" for none).
+// tasks folder, whether it is hidden and its description (shown in its preview, space on its row in the tree; "" for none).
 export const saveWork = (work, { name, income, hidden, tasksPath, description }) =>
   request("/api/work", json("PUT", { work, name, income, hidden, tasksPath, description }));
 

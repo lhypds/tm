@@ -15,6 +15,7 @@ import {
   WorkEditModal,
   AddSpaceModal,
   RepositoryEditModal,
+  SpacePreviewModal,
   IncomeAnalysisModal,
   Scheduler,
   MonthCalendar,
@@ -290,6 +291,7 @@ export default function Home({ all = false }) {
   const [adding, setAdding] = useState(null); // what the add modal starts with: { type, origin, work }
   const [editingOrigin, setEditingOrigin] = useState(null); // { origin, description, income, color } of the origin being edited
   const [editingRepository, setEditingRepository] = useState(null); // { work, name, description, paths } of the repository being edited
+  const [spacePeek, setSpacePeek] = useState(null); // the path of the tree's row whose preview is open (space on it)
   const [removing, setRemoving] = useState(null); // { origin } or { work, repository? } to remove from taskmgr.json
   const [showHidden, setShowHidden] = useState(() => readFlag("tree.showHidden", false)); // the tree shows hidden works too
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -522,6 +524,14 @@ export default function Home({ all = false }) {
     ],
     [treeWorks, origins],
   );
+  // The row previewed (see SpacePreviewModal), as it is now: null once it is gone from the tree.
+  const spacePeekEntry = (spacePeek && spaces.find((s) => s.to === spacePeek && (s.group || s.item))) || null;
+  // The edit dialog of a row: an origin's, a work's or a repository's.
+  const editSpace = ({ group: g, item: w, repository: p }) => {
+    if (p) setEditingRepository({ work: w.work, name: p.name, description: p.description, paths: p.paths });
+    else if (w) setEditingWork(w);
+    else if (g) setEditingOrigin({ origin: g.origin, description: g.description, income: g.income, color: g.color });
+  };
   // The space on the right when its task folder does not exist. A list of several spaces just
   // leaves the missing ones out.
   const missing = (!listScope && spaces.find((s) => s.to === spaceTo && !s.exists)) || null;
@@ -1547,7 +1557,7 @@ export default function Home({ all = false }) {
       if (e.defaultPrevented || e.repeat || (e.code !== "KeyC" && e.key.toLowerCase() !== "c")) return;
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || isTyping(e)) return;
       if (!selected || window.getSelection?.()?.toString()) return;
-      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || analysisOpen || machinesOpen || pickRun || runKey !== null || command !== null) return;
+      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || spacePeekEntry || analysisOpen || machinesOpen || pickRun || runKey !== null || command !== null) return;
       e.preventDefault();
       const id = runId(selected);
       copyText(id).then((ok) => {
@@ -1565,6 +1575,7 @@ export default function Home({ all = false }) {
   // an origin, a repository into a work, also from one of its repositories; an origin from "All
   // origins"), i edits it, e is programming on a repository (its source code in VS Code) and edits
   // an origin or a work, which have none, o opens its folder and d removes it, once confirmed.
+  // space opens the row's preview: its description and what else it has ("All origins" has none).
   function treeKey(name) {
     const i = spaces.findIndex((s) => s.to === spaceTo);
     const move = moveIndex(name, i, spaces.length);
@@ -1577,6 +1588,10 @@ export default function Home({ all = false }) {
       }
       return true;
     }
+    if (name === "space") {
+      if (spaces[i]?.group || spaces[i]?.item) setSpacePeek(spaces[i].to);
+      return true;
+    }
     if (["a", "e", "i", "o", "d"].includes(name)) {
       const { group: g, item: w, repository: p } = spaces[i] || {};
       if (name === "e" && p) {
@@ -1585,18 +1600,14 @@ export default function Home({ all = false }) {
       }
       if (name === "i") name = "e";
       if (name === "a") setAdding(w ? { type: "repository", work: w.work } : g ? { type: "work", origin: g.origin } : { type: "origin" });
+      else if (name === "e") editSpace(spaces[i] || {});
       else if (p) {
-        if (name === "e") setEditingRepository({ work: w.work, name: p.name, description: p.description, paths: p.paths });
-        else if (name === "o") openSpaceFolder({ work: w.work, repository: p.name });
+        if (name === "o") openSpaceFolder({ work: w.work, repository: p.name });
         else setRemoving({ work: w.work, repository: p.name });
       } else if (w) {
-        if (name === "e") setEditingWork(w);
-        else if (name === "o") w.root && openSpaceFolder({ work: w.work });
+        if (name === "o") w.root && openSpaceFolder({ work: w.work });
         else setRemoving({ work: w.work });
-      } else if (g) {
-        if (name === "e") setEditingOrigin({ origin: g.origin, description: g.description, income: g.income, color: g.color });
-        else if (name === "d") setRemoving({ origin: g.origin });
-      }
+      } else if (g && name === "d") setRemoving({ origin: g.origin });
       return true;
     }
     if (["l", "right", "enter"].includes(name)) {
@@ -1623,6 +1634,24 @@ export default function Home({ all = false }) {
       command !== null
     )
       return false;
+    if (spacePeekEntry) {
+      // The preview of a row of the tree: j / k step to the next / previous row that has one (the
+      // tree follows), i / e open its edit dialog over it (saving is back here); space, enter and
+      // q close it, as they close a file's preview.
+      const list = spaces.filter((x) => x.group || x.item);
+      const move = moveIndex(name, list.indexOf(spacePeekEntry), list.length);
+      if (move !== null) {
+        if (move >= 0 && list[move] !== spacePeekEntry) {
+          setSpacePeek(list[move].to);
+          selectSpace(list[move].to, true);
+        }
+        return true;
+      }
+      if (["i", "e"].includes(name)) editSpace(spacePeekEntry);
+      else if (["space", "enter", "q"].includes(name)) setSpacePeek(null);
+      else return false;
+      return true;
+    }
     if (pickRun) {
       // The machines a task can run on: j / k walk them, enter runs the task on the one they are on.
       const move = moveIndex(name, 1, 3); // 0: up, 2: down, null: another key
@@ -2464,6 +2493,10 @@ export default function Home({ all = false }) {
         }}
       />
 
+      {/* Before the edit dialogs, which stack in front of it: one opened from the preview leaves it
+          open, so saving (or cancelling) is back on the preview. */}
+      <SpacePreviewModal entry={spacePeekEntry} onClose={() => setSpacePeek(null)} onEdit={() => editSpace(spacePeekEntry)} />
+
       <WorkEditModal
         work={editingWork}
         onClose={() => setEditingWork(null)}
@@ -2471,6 +2504,7 @@ export default function Home({ all = false }) {
           const oldName = editingWork.work;
           setEditingWork(null);
           setSpaces(d);
+          if (spacePeek) setSpacePeek(api.spacePath(editingWork.origin, newName)); // the preview under it follows the rename
           // Follow the rename when the space on the right is this work or one of its repositories.
           if (newName !== oldName && work === oldName)
             navigate(
@@ -2488,6 +2522,7 @@ export default function Home({ all = false }) {
           const oldName = editingOrigin.origin;
           setEditingOrigin(null);
           setSpaces(d);
+          if (spacePeek) setSpacePeek(api.originPath(newName));
           // Follow the rename when the origin is the one on the right.
           if (newName !== oldName && origin === oldName)
             navigate(work ? api.spacePath(newName, work, repository) : api.originPath(newName), { replace: true });
@@ -2524,6 +2559,7 @@ export default function Home({ all = false }) {
           setSpaces(d);
           // Follow a rename when the repository is the one on the right.
           const inOrigin = (works || []).find((item) => item.work === inWork)?.origin || "";
+          if (spacePeek) setSpacePeek(api.spacePath(inOrigin, inWork, newName));
           if (spaceTo === api.spacePath(inOrigin, inWork, name))
             navigate({ pathname: api.spacePath(inOrigin, inWork, newName), search: searchParams.toString() }, { replace: true });
           showToast(t("repository.saved"));

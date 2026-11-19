@@ -1,0 +1,32 @@
+.modal {
+  max-width: 420px;
+  width: 100%;
+}
+
+/* A label over its value, as an event's details (see EventModal). The description keeps its
+   lines. */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail dd {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* A machine's name and dot, as on its row in the tree. */
+.machine + .machine {
+  margin-left: 8px;
+}

@@ -14,6 +14,7 @@ export { default as UserMenu } from "./UserMenu";
 export { default as WorkEditModal } from "./WorkEditModal";
 export { default as AddSpaceModal } from "./AddSpaceModal";
 export { default as RepositoryEditModal } from "./RepositoryEditModal";
+export { default as SpacePreviewModal } from "./SpacePreviewModal";
 export { default as IncomeAnalysisModal } from "./IncomeAnalysisModal";
 export { default as TaskBoard } from "./TaskBoard";
 export { default as MonthPicker } from "./MonthPicker";

@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { Modal } from "@ui";
+import { Modal, TextArea } from "@ui";
 import * as api from "@utils/api";
 import styles from "./repository.module.css";
 
-// Edit one repository: its name, description (the tooltip of its row in the tree), source folder and
+// Edit one repository: its name, description (several lines; shown in its preview, space on its row in the tree), source folder and
 // tasks folder (either folder may be left empty, not both). `repository` is
 // { work, name, description, paths: { source, tasks } }; the changes are written into
 // taskmgr.json and passed to onSaved as the new { works, origins }, along with the new name.
@@ -54,6 +54,12 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
           e.preventDefault();
           if (!saving) save();
         }}
+        // cmd+s (ctrl+s) saves and closes, as Save does
+        onKeyDown={(e) => {
+          if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
+          e.preventDefault();
+          if (!saving) save();
+        }}
       >
         <label className={styles.field}>
           <span className={styles.label}>{t("repository.name")}</span>
@@ -61,7 +67,7 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t("work.description")}</span>
-          <input className="input" value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
+          <TextArea rows={3} minHeight={48} value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t("add.sourcePath")}</span>

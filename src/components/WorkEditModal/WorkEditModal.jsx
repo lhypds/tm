@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { Checkbox, Modal } from "@ui";
+import { Checkbox, Modal, TextArea } from "@ui";
 import * as api from "@utils/api";
 import IncomeFields, { useIncomeFields, readIncome } from "@components/IncomeFields";
 import ColorPicker from "@components/ColorPicker";
 import styles from "./work.module.css";
 
-// Edit one work: its name, its description (the tooltip of its row in the tree), its tasks folder, whether it is hidden from the tree, and whether it has income; if it
+// Edit one work: its name, its description (several lines; shown in its preview, space on its row in the tree), its tasks folder, whether it is hidden from the tree, and whether it has income; if it
 // does, its income as two lists, monthly and one-time, each of amount and currency. All are written
 // into taskmgr.json; "no income" removes the income. Given an `origin` ({ origin, description, income, color })
 // instead, it edits that origin's name, description, color and income the same way. onSaved gets the new { works, origins } and
@@ -66,6 +66,12 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
           e.preventDefault();
           if (!saving) save();
         }}
+        // cmd+s (ctrl+s) saves and closes, as Save does
+        onKeyDown={(e) => {
+          if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
+          e.preventDefault();
+          if (!saving) save();
+        }}
       >
         <label className={styles.field}>
           <span className={styles.label}>{t("work.name")}</span>
@@ -74,7 +80,7 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
 
         <label className={styles.field}>
           <span className={styles.label}>{t("work.description")}</span>
-          <input className="input" value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
+          <TextArea rows={3} minHeight={48} value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
         </label>
 
         {!origin && (

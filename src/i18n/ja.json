@@ -166,8 +166,8 @@
       "desc": "タスク一覧へ戻る"
     },
     "treeRow": {
-      "keys": "ツリー上で a / i / e / o / d",
-      "desc": "その行に追加（origin に work、work に repository）、編集、プログラミング（repository のソースコードを VS Code で開く）、フォルダを開く、削除"
+      "keys": "ツリー上で a / i / e / o / d / space",
+      "desc": "その行に追加（origin に work、work に repository）、編集、プログラミング（repository のソースコードを VS Code で開く）、フォルダを開く、削除、プレビュー（説明とその他の情報）"
     },
     "tab": {
       "keys": "tab",
@@ -346,6 +346,13 @@
     "delete": "work を削除",
     "deleteMessage": "「{{name}}」とその repository を taskmgr.json から削除しますか？フォルダとタスクは残ります。",
     "deleted": "work を削除しました"
+  },
+  "space": {
+    "noDescription": "説明なし",
+    "income": "収入",
+    "hidden": "非表示",
+    "yes": "はい",
+    "machines": "マシン"
   },
   "add": {
     "title": "追加",

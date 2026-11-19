@@ -5,7 +5,7 @@ import TreeLines from "@components/TreeLines";
 import MachineDot from "@components/MachineDot";
 import { Checkbox } from "@ui";
 import * as api from "@utils/api";
-import { formatIncome, formatIncomeShort } from "@utils/income";
+import { formatIncomeShort } from "@utils/income";
 import { groupWorksByOrigin } from "@utils/works";
 import { lightColor } from "@utils/colors";
 import { useWheelScroll, withKey } from "@utils/keys";
@@ -34,21 +34,16 @@ function RowButton({ label, keys, onClick, children }) {
 // The name line of a row: the name, then its income in short (in 万) at the right end, which the
 // buttons replace while the row is hovered. With a `color` (an origin's; "" for none, which is
 // transparent) a small square of its light tint, as a task's from tag has, sits right after the name.
-// The name's tooltip is the `description` when there is one, else the name itself.
-function Top({ label, description, income, actions, color }) {
-  const { t } = useTranslation();
+// Nothing here has a tooltip but the buttons: what a row is of is in its preview (space).
+function Top({ label, income, actions, color }) {
   const swatch = color !== undefined;
   return (
     <div className={styles.top}>
-      <span className={styles.name} data-swatch={swatch} title={description || label}>
+      <span className={styles.name} data-swatch={swatch}>
         {label}
       </span>
       {swatch && <span className={styles.swatch} data-color={!!color} style={{ background: lightColor(color) || "transparent" }} aria-hidden="true" />}
-      {income && (
-        <span className={styles.income} title={formatIncome(income, t)}>
-          {formatIncomeShort(income)}
-        </span>
-      )}
+      {income && <span className={styles.income}>{formatIncomeShort(income)}</span>}
       {actions}
     </div>
   );
@@ -72,10 +67,9 @@ const machineNames = (s) => (s.machines || []).map((m) => m.name).join(" ");
 // One space in the tree. `depth` is 0 for a work without an origin, 1 for a work under its origin
 // or a repository of a depth-0 work, and 2 for a repository of a work under an origin.
 // `machines` (see MachineDot) are the machines that sync a remote folder (at most two, by name), each
-// shown by its name and a dot in place of `root`. `description` (from taskmgr.json; "" for none) is
-// the row's tooltip, above the path where the path has its own.
+// shown by its name and a dot in place of `root`.
 // Anything else (`rest`: the drag and drop handlers and data attributes) goes on the row itself.
-function Row({ to, exists, hidden, depth, through = [], last, active, focused, label, description, root, machines = [], income, actions, onSelect, ...rest }) {
+function Row({ to, exists, hidden, depth, through = [], last, active, focused, label, root, machines = [], income, actions, onSelect, ...rest }) {
   const ref = useRef(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
@@ -91,7 +85,6 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
       data-focused={active && focused}
       data-missing={!exists}
       data-hidden={!!hidden}
-      title={description || undefined}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(to)}
@@ -99,8 +92,8 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
       {...rest}
     >
       <TreeLines depth={depth} through={through} last={last} />
-      <Top label={label} description={description} income={income} actions={actions} />
-      <div className={`mono ${styles.root}`} title={description ? `${description}\n${root}` : root}>
+      <Top label={label} income={income} actions={actions} />
+      <div className={`mono ${styles.root}`}>
         {/* The line is right-to-left so a long path is cut at its start; this keeps the path itself
             left-to-right, or its leading "/" would show at the end. */}
         <bdi dir="ltr">
@@ -120,8 +113,8 @@ function Row({ to, exists, hidden, depth, through = [], last, active, focused, l
 
 // An origin's name (with its color's square, and income) at the top of its tree; choosing it (`to`) shows every task of its
 // works. "All origins" above the trees is one too, for every task. `rest` goes on the element, as
-// for a Row; `description` is its tooltip, as a Row's.
-function Origin({ name, description, to, active, focused, income, color, actions, onSelect, ...rest }) {
+// for a Row.
+function Origin({ name, to, active, focused, income, color, actions, onSelect, ...rest }) {
   const ref = useRef(null);
   useEffect(() => {
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
@@ -133,14 +126,13 @@ function Origin({ name, description, to, active, focused, income, color, actions
       className={styles.origin}
       data-active={active}
       data-focused={active && focused}
-      title={description || undefined}
       role="button"
       tabIndex={0}
       onClick={() => onSelect(to)}
       {...pointerFocus}
       {...rest}
     >
-      <Top label={name} description={description} income={income} color={color} actions={actions} />
+      <Top label={name} income={income} color={color} actions={actions} />
     </div>
   );
 }
@@ -436,7 +428,6 @@ export default function SpaceTree({
                   {g.origin && (
                     <Origin
                       name={g.origin}
-                      description={g.description}
                       to={api.originPath(g.origin)}
                       color={g.color || ""}
                       income={g.income}
@@ -491,7 +482,6 @@ export default function SpaceTree({
                           active={activeTo === api.spacePath(g.origin, w.work)}
                           focused={focused}
                           label={w.work}
-                          description={w.description}
                           root={machineNames(w) || w.shownPath}
                           machines={w.remote ? w.machines : []}
                           income={w.income}
@@ -541,7 +531,6 @@ export default function SpaceTree({
                               active={activeTo === api.spacePath(g.origin, w.work, p.name)}
                               focused={focused}
                               label={p.name}
-                              description={p.description}
                               root={machineNames(p) || p.shownPath}
                               machines={p.remote ? p.machines : []}
                               onSelect={onSelect}

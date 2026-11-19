@@ -7,7 +7,7 @@
 //     "origins": [
 //       {
 //         "origin": "gcc3",                       // "" or left out for works without an origin
-//         "description": "...",                   // optional (an origin, a work, a repository): its tooltip in the tree
+//         "description": "...",                   // optional (an origin, a work, a repository): a text, shown in its preview in the tree
 //         "income": { "monthly": [...] },         // optional, what the origin pays besides its works
 //         "color": "#93c5fd",                     // optional, "#rrggbb": the origin's square in the tree and its tasks' tags
 //         "works": [
