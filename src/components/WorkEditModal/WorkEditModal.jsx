@@ -80,7 +80,7 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
 
         <label className={styles.field}>
           <span className={styles.label}>{t("work.description")}</span>
-          <TextArea rows={3} minHeight={48} value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
+          <TextArea rows={6} minHeight={48} value={description} placeholder={t("add.optional")} onChange={(e) => setDescription(e.target.value)} />
         </label>
 
         {!origin && (
