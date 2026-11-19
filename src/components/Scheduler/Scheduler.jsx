@@ -211,7 +211,10 @@ function Lines({ value, fill, ...props }) {
 // calendar view's alike (see Calendar).
 // `onDate(date)` is told the day shown, whenever it changes. `onCommand()` opens the page's command
 // line: ":" in the text in NORMAL mode, as in vim (elsewhere on the pane the key is the page's own).
-export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar, goTo, onDate, onCommand, chosenEvent, onEvent }) {
+export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef, onOpen, onStatus, calendarOpen, onToggleCalendar, goTo, onDate, onCommand, chosenEvent, onEvent, onHoverEvent, onHoverTask, onChosenTask, isSelected, onUnselect }) {
+  // The scheduler gone (the task is back in the pane) with the mouse on a card: it is on none.
+  useEffect(() => () => onHoverTask?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { t, i18n } = useTranslation();
   const [date, setDate] = useState(() => goTo?.date || today());
   const [loaded, setLoaded] = useState(false); // the day shown has been read
@@ -697,6 +700,14 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
     setInCalendar(true);
   };
   const chosenIndex = cards.findIndex((c) => cardKey(c) === chosen);
+  // The task of the card chosen, while it is shown chosen (the keyboard is here), is told to the
+  // page (`onChosenTask(card)`, null with none): its row of the list in the middle is shaded too.
+  const shownChosen = focused ? cards[chosenIndex] : null;
+  const chosenTask = shownChosen && !shownChosen.missing && shownChosen.rel ? shownChosen : null;
+  useEffect(() => {
+    onChosenTask?.(chosenTask);
+  }, [chosenTask?.work, chosenTask?.repository, chosenTask?.rel]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onChosenTask?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
   const backTo = useRef(null);
   // The cursor into a run of the text, on `line` of the page (past the run's last line: its end)
   // at `col`: a caret while typing, the NORMAL cursor else.
@@ -796,6 +807,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         const beside = blocks[at + step];
         if (beside && !beside.card) {
           setChosen(null);
+          onUnselect?.(); // off the card, into the text: the list's selection is let go with it
           // under the card: the first line; above it: the last line (its end, while typing)
           if (step > 0) caretTo(at + step, beside.from);
           else if (modeRef.current === "insert") caretTo(at + step, beside.to);
@@ -992,7 +1004,10 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         // a press anywhere but on a card (the text, the blank of the page) lets the chosen card go
         onMouseDown={(e) => {
           setInCalendar(false);
-          if (!e.target.closest("[data-card]")) setChosen(null);
+          if (!e.target.closest("[data-card]")) {
+            setChosen(null);
+            onUnselect?.(); // and the task selected in the list, shaded here as one chosen, with it
+          }
         }}
         onFocus={(e) => e.target.tagName === "TEXTAREA" && setInText(true)}
         onBlur={(e) => e.target.tagName === "TEXTAREA" && setInText(false)}
@@ -1020,6 +1035,11 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
               data-status={block.card.status}
               data-missing={block.card.missing}
               data-chosen={focused && block.index === chosenIndex}
+              // its task is selected in the list in the middle (`isSelected(card)`): shaded as the one chosen here
+              data-selected={!block.card.missing && !!block.card.rel && !!isSelected?.(block.card)}
+              // the mouse on a task: its row of the list in the middle is shown hovered too (`onHoverTask`)
+              onMouseEnter={() => !block.card.missing && block.card.rel && onHoverTask?.(block.card)}
+              onMouseLeave={() => onHoverTask?.(null)}
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.effectAllowed = "move";
@@ -1086,7 +1106,7 @@ export default function Scheduler({ tasks, reloadKey, loading, focused, keysRef,
         {mark !== null && <div className={styles.mark} style={{ top: mark }} aria-hidden="true" />}
         {inText && mode === "normal" && cursorBox && <div className={styles.cursor} style={cursorBox} aria-hidden="true" />}
       </div>
-      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} loading={loading} focused={focused && onCalendar} keysRef={calendarKeys} onChoose={chooseInCalendar} chosenEvent={chosenEvent} onEvent={onEvent} />}
+      {calendarOpen && <Calendar date={date} reloadKey={reloadKey} loading={loading} focused={focused && onCalendar} keysRef={calendarKeys} onChoose={chooseInCalendar} chosenEvent={chosenEvent} onEvent={onEvent} onHover={onHoverEvent} />}
       {loading && <div className={`muted ${styles.loading}`}>{t("common.loading")}</div>}
     </section>
   );

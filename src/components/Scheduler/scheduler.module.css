@@ -144,6 +144,7 @@
 
 /* Hovered, or the one the keyboard is on. */
 .card:hover,
+.card[data-selected="true"],
 .card[data-chosen="true"] {
   background: var(--bg-hover);
 }

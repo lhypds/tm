@@ -192,6 +192,23 @@ export default function Home({ all = false }) {
   const [schedulerDay, setSchedulerDay] = useState(null);
   const [askedDay, setAskedDay] = useState(null);
   const [chosenEvent, setChosenEvent] = useState(null); // the event chosen in the calendars, by its id: one for the calendar view and the timetable
+  // What the mouse is over in the right pane, shown hovered in the middle too: an event of the
+  // timetable (its id: the same event in the calendar view) and a task of the scheduler's day
+  // (its key: its row in the list, its card on the board).
+  const [hoveredEvent, setHoveredEvent] = useState(null);
+  const [hoveredTask, setHoveredTask] = useState(null);
+  const hoverScheduled = useCallback((entry) => setHoveredTask(entry ? keyOf(entry, entry.rel) : null), []);
+  // The task chosen in the scheduler (a click on its card, the keys), while the keyboard is on
+  // it: its row in the list (its card on the board) is shaded too, as one hovered.
+  // The list's own selection is let go then: one task is shaded in the list, not two.
+  const [scheduledTask, setScheduledTask] = useState(null);
+  const chooseScheduled = useCallback((entry) => {
+    setScheduledTask(entry ? keyOf(entry, entry.rel) : null);
+    if (entry) {
+      setSelectedKey(null); // as unselectAll
+      setGroupKeys([]);
+    }
+  }, []);
   const tellSchedulerDay = useCallback((date) => {
     setSchedulerDay(date);
     setAskedDay((asked) => (asked && asked.date !== date ? null : asked));
@@ -919,11 +936,18 @@ export default function Home({ all = false }) {
       showToast(e.message);
     }
   }
-  // The right pane (opened when it was folded) shows the scheduler (s) or the task (t).
-  function showScheduler(on) {
-    if (schedulerAsked) setScheduler(on);
+  // The right pane shows the scheduler (s) or the task (t). It is opened when it was folded,
+  // unless `open` is false (t: what is in the pane changes, a folded pane stays folded).
+  // The scheduler opened (s, the sundial) lets the list's selection go: the task shaded in the list
+  // is from then on the one chosen in the scheduler.
+  function showScheduler(on, open = true) {
+    if (on && open) {
+      unselectAll();
+      setScheduler(true);
+      setEmptyTask(false); // with no task selected the pane goes by this
+    } else if (schedulerAsked) setScheduler(on);
     else setEmptyTask(!on);
-    setDetailOpen(true);
+    if (open) setDetailOpen(true);
   }
   // The sundial in the header: the scheduler takes the right pane, and gives it back to the task
   // on the next click.
@@ -1425,11 +1449,12 @@ export default function Home({ all = false }) {
     else setEmptyTask(false);
   }
   // The view in the middle, and the keyboard on it. The calendar brings the scheduler to the right
-  // pane with it (c, v or the header's button): the days beside their month.
+  // pane with it (c, v or the header's button): the days beside their month. A folded right pane
+  // stays folded, with the scheduler in it.
   function showView(next) {
     setView(next);
     if (next === "calendar") {
-      showScheduler(true);
+      showScheduler(true, false);
       setCalendarEnters((n) => n + 1); // the keyboard goes into the month, on the scheduler's day
     }
     setPane(next === "board" ? (selected ? boardStatus(selected) : boardStatuses[0]) : "tasks");
@@ -1753,9 +1778,10 @@ export default function Home({ all = false }) {
     }
     // t shows the task in the right pane and s the scheduler, as the sundial in the header swaps them
     // (t also puts the task list back in the middle when the calendar is there; with no task
-    // selected there is none to show, and the scheduler stays in the right pane)
+    // selected there is none to show, and the scheduler stays in the right pane). s opens the
+    // right pane when it was folded; t does not: the task is in it when it is opened again
     if (name === "t" || name === "s") {
-      showScheduler(name === "s" || !selected);
+      showScheduler(name === "s" || !selected, name === "s");
       if (name === "t" && view === "calendar") showView("list");
       return true;
     }
@@ -1952,6 +1978,8 @@ export default function Home({ all = false }) {
         tasks={visible}
         statuses={boardStatuses}
         selectedKey={selected?.key}
+        hoveredKey={hoveredTask}
+        markedKey={scheduledTask}
         chosenKeys={chosenKeys}
         focusedStatus={boardStatuses.includes(pane) ? pane : null}
         onFocusStatus={setPane}
@@ -2004,6 +2032,8 @@ export default function Home({ all = false }) {
         <TaskList
           tasks={visible}
           selectedKey={selected?.key}
+          hoveredKey={hoveredTask}
+          markedKey={scheduledTask}
           chosenKeys={chosenKeys}
           focused={pane === "tasks"}
           onSelect={selectTask}
@@ -2245,7 +2275,7 @@ export default function Home({ all = false }) {
         <main className={styles.main} onMouseDown={() => setPane("tasks")}>
           {/* the calendar view is the whole middle: a month, of no space in particular */}
           {view === "calendar" && (
-            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} enterKey={calendarEnters} chosenDay={scheduler && detailOpen ? schedulerDay : null} onDay={showDay} chosenEvent={chosenEvent} onEvent={setChosenEvent} />
+            <MonthCalendar reloadKey={loads} loading={refreshing} focused={pane === "tasks"} keysRef={calendarKeys} enterKey={calendarEnters} chosenDay={scheduler ? schedulerDay : null} onDay={showDay} chosenEvent={chosenEvent} onEvent={setChosenEvent} hoveredEvent={hoveredEvent} />
           )}
           {view !== "calendar" && (all || origin || space) && (
             <nav className={styles.section} aria-label={t("header.location")}>
@@ -2337,7 +2367,7 @@ export default function Home({ all = false }) {
           {detailOpen ? <ChevronRightIcon /> : <ChevronLeftIcon />}
         </button>
         <aside className={styles.detail} data-open={detailOpen} onMouseDown={() => setPane("detail")} onFocus={() => setPane("detail")}>
-          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} goTo={askedDay} onDate={tellSchedulerDay} onCommand={() => setCommand("")} chosenEvent={chosenEvent} onEvent={setChosenEvent} />}
+          {scheduler && <Scheduler tasks={tasks} reloadKey={loads} loading={refreshing} focused={pane === "detail"} keysRef={schedulerKeys} onOpen={openScheduled} onStatus={markScheduled} calendarOpen={calendarOpen} onToggleCalendar={toggleCalendar} goTo={askedDay} onDate={tellSchedulerDay} onCommand={() => setCommand("")} chosenEvent={chosenEvent} onEvent={setChosenEvent} onHoverEvent={setHoveredEvent} onHoverTask={hoverScheduled} onChosenTask={chooseScheduled} isSelected={(entry) => chosenKeys.has(keyOf(entry, entry.rel))} onUnselect={unselectAll} />}
           {!scheduler && spaceTo && (
             <TaskPanel
               task={selected}

@@ -108,6 +108,18 @@
   color: var(--err);
 }
 
+/* The time it is, on today: a light blue hairline across, over the events (a click goes through it to the
+   event under it). */
+.now {
+  position: absolute;
+  left: 56px;
+  right: 12px;
+  height: 0;
+  border-top: var(--line) solid color-mix(in srgb, var(--focus) 55%, transparent);
+  z-index: 1;
+  pointer-events: none;
+}
+
 /* Where the events are, right of the times. */
 .lane {
   position: absolute;

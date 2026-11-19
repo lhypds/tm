@@ -52,8 +52,10 @@
   user-select: none;
 }
 
-/* The selected task sits on the hover grey, as the tree's chosen row does. */
+/* The selected task sits on the hover grey, as the tree's chosen row does (and the one the mouse
+   is on in the scheduler at the right, `data-hovered`). */
 .row[role="button"]:hover,
+.row[data-hovered="true"],
 .row.selected {
   background: var(--bg-hover);
 }

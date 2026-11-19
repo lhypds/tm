@@ -301,9 +301,11 @@
   border-right: 0;
 }
 
-/* Hovered, or the one chosen (a click, the keys): grey, a little darker than the shade of the day
-   the scheduler shows, which may be under it. */
+/* Hovered (here, or in the timetable at the right: `data-hovered`), or the one chosen (a click,
+   the keys): grey, a little darker than the shade of the day the scheduler shows, which may be
+   under it. */
 .event:hover,
+.event[data-hovered="true"],
 .event[data-chosen="true"] {
   background: color-mix(in srgb, var(--fg) 14%, var(--bg));
 }

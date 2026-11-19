@@ -13,6 +13,7 @@ const HOUR = 40; // px an hour: half an hour is a card and its margins (20px), s
 const PAD = 12; // px above midnight, so its hour is not cut
 const SLOT = 20; // px a card takes: its 16px and 2px above and under it
 const READ_EVERY = 5 * 60 * 1000; // as long as the server keeps a calendar it has read
+const NOW_EVERY = 30 * 1000; // how often the line of the current time is put where the time is
 
 const SOURCES = { google: "Google", apple: "Apple" };
 const p2 = (n) => String(n).padStart(2, "0");
@@ -53,7 +54,8 @@ function place(events, from) {
 // The timetable under the scheduler's page, the lower half of the pane, as the prompt is under a
 // task's text: a divider that says "Timetable", then the events of the day `date` in the Google and
 // Apple calendars the server is given (see server/calendar.js). The day is a column of 24 hours, a
-// line across for each with its time at the left, noon's in red, and a dashed one at each half hour; it scrolls, and starts with noon
+// line across for each with its time at the left, noon's in red, and a dashed one at each half hour
+// (and, on today, a blue one where the time is now, over the events); it scrolls, and starts with noon
 // in the middle. An event is a card as thin as a tag of the task list, in its small type, on the line of its start: its
 // times and its title (the rest, where it is and which calendar it is from, on hover), in the
 // color its calendar was given, as light as an origin's is on a task's tag. The events
@@ -68,7 +70,9 @@ function place(events, from) {
 // double click on an event does; a click on an event chooses it, and a press anywhere on the
 // timetable puts the keyboard on it (`onChoose()` tells the scheduler so).
 // The calendars themselves are added and removed in the calendar view (see MonthCalendar).
-export default function Calendar({ date, reloadKey, loading, focused, keysRef, onChoose, chosenEvent, onEvent }) {
+// The event the mouse is over is told (`onHover(id)`, null when it is on none): the calendar view
+// shows the same one hovered.
+export default function Calendar({ date, reloadKey, loading, focused, keysRef, onChoose, chosenEvent, onEvent, onHover }) {
   const { t } = useTranslation();
   const [day, setDay] = useState(null); // { date, configured, events, errors } as read last
   const hoursRef = useRef(null);
@@ -106,6 +110,21 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
 
   const [y, m, d] = date.split("-").map(Number);
   const from = new Date(y, m - 1, d).getTime();
+
+  // The time it is, for the blue line across today: looked at again every half minute, and when
+  // the page is shown again.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const tick = () => document.visibilityState === "visible" && setNow(new Date());
+    const id = setInterval(tick, NOW_EVERY);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
+  const isToday = now.getFullYear() === y && now.getMonth() === m - 1 && now.getDate() === d;
+  const nowTop = PAD + ((now.getHours() * 60 + now.getMinutes()) * HOUR) / 60;
   const whole = events.filter((e) => e.allDay);
   const timed = place(
     events.filter((e) => !e.allDay),
@@ -156,7 +175,9 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
       keysRef.current = null;
     };
   });
-  const mark = (e) => (e.id === chosen ? { "data-chosen": "true", ref: chosenRef } : {});
+  useEffect(() => () => onHover?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps -- the timetable hidden with the mouse on an event
+  const over = (e) => ({ onMouseEnter: () => onHover?.(e.id), onMouseLeave: () => onHover?.(null) });
+  const mark = (e) => ({ ...over(e), ...(e.id === chosen ? { "data-chosen": "true", ref: chosenRef } : {}) });
   const tint = (e) => (e.color ? { "--event": lightColor(e.color) } : undefined);
   // a click on an event chooses it, as the keys do: the keyboard is then on the timetable
   // (`onChoose()` says so to the scheduler)
@@ -236,6 +257,8 @@ export default function Calendar({ date, reloadKey, loading, focused, keysRef, o
                 </div>
               ))}
             </div>
+            {/* the time it is, on today: a blue line across, over the events */}
+            {isToday && <div className={styles.now} style={{ top: nowTop }} />}
           </div>
         </div>
       </div>

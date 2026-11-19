@@ -25,6 +25,8 @@ export default function TaskBoard({
   tasks,
   statuses = BOARD_STATUSES,
   selectedKey,
+  hoveredKey,
+  markedKey,
   chosenKeys,
   focusedStatus,
   onFocusStatus,
@@ -53,6 +55,8 @@ export default function TaskBoard({
           status={status}
           cards={tasks.filter((t) => boardStatus(t) === status)}
           selectedKey={selectedKey}
+          hoveredKey={hoveredKey}
+          markedKey={markedKey}
           chosenKeys={chosenKeys}
           selectedRef={selectedRef}
           focused={status === focusedStatus}
@@ -90,6 +94,8 @@ function Column({
   status,
   cards,
   selectedKey,
+  hoveredKey,
+  markedKey,
   chosenKeys,
   selectedRef,
   focused,
@@ -131,6 +137,7 @@ function Column({
               ref={t.key === selectedKey ? selectedRef : null}
               className={styles.card}
               data-selected={chosenKeys.has(t.key)}
+              data-hovered={t.key === hoveredKey || t.key === markedKey} // the mouse is on it in the scheduler at the right, or it is chosen there
               data-dragging={dragKeys.includes(t.key)}
               role="button"
               tabIndex={0}

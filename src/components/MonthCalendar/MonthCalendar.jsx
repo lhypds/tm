@@ -174,7 +174,7 @@ function MonthSelect({ month, onPick, onClose }) {
 // `chosenEvent` changed with `onEvent(id)`, so the timetable shows it chosen too, and one chosen
 // there is chosen here) and a double click shows its details (see EventModal), a click anywhere else on a day shows that day in the scheduler at the right,
 // with its timetable (`onDay(day)`) and puts the keyboard on it (as the keys do, see below), and the day the scheduler shows (`chosenDay`, "YYYY-MM-DD",
-// or null while it is not on screen) is shaded. The pencil at the right of the title adds and removes calendars (see
+// or null while the task is in the right pane in its place; a folded right pane still has its day) is shaded. The pencil at the right of the title adds and removes calendars (see
 // CalendarsModal), and the plus at its left makes a new event in Apple's Calendar (on the server's
 // machine, a Mac), open there for its time to be chosen, on the day the keyboard is on, else the one the scheduler shows,
 // else today (the first of another month); n does the same, and a double click on a day (anywhere but on an event of it) makes one on that day; a press on a day dragged to another makes one of whole days, from the first of the days dragged over (shaded meanwhile) through the last (esc lets it go). The events are read again whenever `reloadKey` changes (the page's refresh,
@@ -188,7 +188,7 @@ function MonthSelect({ month, onPick, onClose }) {
 // the scheduler shows each day the keyboard comes on (so it is the shaded one, as after a click);
 // enter goes into the day, where j and k walk its events and space shows the one chosen (see EventModal); esc is back out of the
 // day, then out of the month.
-export default function MonthCalendar({ reloadKey, loading, focused, keysRef, enterKey, chosenDay, onDay, chosenEvent, onEvent }) {
+export default function MonthCalendar({ reloadKey, loading, focused, keysRef, enterKey, chosenDay, onDay, chosenEvent, onEvent, hoveredEvent }) {
   const { t, i18n } = useTranslation();
   const [month, setMonth] = useState(() => ({ y: new Date().getFullYear(), m: new Date().getMonth() }));
   const [read, setRead] = useState(null); // { range, events, errors } as read last
@@ -582,6 +582,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
                   key={e.id}
                   ref={e.id === eventId ? chosenRef : undefined}
                   data-chosen={e.id === eventId}
+                  data-hovered={e.id === hoveredEvent} // the mouse is on it in the timetable
                   type="button"
                   className={styles.event}
                   tabIndex={-1}
@@ -611,6 +612,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
           <button
             key={`${week}/${e.id}`}
             data-chosen={e.id === eventId}
+            data-hovered={e.id === hoveredEvent}
             data-starts={starts}
             data-ends={ends}
             type="button"

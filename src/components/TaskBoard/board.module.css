@@ -66,6 +66,7 @@
 }
 
 .card:hover,
+.card[data-hovered="true"],
 .card[data-selected="true"] {
   background: var(--bg-hover);
 }

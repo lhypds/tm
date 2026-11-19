@@ -68,7 +68,9 @@ export const keepFocus = (e) => {
 // (`onMove(tasks, target)`, target null for the top); dragging one of the rows chosen together
 // takes them all along, each subtask among them going with its task. A row does not take a task
 // that is dragged, nor one under it.
-export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, onMove, empty }) {
+// `hoveredKey` is the task the mouse is on in the scheduler at the right, and `markedKey` the one
+// chosen there: their rows are shown hovered.
+export default function TaskList({ tasks, selectedKey, hoveredKey, markedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, onMove, empty }) {
   const { t: tr } = useTranslation();
   const selectedRef = useRef(null);
   useEffect(() => {
@@ -127,6 +129,7 @@ export default function TaskList({ tasks, selectedKey, chosenKeys, focused, onSe
             className={`${styles.row}${chosenKeys.has(t.key) ? ` ${styles.selected}` : ""}`}
             data-status={t.status}
             data-depth={t.depth}
+            data-hovered={t.key === hoveredKey || t.key === markedKey}
             data-dragging={dragKeys.includes(t.key)}
             data-drop={over === t.key}
             role="button"
