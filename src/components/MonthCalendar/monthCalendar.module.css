@@ -221,6 +221,12 @@
   user-select: none;
 }
 
+/* The days of the months around the one shown: a grey fainter than the chosen day's, which sets
+   the months apart. */
+.day[data-other="true"] {
+  background: #fafafa;
+}
+
 .day[data-chosen="true"] {
   background: var(--bg-hover);
 }

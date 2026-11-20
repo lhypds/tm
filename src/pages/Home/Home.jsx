@@ -2270,7 +2270,12 @@ export default function Home({ all = false }) {
             showHidden={showHidden}
             hiddenCount={hiddenCount}
             onShowHidden={setShowHidden}
-            onSelect={(to) => selectSpace(to)}
+            onSelect={(to) => {
+              selectSpace(to);
+              // as with the keyboard (see treeKey): the calendar is of no space in particular,
+              // so the tasks of the row clicked are shown in the list (the progress view stays)
+              if (view === "calendar") setView("list");
+            }}
             onEdit={() => setConfigOpen(true)}
             onAdd={setAdding}
             onEditWork={setEditingWork}

@@ -13,7 +13,7 @@ import styles from "./monthCalendar.module.css";
 const READ_EVERY = 5 * 60 * 1000; // as long as the server keeps a calendar it has read
 const WHEEL_REST = 200; // ms the wheel is still for before the scheduler shows the day it is on
 const WHEEL_TURN = 150; // ms the wheel is still for before it is turned anew
-const WHEEL_DAY = 100; // px of the wheel a day: a notch of a mouse's wheel
+const WHEEL_DAY = 100; // px of the wheel a day, after the first of a turn
 
 const p2 = (n) => String(n).padStart(2, "0");
 const keyOf = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -242,7 +242,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
   // before, as far as it turns (see below), the month following a day of another one. The day is
   // shaded at once (`rolled`), and the scheduler is told (`onDay`, which reads the day and its
   // timetable) only once the wheel has been still for WHEEL_REST: the days passed on the way are
-  // not read.
+  // not read. With cmd held, the wheel steps the month shown instead, as the buttons do.
   const [rolled, setRolled] = useState(null); // the day the wheel is on, the scheduler not told yet
   const wheel = useRef({ last: 0, sum: 0, day: null, timer: 0, pending: false });
   useEffect(() => () => clearTimeout(wheel.current.timer), []);
@@ -251,14 +251,29 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
     e.preventDefault(); // not the events of the day under it too, which would scroll (see the listener)
     if (dragging.current) return; // days are being dragged over
     const w = wheel.current;
-    // A day every WHEEL_DAY px of it, as many as it turns: turned fast, the days go by fast.
     const at = Date.now();
-    if (at - w.last > WHEEL_TURN) w.sum = 0; // what was left of a turn that is over
+    // cmd: a month in place of a day, one a turn of the wheel however far it turns (at its first
+    // move, so a notch is enough and what a trackpad sends after a swipe adds none)
+    if (e.metaKey) {
+      if (at - w.last > WHEEL_TURN) step(Math.sign(e.deltaY));
+      w.last = at;
+      w.sum = 0;
+      return;
+    }
+    // A day at the first move of a turn (a notch is enough, however short), then one every
+    // WHEEL_DAY px of what follows, as many as it turns: turned fast, the days go by fast.
+    const fresh = at - w.last > WHEEL_TURN;
     w.last = at;
-    w.sum += e.deltaY * (e.deltaMode === 1 ? WHEEL_DAY / 3 : 1); // (a wheel that counts lines: three a notch)
-    const n = Math.trunc(w.sum / WHEEL_DAY);
-    if (!n) return;
-    w.sum -= n * WHEEL_DAY;
+    let n;
+    if (fresh) {
+      w.sum = 0; // what was left of a turn that is over
+      n = Math.sign(e.deltaY);
+    } else {
+      w.sum += e.deltaY * (e.deltaMode === 1 ? WHEEL_DAY / 3 : 1); // (a wheel that counts lines: three a notch)
+      n = Math.trunc(w.sum / WHEEL_DAY);
+      if (!n) return;
+      w.sum -= n * WHEEL_DAY;
+    }
     // from the day shaded, else the one the keyboard is on, else today (the first of another month)
     const here = month.y === now.getFullYear() && month.m === now.getMonth() ? keyOf(now) : keyOf(new Date(month.y, month.m, 1));
     // (the wheel's own day is kept beside the state: more of the wheel may come before it is drawn)
@@ -465,6 +480,8 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
   });
 
   const names = new Intl.DateTimeFormat(i18n.language, { weekday: "short" });
+  // the first day of a month says its month too ("Dec 1", "12月1日")
+  const firstOf = new Intl.DateTimeFormat(i18n.language, { month: "short", day: "numeric" });
   const today = keyOf(now);
   const let1 = (e) => e.currentTarget.blur(); // let go after the click, so the keys stay the page's
 
@@ -575,7 +592,7 @@ export default function MonthCalendar({ reloadKey, loading, focused, keysRef, en
               addEvent(days[i]);
             }}
           >
-            <span className={styles.number}>{d.getDate()}</span>
+            <span className={styles.number}>{d.getDate() === 1 ? firstOf.format(d) : d.getDate()}</span>
             <div className={styles.events} style={taken[days[i]] ? { marginTop: taken[days[i]] * LANE } : undefined}>
               {rest[days[i]].map((e) => (
                 <button
