@@ -121,8 +121,11 @@
   width: 100%;
   min-height: 0;
   margin: 0;
-  padding: 12px;
+  padding: 12px 12px 0;
+  /* The bottom gap is a border, not padding: a textarea scrolls its caret's line flush to the edge
+     of its padding box, so padding there is gone while typing on the last line. */
   border: none;
+  border-bottom: 12px solid transparent;
   outline: none;
   resize: none;
   background-color: transparent;
