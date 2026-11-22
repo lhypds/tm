@@ -1223,9 +1223,10 @@ export default function Home({ all = false }) {
 
   // The task dialog saved on an existing task: its text when it changed (the first line names the
   // folder, so the task may move), and, with the Prompt area shown (`prompt` not null), its
-  // prompt.txt: written when it changed, removed when emptied. The dialog closes; with `execute`
-  // Claude Code then runs on the task, as its run button would.
-  async function saveEdited(task, { text, prompt, execute }) {
+  // prompt.txt: written when it changed, removed when emptied. The dialog closes, unless `keep`
+  // (cmd/ctrl+s): it is then of the task as saved. With `execute` Claude Code then runs on the
+  // task, as its run button would.
+  async function saveEdited(task, { text, prompt, execute, keep }) {
     setSaving(true);
     showToast(t("toast.saving"), null);
     try {
@@ -1239,7 +1240,11 @@ export default function Home({ all = false }) {
       }
       const key = keyOf(task.space, rel);
       setSelectedKey((k) => (k === task.key ? key : k));
-      closePeek();
+      if (keep) {
+        // the first line names the folder, so the dialog follows the rename; the prompt is read again
+        setPeek((p) => (p && p.key === task.key ? { ...p, key, rel, details: text } : p));
+        setLoads((n) => n + 1);
+      } else closePeek();
       await reload();
       showToast(t("toast.saved"));
       if (execute) {
@@ -1254,10 +1259,11 @@ export default function Home({ all = false }) {
     }
   }
 
-  // `prompt`: the text of the editor's Prompt area when it is shown ("Save & Execute"), which
-  // becomes the task's prompt.txt (never blank: the editor only saves then); Claude Code then runs on the task, as its run
-  // button would (asking which machine first, when two sync its folder). Null: saved only.
-  async function saveEditor(text, files = [], prompt = null) {
+  // `prompt`: the text of the editor's Prompt area when it is shown (null: hidden), which, unless
+  // blank, becomes the task's prompt.txt; with `execute` ("Save & Execute") Claude Code then runs on the task, as its run
+  // button would (asking which machine first, when two sync its folder). `keep` (cmd/ctrl+s): the
+  // dialog stays open, from then on the new task's.
+  async function saveEditor({ text, files = [], prompt = null, execute = false, keep = false }) {
     setSaving(true);
     showToast(t("toast.saving"), null);
     // the new task goes where the editor was opened for: the folder on the right (in a work's
@@ -1283,8 +1289,9 @@ export default function Home({ all = false }) {
       } catch (e) {
         showToast(t("toast.createdUploadFailed", { error: e.message }), 5000);
       }
-      let run = prompt !== null;
-      if (run) {
+      const withPrompt = prompt !== null && !!prompt.trim();
+      let run = execute && withPrompt;
+      if (withPrompt) {
         try {
           await api.saveTaskPrompt(inSpace, rel, prompt);
         } catch (e) {
@@ -1293,6 +1300,11 @@ export default function Home({ all = false }) {
         }
       }
       setCreating(null);
+      if (keep) {
+        // a second save must not create it again: the dialog is the task's from here on
+        setPeekPromptOpen(prompt !== null);
+        setPeek({ ...created, space: inSpace, rel, key: keyOf(inSpace, rel), details: text });
+      }
       setSelectedKey(keyOf(inSpace, rel));
       await reload();
       showToast(t("toast.created"));
@@ -2491,8 +2503,8 @@ export default function Home({ all = false }) {
       <ConfigEditorModal
         isOpen={configOpen}
         onClose={() => setConfigOpen(false)}
-        onSaved={(d) => {
-          setConfigOpen(false);
+        onSaved={(d, keep) => {
+          if (!keep) setConfigOpen(false);
           setSpaces(d);
           showToast(t("config.saved"));
         }}
@@ -2505,9 +2517,10 @@ export default function Home({ all = false }) {
       <WorkEditModal
         work={editingWork}
         onClose={() => setEditingWork(null)}
-        onSaved={(d, newName) => {
+        onSaved={(d, newName, keep) => {
           const oldName = editingWork.work;
-          setEditingWork(null);
+          // kept open (cmd/ctrl+s): the dialog is of the work as saved, so the next save finds it under its new name
+          setEditingWork((keep && d.works.find((item) => item.work === newName)) || null);
           setSpaces(d);
           if (spacePeek) setSpacePeek(api.spacePath(editingWork.origin, newName)); // the preview under it follows the rename
           // Follow the rename when the space on the right is this work or one of its repositories.
@@ -2523,9 +2536,10 @@ export default function Home({ all = false }) {
       <WorkEditModal
         origin={editingOrigin}
         onClose={() => setEditingOrigin(null)}
-        onSaved={(d, newName) => {
+        onSaved={(d, newName, keep) => {
           const oldName = editingOrigin.origin;
-          setEditingOrigin(null);
+          const g = keep && d.origins.find((item) => item.origin === newName);
+          setEditingOrigin(g ? { origin: g.origin, description: g.description, income: g.income, color: g.color } : null);
           setSpaces(d);
           if (spacePeek) setSpacePeek(api.originPath(newName));
           // Follow the rename when the origin is the one on the right.
@@ -2558,9 +2572,10 @@ export default function Home({ all = false }) {
       <RepositoryEditModal
         repository={editingRepository}
         onClose={() => setEditingRepository(null)}
-        onSaved={(d, newName) => {
+        onSaved={(d, newName, keep) => {
           const { work: inWork, name } = editingRepository;
-          setEditingRepository(null);
+          const p = keep && d.works.find((item) => item.work === inWork)?.repositories.find((item) => item.name === newName);
+          setEditingRepository(p ? { work: inWork, name: p.name, description: p.description, paths: p.paths } : null);
           setSpaces(d);
           // Follow a rename when the repository is the one on the right.
           const inOrigin = (works || []).find((item) => item.work === inWork)?.origin || "";
@@ -2593,7 +2608,7 @@ export default function Home({ all = false }) {
         noRunner={noRunnerOf(peekTask?.space)}
         onRun={openRun}
         onCancel={() => (creating ? setCreating(null) : closePeek())}
-        onSave={(v) => (creating ? saveEditor(v.text, v.files, v.execute ? v.prompt : null) : saveEdited(peekTask, v))}
+        onSave={(v) => (creating ? saveEditor(v) : saveEdited(peekTask, v))}
         onPreview={(file) => setPreview({ ...file, space: creating.space })}
         onOpenFile={(file) => openFile(file, peek)}
         onOpenFolder={openFolder}

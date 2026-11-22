@@ -34,7 +34,8 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
     setError("");
   }, [work, origin, reset]);
 
-  async function save() {
+  // `keep`: the dialog stays open (cmd/ctrl+s); Save closes it.
+  async function save(keep = false) {
     const newName = name.trim();
     if (!newName) {
       setError(t("work.nameEmpty"));
@@ -50,7 +51,7 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
       const spaces = origin
         ? await api.saveOrigin(origin.origin, { name: newName, income: read.income, color, description })
         : await api.saveWork(work.work, { name: newName, income: read.income, hidden, tasksPath, description });
-      onSaved(spaces, newName);
+      onSaved(spaces, newName, keep);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -66,11 +67,11 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
           e.preventDefault();
           if (!saving) save();
         }}
-        // cmd+s (ctrl+s) saves and closes, as Save does
+        // cmd+s (ctrl+s) saves and leaves the dialog open
         onKeyDown={(e) => {
           if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
           e.preventDefault();
-          if (!saving) save();
+          if (!saving) save(true);
         }}
       >
         <label className={styles.field}>

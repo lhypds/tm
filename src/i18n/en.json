@@ -135,7 +135,6 @@
     "saveHint": "⌘S / Ctrl+S saves",
     "save": "Save",
     "saveExecute": "Save & Execute",
-    "executeHint": "⌘S / Ctrl+S saves and runs Claude Code on the task",
     "saving": "Saving...",
     "newSubtask": "New subtask of “{{name}}”"
   },

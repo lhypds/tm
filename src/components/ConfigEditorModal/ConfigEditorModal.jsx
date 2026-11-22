@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { modKey, withKey } from "@utils/keys";
 import { Modal, TextArea, showToast, hideToast } from "@ui";
 import * as api from "@utils/api";
 import { jsonTokens } from "@utils/highlight";
@@ -28,11 +27,12 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
       .catch((e) => setError(e.message));
   }, [isOpen]);
 
-  async function save() {
+  // `keep`: the dialog stays open (cmd/ctrl+s); Save closes it.
+  async function save(keep = false) {
     setSaving(true);
     showToast(t("toast.saving"), null);
     try {
-      onSaved(await api.saveConfig(text));
+      onSaved(await api.saveConfig(text), keep);
     } catch (e) {
       hideToast(); // the error is shown in the dialog
       setError(e.message);
@@ -61,7 +61,7 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
           onKeyDown={(e) => {
             if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
               e.preventDefault();
-              if (text !== null && !saving) save();
+              if (text !== null && !saving) save(true);
             }
           }}
         />
@@ -70,7 +70,7 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
           <button type="button" className="btn lg" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </button>
-          <button type="button" className="btn lg primary" onClick={save} disabled={saving || text === null} title={withKey(t("editor.save"), `${modKey}S`)}>
+          <button type="button" className="btn lg primary" onClick={() => save()} disabled={saving || text === null}>
             {t("editor.save")}
           </button>
         </div>

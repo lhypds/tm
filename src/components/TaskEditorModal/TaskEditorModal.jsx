@@ -4,7 +4,7 @@ import { Modal } from "@ui";
 import Attachments from "@components/Attachments";
 import { BrainIcon, CodeIcon, FolderIcon, TrashIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
-import { moveIndex, modKey, withKey } from "@utils/keys";
+import { moveIndex, withKey } from "@utils/keys";
 import { formatSize, previewKind } from "@utils/task";
 import styles from "./editor.module.css";
 
@@ -35,8 +35,9 @@ function HeaderButton({ label, keys, dot, pressed, disabled, onClick, children }
 // (the first line is the title), for a new task (`task` null: "New task", or with `parent` a
 // subtask of that task, which the title says) and for an existing one (`task`: "Task", opened with
 // space or a double click on it). `isOpen` is separate so a closed dialog keeps its last text until it reopens.
-// Nothing is written until it is saved, with the button at the bottom right or cmd/ctrl+s:
-// onSave({ text, files, prompt, execute }), `files` the attachments added to a new task (kept until
+// Nothing is written until it is saved, with the button at the bottom right, which also closes the
+// dialog, or cmd/ctrl+s, which leaves it open (`keep`) and executes nothing:
+// onSave({ text, files, prompt, execute, keep }), `files` the attachments added to a new task (kept until
 // then), `prompt` the Prompt area's text, or null while that is hidden (the prompt is left as it is).
 // The brain beside the title shows the Prompt area under the text, the task's prompt.txt (`prompt`:
 // its saved text, null for none, undefined until read). With a prompt typed there the button reads
@@ -148,10 +149,10 @@ export default function TaskEditorModal({
     }
   }
 
-  function submit(e) {
+  function submit(e, keep = false) {
     e?.preventDefault();
     if (saving || blocked) return;
-    onSave({ text, files: pending, prompt: promptOpen ? prompt : null, execute });
+    onSave({ text, files: pending, prompt: promptOpen ? prompt : null, execute: execute && !keep, keep });
   }
   // The task's run going is shown; otherwise it is saved and executed.
   function runNow() {
@@ -166,7 +167,7 @@ export default function TaskEditorModal({
     else onCancel();
   }
 
-  // cmd/ctrl+s saves wherever the caret is, in a text or out of it.
+  // cmd/ctrl+s saves wherever the caret is, in a text or out of it, and the dialog stays open.
   const submitRef = useRef(submit);
   submitRef.current = submit;
   useEffect(() => {
@@ -174,7 +175,7 @@ export default function TaskEditorModal({
     const onKey = (e) => {
       if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
       e.preventDefault();
-      submitRef.current();
+      submitRef.current(null, true);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -328,11 +329,11 @@ export default function TaskEditorModal({
         )}
 
         <div className={styles.actions}>
-          <span className={`muted ${styles.hint}`}>{t(execute ? "editor.executeHint" : "editor.saveHint")}</span>
+          <span className={`muted ${styles.hint}`}>{t("editor.saveHint")}</span>
           <button type="button" className="btn lg" onClick={onCancel} disabled={saving}>
             {t("common.cancel")}
           </button>
-          <button type="submit" className="btn lg primary" disabled={saving || blocked} title={withKey(t(execute ? "editor.saveExecute" : "editor.save"), `${modKey}S`)}>
+          <button type="submit" className="btn lg primary" disabled={saving || blocked} title={t(execute ? "editor.saveExecute" : "editor.save")}>
             {saving ? t("editor.saving") : t(execute ? "editor.saveExecute" : "editor.save")}
           </button>
         </div>

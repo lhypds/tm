@@ -26,7 +26,8 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
     setError("");
   }, [repository]);
 
-  async function save() {
+  // `keep`: the dialog stays open (cmd/ctrl+s); Save closes it.
+  async function save(keep = false) {
     const newName = name.trim();
     if (!newName) {
       setError(t("repository.nameEmpty"));
@@ -38,7 +39,7 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      onSaved(await api.saveRepository(repository.work, repository.name, { newName, sourcePath, tasksPath, description }), newName);
+      onSaved(await api.saveRepository(repository.work, repository.name, { newName, sourcePath, tasksPath, description }), newName, keep);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -54,11 +55,11 @@ export default function RepositoryEditModal({ repository, onClose, onSaved }) {
           e.preventDefault();
           if (!saving) save();
         }}
-        // cmd+s (ctrl+s) saves and closes, as Save does
+        // cmd+s (ctrl+s) saves and leaves the dialog open
         onKeyDown={(e) => {
           if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
           e.preventDefault();
-          if (!saving) save();
+          if (!saving) save(true);
         }}
       >
         <label className={styles.field}>

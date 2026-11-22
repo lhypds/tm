@@ -135,7 +135,6 @@
     "saveHint": "⌘S / Ctrl+S で保存",
     "save": "保存",
     "saveExecute": "保存して実行",
-    "executeHint": "⌘S / Ctrl+S で保存し、Claude Code でタスクを実行",
     "saving": "保存中...",
     "newSubtask": "「{{name}}」のサブタスクを追加"
   },
