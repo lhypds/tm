@@ -2380,7 +2380,7 @@ export default function Home({ all = false }) {
                 title={withKey(selected ? t("header.newSubtaskOf", { name: selected.title || selected.id }) : t("header.newTask"), "a / n")}
               >
                 <PlusIcon />
-                {t(selected ? "header.newSubtask" : "header.newTask")}
+                <span className={styles.addTaskLabel}>{t(selected ? "header.newSubtask" : "header.newTask")}</span>
               </button>
             </div>
           )}

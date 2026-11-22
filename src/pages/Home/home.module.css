@@ -393,6 +393,17 @@
     width: min(300px, 70vw);
   }
 
+  /* the new task button is a square + alone: its label would crowd the checkboxes out of the bar */
+  .addTask {
+    width: 22px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .addTaskLabel {
+    display: none;
+  }
+
   .detail,
   .detail > * {
     width: min(340px, 80vw);
