@@ -6,6 +6,9 @@
 //   POST   /api/ai/run               { work, repository?, rel, after? }: start Claude Code on that task; 201 { run }.
 //                                    `after` ("push" or "pr") is what Claude is told to do with its changes
 //                                    once done: commit and push, or a new branch and a pull request (see ai/task.js)
+//   POST   /api/ai/prompt            { work, repository?, prompt, text?, after?, machine? }: start Claude Code in that
+//                                    space with the prompt, on no task and making none (the new task dialog's
+//                                    Execute); `text` is the task text typed there, given as context; 201 { run }
 //   GET    /api/ai/machines          the machines Claude Code can be run on from here: { machines }
 //   DELETE /api/ai/machines/<name>   forget a machine: { ok }
 //   POST   /api/ai/machine/run       { machine, prompt }: start Claude Code on that machine with the prompt as
@@ -41,7 +44,7 @@ const path = require('path');
 const express = require('express');
 
 const { TASK_FILE, PROMPT_FILE, readPrompt, readTaskDir } = require('../../utils/task');
-const { isDirectory, spaceOf, taskDirIn, titleOf, afterOf } = require('../../ai/task');
+const { isDirectory, spaceOf, taskDirIn, titleOf, afterOf, buildFreePrompt, cwdOf } = require('../../ai/task');
 const session = require('../../ai/session');
 const remote = require('../../ai/remote');
 const record = require('../../ai/record');
@@ -132,6 +135,32 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     const target = asked ? (where.machines || []).find(m => m.name === asked) : where.machine;
     if (!target) throw httpError(400, `"${asked}" does not sync this folder.`);
     const run = await remote.startRun({ machine: target.name, task, taskDir, files, after });
+    res.status(201).json({ run: remote.publicRun(run, true) });
+  });
+
+  // A prompt run in a space, on no task: where a task of the space would run (the repository's source
+  // folder, else the tasks folder; on the machine a pushed copy came from), and nothing is written.
+  app.post('/api/ai/prompt', async (req, res) => {
+    const body = req.body || {};
+    const space = spaceFrom(body);
+    if (typeof body.prompt !== 'string' || !body.prompt.trim()) throw httpError(400, 'Missing prompt.');
+    const text = typeof body.text === 'string' ? body.text : '';
+    const after = afterOf(body.after);
+    const prompt = buildFreePrompt(body.prompt, text, after);
+    const title = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)[0] || '';
+    const ref = { title, work: space.work, repository: space.repository, after };
+    const where = locate(space) || {};
+    if (!where.remote) {
+      let cwd;
+      try { cwd = cwdOf(space, space.root); } catch (e) { throw httpError(400, e.message); }
+      const run = session.startPrompt({ prompt, cwd, ...ref });
+      return res.status(201).json({ run: session.publicRun(run, true) });
+    }
+    if (!where.machine) throw httpError(409, 'This folder is a copy pushed without a machine id; Claude Code cannot run on it.');
+    const asked = typeof body.machine === 'string' ? body.machine.trim() : '';
+    const target = asked ? (where.machines || []).find(m => m.name === asked) : where.machine;
+    if (!target) throw httpError(400, `"${asked}" does not sync this folder.`);
+    const run = await remote.startPrompt({ machine: target.name, prompt, ...ref });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 

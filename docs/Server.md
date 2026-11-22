@@ -273,6 +273,13 @@ Forget a machine (the × beside one that is not in touch, in the web UI's Machin
 here is no longer remembered for it. `{ ok: true }`; 404 when it is not known. Never refused otherwise: a machine that  
 is in touch, or comes back later, goes on syncing and is counted again at its next push or pull.  
 
+`POST /api/ai/prompt` `{ work, repository?, prompt, text?, after?, machine? }`  
+Start Claude Code in that space with the prompt, on no task and making none (the "Execute" of the web UI's New task  
+dialog): in the folder a task of the space would run in (the repository's source folder, else the tasks folder; on the  
+machine a pushed copy came from). `text`, the task text typed there, is given to Claude as context, and `after` is as for  
+`POST /api/ai/run`. 201 `{ run }`: a run on no task as the one below, whose `task` also says the `work` and `repository`  
+and whose `title` is the first line of `text` when there is one. It leaves no record.  
+
 `POST /api/ai/machine/run` `{ machine, prompt }`  
 Start Claude Code on that machine with the prompt as it is, on no task, in the home folder of its user (the web UI's  
 Machines dialog). 201 `{ run }`, with its transcript: a run as above whose `task` is `{ work: "", repository: "", rel: "",  

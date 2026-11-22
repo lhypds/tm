@@ -1,0 +1,88 @@
+/* The playlist (see PlaylistModal): the runs still going, a framed row each. */
+.modal {
+  max-width: 520px;
+}
+
+.none {
+  margin: 0;
+}
+
+.runs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.runs li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: var(--line) solid var(--border);
+}
+
+/* No gap between them: one line between two runs, not two. */
+.runs li + li {
+  border-top: 0;
+}
+
+.runs li:hover {
+  background: var(--bg-hover);
+}
+
+/* What runs, over where and since when: the click that shows the run. */
+.name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.title,
+.meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: 10px;
+}
+
+.state {
+  flex: none;
+  font-size: 10px;
+}
+
+.state[data-pending="true"] {
+  color: var(--warn);
+}
+
+/* Stop the run: a small square at the right end, as in the Machines dialog. */
+.stop {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.stop:hover {
+  color: var(--err);
+}
+
+.stop svg {
+  width: 10px;
+  height: 10px;
+}

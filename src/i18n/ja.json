@@ -135,6 +135,10 @@
     "saveHint": "⌘S / Ctrl+S で保存",
     "save": "保存",
     "saveExecute": "保存して実行",
+    "create": "作成",
+    "createExecute": "作成して実行",
+    "execute": "実行",
+    "executeTip": "タスクを作成せずに、このプロンプトで Claude Code を実行",
     "saving": "保存中...",
     "newSubtask": "「{{name}}」のサブタスクを追加"
   },
@@ -470,6 +474,10 @@
     "forget": "{{when}} の実行を削除",
     "forgetConfirm": "{{when}} の実行を削除しますか？",
     "forgetTitle": "実行履歴を削除"
+  },
+  "playlist": {
+    "title": "プレイリスト",
+    "none": "実行中のものはありません。"
   },
   "machines": {
     "title": "マシン",

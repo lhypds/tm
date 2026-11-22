@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useEffect, useRef, useState } from "react";
-import { Modal } from "@ui";
+import { Checkbox, Modal } from "@ui";
 import Attachments from "@components/Attachments";
 import { BrainIcon, CodeIcon, FolderIcon, TrashIcon } from "@components/icons";
 import { fileUrl } from "@utils/api";
@@ -45,6 +45,12 @@ function HeaderButton({ label, keys, dot, pressed, disabled, onClick, children }
 // hidden, "Save". The button is greyed out while the task's text is blank. For a new task the
 // prompt starts hidden; for an existing one as it was last left (`promptDefault`, onPromptOpen(open)
 // keeps it).
+// A new task's button reads "Create", and "Create & Execute" with a prompt typed. Under its prompt
+// are two checkboxes, what Claude does with its changes once the work is done: "Commit & push"
+// (ticked as the dialog opens) and "Create PR", one or the other or neither; onSave gets it as
+// `after` ("push", "pr" or null). With a prompt typed there is also "Execute", beside the button:
+// onExecute({ text, prompt, after }) runs Claude Code with the prompt (the text, when there is one,
+// as its context) and creates no task. It is greyed out while `noRunner` says nothing can run.
 // An existing task also has, beside the title, programming (onCode(task): its repository's source
 // code in VS Code; the button is grey unless `canCode`), its folder (onOpenFolder) and delete (onDelete, which
 // asks first), and under the texts its attachments (`files`, the one at `selectedRel`
@@ -78,6 +84,7 @@ export default function TaskEditorModal({
   onRun,
   onCancel,
   onSave,
+  onExecute,
   onPreview,
   onOpenFile,
   onOpenFolder,
@@ -94,6 +101,7 @@ export default function TaskEditorModal({
   const [prompt, setPrompt] = useState("");
   const [promptOpen, setPromptOpen] = useState(false);
   const [pending, setPending] = useState([]); // File objects
+  const [after, setAfter] = useState("push"); // a new task's: what Claude does with its changes after the work
   const [section, setSection] = useState(null); // the text the caret is in, or was last, or j / k chose: "task" or "prompt"; null: none yet
   const base = useRef({ text: "", prompt: "" }); // the texts as saved, to tell what was typed
   const textRef = useRef(null);
@@ -107,6 +115,7 @@ export default function TaskEditorModal({
     setText(savedText);
     setPrompt(savedPrompt);
     setPending([]);
+    setAfter("push");
     setPromptOpen(taskKey ? !!promptDefault : false);
     setSection(taskKey ? null : "task");
     if (!taskKey) textRef.current?.focus();
@@ -152,7 +161,12 @@ export default function TaskEditorModal({
   function submit(e, keep = false) {
     e?.preventDefault();
     if (saving || blocked) return;
-    onSave({ text, files: pending, prompt: promptOpen ? prompt : null, execute: execute && !keep, keep });
+    onSave({ text, files: pending, prompt: promptOpen ? prompt : null, execute: execute && !keep, keep, ...(task ? {} : { after }) });
+  }
+  // A new task's Execute: the prompt runs, and no task is created.
+  function executeOnly() {
+    if (saving || !execute || noRunner) return;
+    onExecute({ text, prompt, after });
   }
   // The task's run going is shown; otherwise it is saved and executed.
   function runNow() {
@@ -230,6 +244,7 @@ export default function TaskEditorModal({
     keysRef.current = isOpen ? keys : null;
   });
 
+  const saveLabel = t(task ? (execute ? "editor.saveExecute" : "editor.save") : execute ? "editor.createExecute" : "editor.create");
   const brainLabel = t(promptOpen ? "panel.hidePrompt" : "panel.showPrompt");
   const actions = (
     <div className={styles.headerButtons}>
@@ -289,6 +304,17 @@ export default function TaskEditorModal({
               }}
               aria-label={t("panel.prompt")}
             />
+            {/* a new task's: what to do with the changes after the work, one of the two or neither */}
+            {!task && (
+              <div className={styles.after}>
+                <Checkbox checked={after === "push"} onChange={(on) => setAfter(on ? "push" : null)}>
+                  {t("ai.afterPush")}
+                </Checkbox>
+                <Checkbox checked={after === "pr"} onChange={(on) => setAfter(on ? "pr" : null)}>
+                  {t("ai.afterPr")}
+                </Checkbox>
+              </div>
+            )}
           </>
         )}
 
@@ -333,8 +359,13 @@ export default function TaskEditorModal({
           <button type="button" className="btn lg" onClick={onCancel} disabled={saving}>
             {t("common.cancel")}
           </button>
-          <button type="submit" className="btn lg primary" disabled={saving || blocked} title={t(execute ? "editor.saveExecute" : "editor.save")}>
-            {saving ? t("editor.saving") : t(execute ? "editor.saveExecute" : "editor.save")}
+          {!task && execute && (
+            <button type="button" className="btn lg" onClick={executeOnly} disabled={saving || !!noRunner} title={noRunner || t("editor.executeTip")}>
+              {t("editor.execute")}
+            </button>
+          )}
+          <button type="submit" className="btn lg primary" disabled={saving || blocked} title={saveLabel}>
+            {saving ? t("editor.saving") : saveLabel}
           </button>
         </div>
       </form>

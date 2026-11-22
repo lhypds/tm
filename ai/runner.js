@@ -217,7 +217,9 @@ function startRunner({ server, token, machineId, log, warn, logFile, ai = true, 
           break;
         }
         case 'prompt': {
-          const run = session.startPrompt({ id: String(cmd.run || '') || null, prompt: cmd.prompt });
+          // in a space's folder when the command names one (the new task dialog's Execute), else at home
+          const inSpace = cmd.work ? { cwd: folderOf(cmd), work: String(cmd.work), repository: String(cmd.repository || ''), title: String(cmd.title || ''), after: afterOf(cmd.after) } : {};
+          const run = session.startPrompt({ id: String(cmd.run || '') || null, prompt: cmd.prompt, ...inSpace });
           log(`runner: run ${run.id}: prompt "${run.task.title}" in ${run.cwd}`);
           break;
         }

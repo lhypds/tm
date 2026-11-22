@@ -14,6 +14,12 @@ export const runEventsUrl = "/api/ai/events";
 export const startRun = (space, rel, after = null, machine = null) =>
   request("/api/ai/run", json("POST", { ...sp(space), rel, ...(after ? { after } : {}), ...(machine ? { machine } : {}) }));
 
+// Start Claude Code in the space with `prompt`, on no task and making none (the new task dialog's
+// Execute): where a task of the space would run. `text` is the task text typed there, given to Claude
+// as context; `after` as in startRun. Resolves to { run } with its transcript.
+export const startSpacePrompt = (space, { prompt, text = "", after = null }) =>
+  request("/api/ai/prompt", json("POST", { ...sp(space), prompt, text, ...(after ? { after } : {}) }));
+
 // The machines Claude Code can be run on from here (those that sync with this server): { machines:
 // [{ name, seenAt, online, runner, linked, port }] }, `linked` whether the machine's taskmgrd is
 // connected, so it can be given a tm command, `runner` whether it runs Claude Code too, so it can be

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showToast } from "@ui";
 import * as api from "./api";
 
@@ -8,7 +8,9 @@ import * as api from "./api";
 // its space and rel), start / answer / stop act on one (an error shows as a toast); start(task, after,
 // machine) takes what Claude should do with its changes once done ("push", "pr" or null, see
 // api.startRun) and, for a folder two machines sync, the one to run on (null: the server picks).
-// startOn(machine, prompt) starts a run on no task, on a machine (the Machines dialog).
+// startOn(machine, prompt) starts a run on no task, on a machine (the Machines dialog);
+// startIn(space, { prompt, text, after }) one in a space, on no task either (the new task dialog's Execute).
+// `going` is the runs still going (running or queued), oldest first, for the header's playlist.
 // onAsk(run) is called when a run gets a question for the user, whatever task is shown; onEnd(run)
 // when a run seen going here is over (done, failed or stopped; not for one found over already).
 export default function useRuns({ onAsk, onEnd } = {}) {
@@ -113,6 +115,19 @@ export default function useRuns({ onAsk, onEnd } = {}) {
     }
   }, []);
 
+  // Start Claude Code in a space with a prompt, on no task (see api.startSpacePrompt): the run, or
+  // null when refused.
+  const startIn = useCallback(async (space, body) => {
+    try {
+      const { run } = await api.startSpacePrompt(space, body);
+      put(run);
+      return run;
+    } catch (e) {
+      failed(e);
+      return null;
+    }
+  }, []);
+
   const answer = useCallback(async (run, body) => {
     if (!run.pending) return false;
     try {
@@ -132,5 +147,13 @@ export default function useRuns({ onAsk, onEnd } = {}) {
     }
   }, []);
 
-  return { runs, runFor, start, startOn, answer, stop };
+  const goingRuns = useMemo(
+    () =>
+      Object.values(runs)
+        .filter(isGoing)
+        .sort((a, b) => a.startedAt - b.startedAt),
+    [runs],
+  );
+
+  return { runs, going: goingRuns, runFor, start, startOn, startIn, answer, stop };
 }

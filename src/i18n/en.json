@@ -135,6 +135,10 @@
     "saveHint": "⌘S / Ctrl+S saves",
     "save": "Save",
     "saveExecute": "Save & Execute",
+    "create": "Create",
+    "createExecute": "Create & Execute",
+    "execute": "Execute",
+    "executeTip": "Run Claude Code with this prompt, without creating a task",
     "saving": "Saving...",
     "newSubtask": "New subtask of “{{name}}”"
   },
@@ -470,6 +474,10 @@
     "forget": "Remove the run of {{when}}",
     "forgetConfirm": "Remove the run of {{when}}?",
     "forgetTitle": "Remove run"
+  },
+  "playlist": {
+    "title": "Playlist",
+    "none": "Nothing is running."
   },
   "machines": {
     "title": "Machines",

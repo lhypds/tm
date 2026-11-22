@@ -266,6 +266,18 @@ export function MonitorIcon({ className }) {
   );
 }
 
+// The playlist (the runs of Claude Code still going): the lines of a list, a play triangle beside them.
+export function PlaylistIcon({ className }) {
+  return (
+    <Icon className={className}>
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="12" y2="12" />
+      <line x1="3" y1="18" x2="12" y2="18" />
+      <polygon points="16 11 21 14.5 16 18 16 11" />
+    </Icon>
+  );
+}
+
 // Run (Claude Code on a task): a play triangle.
 export function PlayIcon({ className }) {
   return (

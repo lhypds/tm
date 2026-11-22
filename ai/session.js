@@ -201,7 +201,10 @@ function startRun({ space, taskDir, taskRef, id = null, after = null }) {
 // in `cwd`, the user's home folder unless given. The run is shaped as a task's, for the browser to
 // follow alike: its `task` is { free: true, title (the prompt's first line), key }, with no work, no
 // rel and no id, its `taskDir` null, and its `files` the prompt, as a prompt.txt. `id` as in startRun.
-function startPrompt({ prompt, id = null, cwd = os.homedir() }) {
+// A prompt run in a space, on no task either (the new task dialog's Execute; `cwd` is then the
+// space's folder), says which in `work` and `repository`, has the `title` given (the first line of
+// the task text typed, when there was one) and the `after` its prompt ends with (see ai/task.js).
+function startPrompt({ prompt, id = null, cwd = os.homedir(), title = '', work = '', repository = '', after = null }) {
   const text = String(prompt || '').trim();
   if (!text) throw httpError(400, 'Missing prompt.');
   if (id && runs.has(id)) throw httpError(409, `There is a run ${id} already.`);
@@ -210,10 +213,10 @@ function startPrompt({ prompt, id = null, cwd = os.homedir() }) {
   return begin({
     id,
     key,
-    task: { work: '', repository: '', rel: '', id: '', title: clip(text.split(/\r?\n/)[0].trim(), TITLE_MAX), key, free: true },
+    task: { work: String(work || ''), repository: String(repository || ''), rel: '', id: '', title: clip(String(title || '').trim() || text.split(/\r?\n/)[0].trim(), TITLE_MAX), key, free: true },
     cwd,
     taskDir: null,
-    after: null,
+    after,
     files: { [PROMPT_FILE]: text },
     input: text
   });

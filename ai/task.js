@@ -261,6 +261,16 @@ function buildPrompt(space, task, prompt, taskDir, cwd, after = null) {
   return out.join('\n') + '\n';
 }
 
+// The first prompt of a run on no task, in a space (the new task dialog's Execute, which makes no
+// task): the prompt as typed, then the text typed as the task's, when there is one, as its context,
+// then what to do with the changes after (`after`: a key of AFTER, or null).
+function buildFreePrompt(prompt, text = '', after = null) {
+  const out = [trimBlank(prompt)];
+  if (trimBlank(text)) out.push('', '## Context', trimBlank(text));
+  if (AFTER[after]) out.push('', '## After', AFTER[after]);
+  return out.join('\n') + '\n';
+}
+
 // The folder Claude works in for a task of the space: the repository's source folder (which must
 // exist), else the task folder.
 function cwdOf(space, taskDir) {
@@ -301,6 +311,7 @@ module.exports = {
   AFTER,
   afterOf,
   buildPrompt,
+  buildFreePrompt,
   cwdOf,
   titleOf,
   describeRun

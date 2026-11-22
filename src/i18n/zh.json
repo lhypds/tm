@@ -135,6 +135,10 @@
     "saveHint": "⌘S / Ctrl+S 保存",
     "save": "保存",
     "saveExecute": "保存并执行",
+    "create": "创建",
+    "createExecute": "创建并执行",
+    "execute": "执行",
+    "executeTip": "用这个 prompt 运行 Claude Code，不创建任务",
     "saving": "保存中...",
     "newSubtask": "为“{{name}}”添加子任务"
   },
@@ -470,6 +474,10 @@
     "forget": "删除 {{when}} 的运行记录",
     "forgetConfirm": "删除 {{when}} 的运行记录？",
     "forgetTitle": "删除运行记录"
+  },
+  "playlist": {
+    "title": "播放列表",
+    "none": "没有正在执行的任务。"
   },
   "machines": {
     "title": "机器",

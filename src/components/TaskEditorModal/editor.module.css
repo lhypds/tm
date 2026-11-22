@@ -52,6 +52,17 @@
   background-color: var(--bg-hover);
 }
 
+/* Under a new task's prompt: the two checkboxes saying what Claude does with its changes after the
+   work (commit and push, or a pull request), on one line. */
+.after {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
 /* Above the prompt: its name. Closer to the prompt under it
    (half the column's gap) than to the task's text above, so it reads as the prompt's head. */
 .promptHead {

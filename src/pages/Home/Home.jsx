@@ -34,6 +34,7 @@ import {
   BoardIcon,
   CalendarIcon,
   MonitorIcon,
+  PlaylistIcon,
   SundialIcon,
   TaskIcon,
 } from "@components/icons";
@@ -45,7 +46,7 @@ import { ALL_MONTHS, inPeriod, taskMonths, monthLabel, previewKind, flattenTasks
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
-import { RunModal, MachinesModal, RunOnModal, useRuns } from "@ai";
+import { RunModal, MachinesModal, RunOnModal, PlaylistModal, useRuns } from "@ai";
 import { getMachines } from "@ai/api";
 import { findHere, getHere, getHereUrl, useHere, isLocalPage } from "@utils/here";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
@@ -791,13 +792,13 @@ export default function Home({ all = false }) {
     setRunFile(null);
     setRunPromptRel(null);
   };
-  // A run starts, with what to do after the work as the checkboxes under the prompt say, on
-  // `machine` when the task's folder is synced by two; refused (the machine not connected, say),
-  // the dialog closes again.
-  const startRun = async (task, machine = null) => {
+  // A run starts, with what to do after the work as the checkboxes under the prompt say (`after`:
+  // a new task's own, see saveEditor), on `machine` when the task's folder is synced by two;
+  // refused (the machine not connected, say), the dialog closes again.
+  const startRun = async (task, machine = null, after = runAfter) => {
     showRun(task, null);
     setStarting(true);
-    const ok = await ai.start(task, runAfter, machine);
+    const ok = await ai.start(task, after, machine);
     setStarting(false);
     if (!ok) closeRun();
   };
@@ -807,7 +808,7 @@ export default function Home({ all = false }) {
   // run's dialog with it. Only a machine whose runner is connected can be picked: the keys, the
   // wheel and the pointer pass the others over (index -1 while none can). Whether a runner is
   // connected is asked again while the list is open, as the tree's answer may be minutes old.
-  const [pickRun, setPickRun] = useState(null); // { task, machines, index } while the machines are listed
+  const [pickRun, setPickRun] = useState(null); // { task, machines, index, after } while the machines are listed
   const firstReady = (machines) => machines.findIndex((m) => m.runner);
   // The next machine that can be picked from `index` on, `dir` 1 down or -1 up; `index` when none.
   const stepReady = (machines, index, dir) => {
@@ -837,7 +838,7 @@ export default function Home({ all = false }) {
       clearInterval(id);
     };
   }, [picking]);
-  const openRun = async (task, folder = null) => {
+  const openRun = async (task, folder = null, after = runAfter) => {
     if (folder) {
       showRun(task, folder);
       selectRun(folder); // the keyboard is on the record opened, so space closes and opens it again
@@ -847,18 +848,18 @@ export default function Home({ all = false }) {
     const machines = runMachinesOf(task.space);
     if (machines.length > 1) {
       showRun(task, null);
-      setPickRun({ task, machines, index: firstReady(machines) });
+      setPickRun({ task, machines, index: firstReady(machines), after });
       return;
     }
-    await startRun(task);
+    await startRun(task, null, after);
   };
   const movePick = (dir) => setPickRun((p) => p && { ...p, index: p.index < 0 ? firstReady(p.machines) : stepReady(p.machines, p.index, dir) });
   const confirmPick = (index) => {
     const m = pickRun?.machines[index];
     if (!m?.runner) return; // not one that can be picked
-    const { task } = pickRun;
+    const { task, after } = pickRun;
     setPickRun(null);
-    startRun(task, m.name);
+    startRun(task, m.name, after);
   };
   const cancelPick = () => {
     setPickRun(null);
@@ -875,7 +876,10 @@ export default function Home({ all = false }) {
   // The Machines dialog, opened from the header: a prompt run on the machines that sync with this
   // server, on no task (see MachinesModal). A run picked there, or just started, shows in a run
   // dialog of its own, in front of it (`machineRunId`), under a stand-in for the task it has not.
+  // So does a run picked in the playlist (the header's button beside it: every run still going,
+  // see PlaylistModal), whatever it is on, and the one the new task dialog's Execute starts.
   const [machinesOpen, setMachinesOpen] = useState(false);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
   const here = useHere(); // the machine this browser is on, "" until found: named at the right end of the status bar
   const [machineRunId, setMachineRunId] = useState(null);
   const [machineRunFile, setMachineRunFile] = useState(null); // its prompt, previewed from that dialog
@@ -884,7 +888,7 @@ export default function Home({ all = false }) {
     () => (machineRun ? { key: machineRun.task.key, title: machineRun.task.title, rel: "", space: null } : null),
     [machineRun?.task.key, machineRun?.task.title], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const machinesBusy = Object.values(ai.runs).some((r) => r.task?.free && isGoing(r)); // a dot on the header's button meanwhile
+  const machinesBusy = Object.values(ai.runs).some((r) => r.task?.free && r.machine && isGoing(r)); // a dot on the header's button meanwhile
   const closeMachineRun = () => {
     setMachineRunId(null);
     setMachineRunFile(null);
@@ -1259,11 +1263,25 @@ export default function Home({ all = false }) {
     }
   }
 
+  // The new task dialog's Execute: Claude Code runs with the prompt in the folder the task would
+  // have been in, on no task (the text typed, when there is one, is its context), and none is
+  // created. The dialog closes and the run shows, as one picked in the playlist does.
+  async function executeOnly({ text, prompt, after }) {
+    const inSpace = creating.space;
+    setSaving(true);
+    const run = await ai.startIn(inSpace, { prompt, text, after });
+    setSaving(false);
+    if (!run) return;
+    setCreating(null);
+    setMachineRunId(run.id);
+  }
+
   // `prompt`: the text of the editor's Prompt area when it is shown (null: hidden), which, unless
   // blank, becomes the task's prompt.txt; with `execute` ("Save & Execute") Claude Code then runs on the task, as its run
   // button would (asking which machine first, when two sync its folder). `keep` (cmd/ctrl+s): the
-  // dialog stays open, from then on the new task's.
-  async function saveEditor({ text, files = [], prompt = null, execute = false, keep = false }) {
+  // dialog stays open, from then on the new task's. `after`: what the dialog's checkboxes under the
+  // prompt say Claude does with its changes once done ("push", "pr" or null).
+  async function saveEditor({ text, files = [], prompt = null, execute = false, keep = false, after = null }) {
     setSaving(true);
     showToast(t("toast.saving"), null);
     // the new task goes where the editor was opened for: the folder on the right (in a work's
@@ -1311,7 +1329,7 @@ export default function Home({ all = false }) {
       if (run) {
         const reason = noRunnerOf(inSpace);
         if (reason) showToast(reason, 5000);
-        else openRun({ ...created, space: inSpace, rel, key: keyOf(inSpace, rel) });
+        else openRun({ ...created, space: inSpace, rel, key: keyOf(inSpace, rel) }, null, after);
       }
     } catch (e) {
       showToast(e.message, 4000);
@@ -1569,7 +1587,7 @@ export default function Home({ all = false }) {
       if (e.defaultPrevented || e.repeat || (e.code !== "KeyC" && e.key.toLowerCase() !== "c")) return;
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || isTyping(e)) return;
       if (!selected || window.getSelection?.()?.toString()) return;
-      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || spacePeekEntry || analysisOpen || machinesOpen || pickRun || runKey !== null || command !== null) return;
+      if (creating || confirm || removingFile || configOpen || editingWork || editingOrigin || adding || editingRepository || spacePeekEntry || analysisOpen || machinesOpen || playlistOpen || machineRunId || pickRun || runKey !== null || command !== null) return;
       e.preventDefault();
       const id = runId(selected);
       copyText(id).then((ok) => {
@@ -1643,6 +1661,8 @@ export default function Home({ all = false }) {
       editingRepository ||
       analysisOpen ||
       machinesOpen ||
+      playlistOpen ||
+      machineRunId ||
       command !== null
     )
       return false;
@@ -2264,6 +2284,19 @@ export default function Home({ all = false }) {
           >
             <MonitorIcon />
           </button>
+          <button
+            type="button"
+            className="btn"
+            data-dot={ai.going.length > 0}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              setPlaylistOpen(true);
+            }}
+            title={t("playlist.title")}
+            aria-label={t("playlist.title")}
+          >
+            <PlaylistIcon />
+          </button>
           <div className={styles.account}>
             <LanguageSwitcher />
             <UserMenu />
@@ -2605,10 +2638,11 @@ export default function Home({ all = false }) {
         selectedRel={peekFile?.rel}
         onSelectRel={setPeekFileRel}
         run={ai.runFor(peekTask)}
-        noRunner={noRunnerOf(peekTask?.space)}
+        noRunner={noRunnerOf(creating ? creating.space : peekTask?.space)}
         onRun={openRun}
         onCancel={() => (creating ? setCreating(null) : closePeek())}
         onSave={(v) => (creating ? saveEditor(v) : saveEdited(peekTask, v))}
+        onExecute={executeOnly}
         onPreview={(file) => setPreview({ ...file, space: creating.space })}
         onOpenFile={(file) => openFile(file, peek)}
         onOpenFolder={openFolder}
@@ -2649,6 +2683,17 @@ export default function Home({ all = false }) {
         onForget={reload}
         onClose={() => {
           setMachinesOpen(false);
+          closeMachineRun();
+        }}
+      />
+      {/* the runs still going; one picked shows in the run dialog under it, in front */}
+      <PlaylistModal
+        isOpen={playlistOpen}
+        runs={ai.going}
+        onOpenRun={(r) => setMachineRunId(r.id)}
+        onStop={ai.stop}
+        onClose={() => {
+          setPlaylistOpen(false);
           closeMachineRun();
         }}
       />

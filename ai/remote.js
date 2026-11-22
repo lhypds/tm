@@ -172,14 +172,16 @@ async function startRun({ machine, task, taskDir, files, after = null }) {
 
 // Ask `machine` to run Claude Code with `prompt` as it is, on no task, in its user's home folder (the
 // web UI's Machines dialog; see session.startPrompt, whose run this one is shaped as while queued).
-async function startPrompt({ machine, prompt }) {
+// With `work` (and `repository`), the prompt runs in that space's folder there instead (the new task
+// dialog's Execute), under `title`, with `after` what its text ends with.
+async function startPrompt({ machine, prompt, title = '', work = '', repository = '', after = null }) {
   if (!isConnected(machine)) throw notConnected(machine);
   const text = String(prompt || '').trim();
   if (!text) throw httpError(400, 'Missing prompt.');
   const id = newId();
-  const first = text.split(/\r?\n/)[0].trim();
-  const task = { work: '', repository: '', rel: '', id: '', title: first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX)}...` : first, key: `${FREE_KEY}${id}`, free: true };
-  return queue({ id, machine, task, taskDir: null, after: null, files: { [PROMPT_FILE]: text } }, { type: 'prompt', run: id, prompt: text });
+  const first = String(title || '').trim() || text.split(/\r?\n/)[0].trim();
+  const task = { work, repository, rel: '', id: '', title: first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX)}...` : first, key: `${FREE_KEY}${id}`, free: true };
+  return queue({ id, machine, task, taskDir: null, after, files: { [PROMPT_FILE]: text } }, { type: 'prompt', run: id, prompt: text, ...(work ? { work, repository, title: first, after } : {}) });
 }
 
 // A run asked of its machine with `cmd`: here as `queued` until the machine starts it, forgotten when
