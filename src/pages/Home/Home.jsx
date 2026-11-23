@@ -46,7 +46,7 @@ import { ALL_MONTHS, inPeriod, taskMonths, monthLabel, previewKind, flattenTasks
 import { groupWorksByOrigin, runName, runId, ambiguousRunNames } from "@utils/works";
 import { copyText } from "@utils/clipboard";
 import { useTaskFiles } from "@components/Attachments";
-import { RunModal, MachinesModal, RunOnModal, PlaylistModal, useRuns } from "@ai";
+import { RunModal, MachinesModal, RunOnModal, PlaylistModal, useRuns, isMachineRun } from "@ai";
 import { getMachines } from "@ai/api";
 import { findHere, getHere, getHereUrl, useHere, isLocalPage } from "@utils/here";
 import { useShortcuts, useWheelSteps, moveIndex, isTyping, modKey, withKey } from "@utils/keys";
@@ -888,7 +888,7 @@ export default function Home({ all = false }) {
     () => (machineRun ? { key: machineRun.task.key, title: machineRun.task.title, rel: "", space: null } : null),
     [machineRun?.task.key, machineRun?.task.title], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const machinesBusy = Object.values(ai.runs).some((r) => r.task?.free && r.machine && isGoing(r)); // a dot on the header's button meanwhile
+  const machinesBusy = Object.values(ai.runs).some((r) => isMachineRun(r) && r.machine && isGoing(r)); // a dot on the header's button meanwhile
   const closeMachineRun = () => {
     setMachineRunId(null);
     setMachineRunFile(null);

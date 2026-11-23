@@ -8,10 +8,10 @@ import { formatDateTime } from "@utils/task";
 import { useHere, findHere } from "@utils/here";
 import * as api from "../api";
 import { duration } from "../duration";
+import { isGoing, isMachineRun } from "../useRuns";
 import styles from "./machines.module.css";
 
 const REFRESH_MS = 5000; // how often the machines are asked for while the dialog is open
-const RUNS_SHOWN = 5; // the latest runs listed under a machine
 // The tm commands a machine can be given, typed as "/restart" (TM_COMMANDS in utils/tmcommand.js).
 const COMMANDS = ["restart", "start", "stop", "push", "pull", "status"];
 const PICKED_KEY = "machines.picked"; // the names of the machines ticked, kept for the next time
@@ -29,13 +29,15 @@ function readPicked() {
 // with this server (GET /api/ai/machines, asked again every few seconds while open), each with its
 // dot, a tick to pick it once its taskmgrd is connected (for a prompt it has to run Claude Code too,
 // AI_RUNNER=1 there: a machine that does not takes the / commands only, and says so),
-// and under it its latest runs started from here: when, what was asked and how it goes, a click
-// showing the run (onOpenRun(run)). Above them the prompt and the run button: it starts Claude Code
-// with that prompt on every machine ticked (onRun(machine, prompt), resolving to the run, or null
-// when refused), on no task, in the home folder there (⌘ / ctrl + enter runs too). One machine
-// started: its run is shown at once. Once run, the prompt is emptied and stays as its placeholder (tab brings it back as text). A run
-// still going has a stop button at its right end (onStop(run)). `runs` is every run the server has, by id (see useRuns); the
-// ones of this dialog are those on no task (`task.free`).
+// and under it the runs started from here that are still going: when, what was asked and how it
+// goes, a click showing the run (onOpenRun(run)), a stop button at the right end (onStop(run)). Above
+// them the prompt and the run button: it starts Claude Code with that prompt on every machine ticked
+// (onRun(machine, prompt), resolving to the run, or null when refused), on no task, in the home folder
+// there (⌘ / ctrl + enter runs too). One machine started: its run is shown at once. Once run, the
+// prompt is emptied and stays as its placeholder (tab brings it back as text). `runs` is every run
+// the server has, by id (see useRuns); the ones of this dialog are those started from here (see
+// isMachineRun: on no task and in no space; a prompt run in a space, from the new task dialog's
+// Execute, is the playlist's), and only while they go: one over leaves the list.
 //
 // A prompt that starts with "/" is a tm command, not a prompt for Claude: "/restart" runs `tm restart`
 // on every machine ticked, as a prompt does (POST /api/ai/machine/command; each
@@ -110,11 +112,11 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
     }
   };
 
-  // The runs started from here, newest first, by machine.
+  // The runs started from here still going, newest first, by machine.
   const runsOf = useMemo(() => {
     const by = {};
     for (const r of Object.values(runs || {})) {
-      if (!r.task?.free || !r.machine) continue;
+      if (!isMachineRun(r) || !r.machine || !isGoing(r)) continue;
       (by[r.machine] ||= []).push(r);
     }
     for (const list of Object.values(by)) list.sort((a, b) => b.startedAt - a.startedAt);
@@ -298,7 +300,7 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
                       </button>
                     )}
                   </div>
-                  {(runsOf[m.name] || []).slice(0, RUNS_SHOWN).map((r) => (
+                  {(runsOf[m.name] || []).map((r) => (
                     <div key={r.id} className={styles.run}>
                       <span className={`muted ${styles.when}`}>{formatDateTime(r.startedAt)}</span>
                       <button
@@ -316,11 +318,9 @@ export default function MachinesModal({ isOpen, runs, onRun, onOpenRun, onStop, 
                       <span className={`muted ${styles.state}`} data-pending={!!r.pending} title={r.error || ""}>
                         {stateOf(r)}
                       </span>
-                      {(r.status === "running" || r.status === "queued") && (
-                        <button type="button" className={styles.stop} tabIndex={-1} onClick={() => onStop(r)} title={t("ai.stop")} aria-label={t("ai.stop")}>
-                          <StopIcon />
-                        </button>
-                      )}
+                      <button type="button" className={styles.stop} tabIndex={-1} onClick={() => onStop(r)} title={t("ai.stop")} aria-label={t("ai.stop")}>
+                        <StopIcon />
+                      </button>
                     </div>
                   ))}
                 </li>

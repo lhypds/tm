@@ -4,4 +4,4 @@ export { default as RunList } from "./RunList";
 export { default as MachinesModal } from "./MachinesModal";
 export { default as RunOnModal } from "./RunOnModal";
 export { default as PlaylistModal } from "./PlaylistModal";
-export { default as useRuns } from "./useRuns";
+export { default as useRuns, isGoing, isMachineRun } from "./useRuns";

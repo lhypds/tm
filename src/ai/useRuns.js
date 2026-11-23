@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showToast } from "@ui";
 import * as api from "./api";
 
+// Whether a run is still going: running, or queued on its machine.
+export const isGoing = (r) => !!r && (r.status === "running" || r.status === "queued");
+
+// Whether a run is one of the Machines dialog's: a prompt run on a machine itself, on no task and in
+// no space (ai/session.js startPrompt: `task.free` with no work). A prompt run in a space, on no task
+// either (the new task dialog's Execute), has a work, and is not.
+export const isMachineRun = (r) => !!r?.task?.free && !r.task.work;
+
 // The runs of Claude Code (see ai/session.js), followed live over the server's event stream for as
 // long as the page is open: `runs` is every run the server has, by id, each with its transcript
 // (`items`) and its `pending` question. runFor(task) is the latest run of a task of the list (by
@@ -10,7 +18,8 @@ import * as api from "./api";
 // api.startRun) and, for a folder two machines sync, the one to run on (null: the server picks).
 // startOn(machine, prompt) starts a run on no task, on a machine (the Machines dialog);
 // startIn(space, { prompt, text, after }) one in a space, on no task either (the new task dialog's Execute).
-// `going` is the runs still going (running or queued), oldest first, for the header's playlist.
+// `going` is the runs still going (running or queued) that are not the Machines dialog's, oldest
+// first, for the header's playlist (the Machines dialog lists its own, see isMachineRun).
 // onAsk(run) is called when a run gets a question for the user, whatever task is shown; onEnd(run)
 // when a run seen going here is over (done, failed or stopped; not for one found over already).
 export default function useRuns({ onAsk, onEnd } = {}) {
@@ -21,7 +30,6 @@ export default function useRuns({ onAsk, onEnd } = {}) {
   endRef.current = onEnd;
   const asked = useRef(new Set()); // the ids of the questions onAsk was called for, each once
   const going = useRef(new Set()); // the ids of the runs seen going (running or queued), for onEnd
-  const isGoing = (r) => r.status === "running" || r.status === "queued";
 
   useEffect(() => {
     const es = new EventSource(api.runEventsUrl);
@@ -150,7 +158,7 @@ export default function useRuns({ onAsk, onEnd } = {}) {
   const goingRuns = useMemo(
     () =>
       Object.values(runs)
-        .filter(isGoing)
+        .filter((r) => isGoing(r) && !isMachineRun(r))
         .sort((a, b) => a.startedAt - b.startedAt),
     [runs],
   );

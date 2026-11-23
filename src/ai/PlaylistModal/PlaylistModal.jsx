@@ -5,7 +5,8 @@ import { formatDateTime } from "@utils/task";
 import styles from "./playlist.module.css";
 
 // The playlist, opened from the header: every run of Claude Code still going (`runs`, oldest first,
-// see useRuns: on a task, or on none, from the Machines dialog or the new task dialog's Execute),
+// see useRuns `going`: on a task, or on none, from the new task dialog's Execute; not the Machines
+// dialog's own, which it lists itself),
 // each a row with what it runs on (the task's title, or the prompt's first line), where (the work
 // and repository, and the machine when it is another), since when, and how it goes (running,
 // waiting for an answer, or queued on its machine). A click on one shows the run (onOpenRun(run));
