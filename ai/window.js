@@ -30,7 +30,7 @@ const FOLLOW = path.join(__dirname, 'follow.js');
 // `closeAfter` the seconds the window stays after the run before closing by itself (0: until Enter).
 // `skip(id)` says the run of that id opens none (asked from a browser on this very machine, which shows
 // it already; see ai/runner.js). Returns the way to stop following (the windows open stay).
-function watchRuns(session, { server, machine, log, warn, terminal = 'terminal', closeAfter = 10, skip = () => false }) {
+function watchRuns(session, { server, machine, log, warn, terminal = 'terminal', closeAfter = 3, skip = () => false }) {
   const open = new Map();   // run id -> { file, stream }
 
   function start(run) {

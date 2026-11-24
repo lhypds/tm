@@ -19,7 +19,7 @@ const POLL_MS = 150;        // how often the file is looked at
 const RESULT_LINES = 10;    // lines of a tool result shown
 const SUMMARY_LINES = 20;   // lines of a tool call's summary shown (a long command, a plan)
 const OPEN_MS = 10 * 1000;  // how long to wait for the file to appear
-const CLOSE_S = 10;         // seconds the window stays after the run, unless the meta line says otherwise
+const CLOSE_S = 3;          // seconds the window stays after the run, unless the meta line says otherwise
 
 const file = process.argv[2];
 if (!file) {

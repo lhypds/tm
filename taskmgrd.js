@@ -24,7 +24,7 @@
 // server's web UI, and runs here, where the tasks, the source code and the claude login are (see
 // ai/runner.js); with AI_RUNNER_WINDOW=1 as well, each of those runs opens a terminal window here
 // that shows it as it goes (ai/window.js; on macOS Terminal.app, or iTerm2 with AI_RUNNER_TERMINAL=iterm)
-// and closes by itself AI_RUNNER_WINDOW_CLOSE seconds after the run (10 when not set; 0 keeps it until
+// and closes by itself AI_RUNNER_WINDOW_CLOSE seconds after the run (3 when not set; 0 keeps it until
 // Enter). With all three off, or without SYNC_SERVER, it has nothing to do, and with a
 // POLLING_INTERVAL that is not a number of seconds it cannot poll: it says so and exits with 0 (pm2
 // then leaves it stopped rather than starting it again and again, see ecosystem.config.cjs).
@@ -49,7 +49,7 @@ const AI_RUNNER_WINDOW = AI_RUNNER && isOn(process.env.AI_RUNNER_WINDOW);
 const terminalSetting = String(process.env.AI_RUNNER_TERMINAL || '').trim().toLowerCase();
 const AI_RUNNER_TERMINAL = /^iterm2?$/.test(terminalSetting) ? 'iterm' : 'terminal';
 const closeSetting = String(process.env.AI_RUNNER_WINDOW_CLOSE ?? '').trim();
-const AI_RUNNER_WINDOW_CLOSE = closeSetting !== '' && Number(closeSetting) >= 0 ? Number(closeSetting) : 10;
+const AI_RUNNER_WINDOW_CLOSE = closeSetting !== '' && Number(closeSetting) >= 0 ? Number(closeSetting) : 3;
 function notRunning(why) {
   console.log(`taskmgrd: ${why}; not running.`);
   process.exit(0);
