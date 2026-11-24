@@ -3,7 +3,7 @@
 //
 //   GET    /api/ai/events            the runs, live: a text/event-stream (SSE) of events (see below)
 //   GET    /api/ai/runs              the runs, with their transcripts: { runs }
-//   POST   /api/ai/run               { work, repository?, rel, after? }: start Claude Code on that task; 201 { run }.
+//   POST   /api/ai/run               { work, repository?, rel, after?, machine?, here? }: start Claude Code on that task; 201 { run }.
 //                                    `after` ("push" or "pr") is what Claude is told to do with its changes
 //                                    once done: commit and push, or a new branch and a pull request (see ai/task.js)
 //   POST   /api/ai/prompt            { work, repository?, prompt, text?, after?, machine? }: start Claude Code in that
@@ -56,6 +56,11 @@ function httpError(status, message) {
   e.status = status;
   return e;
 }
+
+// Whether a run on `machine` was asked by a browser on that very machine (`here` in the body, see
+// src/ai/api.js): the run then opens no terminal window there, as the user already sees it in the
+// browser; a run on another machine opens one for whoever sits there (ai/window.js).
+const onHere = (body, machine) => !!machine && String(body?.here || '') === machine;
 
 // Open an event stream on res: returns the way to send an event. Comments keep it open; `onClose`
 // is called when the client goes.
@@ -134,7 +139,7 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     const asked = typeof body.machine === 'string' ? body.machine.trim() : '';
     const target = asked ? (where.machines || []).find(m => m.name === asked) : where.machine;
     if (!target) throw httpError(400, `"${asked}" does not sync this folder.`);
-    const run = await remote.startRun({ machine: target.name, task, taskDir, files, after });
+    const run = await remote.startRun({ machine: target.name, task, taskDir, files, after, window: !onHere(body, target.name) });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 
@@ -160,7 +165,7 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     const asked = typeof body.machine === 'string' ? body.machine.trim() : '';
     const target = asked ? (where.machines || []).find(m => m.name === asked) : where.machine;
     if (!target) throw httpError(400, `"${asked}" does not sync this folder.`);
-    const run = await remote.startPrompt({ machine: target.name, prompt, ...ref });
+    const run = await remote.startPrompt({ machine: target.name, prompt, ...ref, window: !onHere(body, target.name) });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 
@@ -194,7 +199,7 @@ function createAiApp({ config, logFile, machine, locate = () => ({ remote: false
     const name = String(body.machine || '');
     if (!name) throw httpError(400, 'Missing machine.');
     if (typeof body.prompt !== 'string' || !body.prompt.trim()) throw httpError(400, 'Missing prompt.');
-    const run = await remote.startPrompt({ machine: name, prompt: body.prompt });
+    const run = await remote.startPrompt({ machine: name, prompt: body.prompt, window: !onHere(body, name) });
     res.status(201).json({ run: remote.publicRun(run, true) });
   });
 

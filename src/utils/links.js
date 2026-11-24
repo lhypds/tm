@@ -62,7 +62,10 @@ const MIRRORED = [
 
 // A textarea does not say where its letters are, so an unseen copy of it is laid over it: a box
 // the size of the textarea's inside (without its border and scrollbar), holding the same text in
-// the same font, scrolled as far.
+// the same font, scrolled as far. It must be able to scroll as far as the textarea, or its scroll is
+// cut short and the letters measured lower than they are: the textarea can scroll further than the
+// same text in a box (a last empty line after a closing newline, its bottom padding), so a spacer
+// after the text gives the mirror room to.
 function makeMirror(el) {
   const mirror = document.createElement("div");
   const cs = getComputedStyle(el);
@@ -77,6 +80,7 @@ function makeMirror(el) {
     pointerEvents: "none",
   });
   mirror.textContent = el.value;
+  mirror.appendChild(document.createElement("div"));
   document.body.appendChild(mirror);
   return mirror;
 }
@@ -86,6 +90,9 @@ function placeMirror(mirror, el, box) {
   mirror.style.top = `${box.top + el.clientTop}px`;
   mirror.style.width = `${el.clientWidth}px`;
   mirror.style.height = `${el.clientHeight}px`;
+  const spacer = mirror.lastChild;
+  spacer.style.height = `${el.clientHeight}px`;
+  spacer.style.width = `${el.scrollWidth}px`;
   mirror.scrollTop = el.scrollTop;
   mirror.scrollLeft = el.scrollLeft;
 }

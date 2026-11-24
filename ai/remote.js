@@ -161,27 +161,29 @@ function fail(run, error) {
 // browser names the task, `taskDir` the copy's folder here, `files` the task's text files as they
 // are here ({ "task.txt": text, "prompt.txt": text | null }), written there before the run, and
 // `after` what Claude is told to do with its changes once done ("push", "pr" or null; see ai/task.js).
-async function startRun({ machine, task, taskDir, files, after = null }) {
+// `window` false asks the machine to open no terminal window for the run (asked by a browser on that
+// very machine, see server/ai/ai.js), as does `window` in startPrompt.
+async function startRun({ machine, task, taskDir, files, after = null, window = true }) {
   if (!isConnected(machine)) throw notConnected(machine);
   for (const r of runs.values()) {
     if (r.task.key === task.key && (r.status === 'running' || r.status === 'queued')) throw httpError(409, 'Claude Code is already running on this task.');
   }
   const id = newId();
-  return queue({ id, machine, task, taskDir, after, files }, { type: 'run', run: id, work: task.work, repository: task.repository, rel: task.rel, files, after });
+  return queue({ id, machine, task, taskDir, after, files }, { type: 'run', run: id, work: task.work, repository: task.repository, rel: task.rel, files, after, ...(window ? {} : { window: false }) });
 }
 
 // Ask `machine` to run Claude Code with `prompt` as it is, on no task, in its user's home folder (the
 // web UI's Machines dialog; see session.startPrompt, whose run this one is shaped as while queued).
 // With `work` (and `repository`), the prompt runs in that space's folder there instead (the new task
 // dialog's Execute), under `title`, with `after` what its text ends with.
-async function startPrompt({ machine, prompt, title = '', work = '', repository = '', after = null }) {
+async function startPrompt({ machine, prompt, title = '', work = '', repository = '', after = null, window = true }) {
   if (!isConnected(machine)) throw notConnected(machine);
   const text = String(prompt || '').trim();
   if (!text) throw httpError(400, 'Missing prompt.');
   const id = newId();
   const first = String(title || '').trim() || text.split(/\r?\n/)[0].trim();
   const task = { work, repository, rel: '', id: '', title: first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX)}...` : first, key: `${FREE_KEY}${id}`, free: true };
-  return queue({ id, machine, task, taskDir: null, after, files: { [PROMPT_FILE]: text } }, { type: 'prompt', run: id, prompt: text, ...(work ? { work, repository, title: first, after } : {}) });
+  return queue({ id, machine, task, taskDir: null, after, files: { [PROMPT_FILE]: text } }, { type: 'prompt', run: id, prompt: text, ...(work ? { work, repository, title: first, after } : {}), ...(window ? {} : { window: false }) });
 }
 
 // A run asked of its machine with `cmd`: here as `queued` until the machine starts it, forgotten when

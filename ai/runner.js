@@ -81,7 +81,13 @@ async function* sseMessages(body) {
 // Returns { stop }.
 function startRunner({ server, token, machineId, log, warn, logFile, ai = true, port = null, commandLog = path.join(__dirname, '..', 'logs', 'command.log'), commandWindow = {}, window = false, session = require('./session'), getWorks = () => resolveConfig().getWorks(), open = openFolder, code = openInCode, calendar = newEvent }) {
   session.configure({ logFile, machine: machineId });
-  const unwatch = ai && window ? watchRuns(session, { server, machine: machineId, log, warn, ...window }) : null;
+  // The runs asked from a browser on this very machine (`window: false` in the command, see
+  // server/ai/ai.js), by id: they open no window here, the browser shows them already.
+  const noWindow = new Set();
+  const unwatch = ai && window ? watchRuns(session, { server, machine: machineId, log, warn, ...window, skip: (id) => noWindow.has(id) }) : null;
+  const offNoWindow = session.subscribe((event, data) => {
+    if (event === 'run' && data && data.status !== 'running' && data.status !== 'queued') noWindow.delete(data.id);
+  });
   const headers = { Authorization: `Bearer ${token}`, 'X-Machine-Id': encodeURIComponent(machineId), 'X-Ai-Runner': ai ? '1' : '0', ...(port ? { 'X-Web-Port': String(port) } : {}) };
 
   let stopped = false;
@@ -211,6 +217,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, ai = true, 
       switch (cmd.type) {
         case 'run': {
           const { space, taskDir, made } = locate(cmd);
+          if (cmd.window === false && cmd.run) noWindow.add(String(cmd.run));
           const written = writeFiles(taskDir, cmd.files);
           const run = session.startRun({ id: String(cmd.run || '') || null, space, taskDir, taskRef: { work: space.work, repository: space.repository, rel: String(cmd.rel || '') }, after: afterOf(cmd.after) });
           log(`runner: run ${run.id}: ${run.task.id} ${run.task.title} in ${run.cwd}${made ? ' (task made here)' : ''}${written.length ? ` (${written.join(', ')} written)` : ''}`);
@@ -218,6 +225,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, ai = true, 
         }
         case 'prompt': {
           // in a space's folder when the command names one (the new task dialog's Execute), else at home
+          if (cmd.window === false && cmd.run) noWindow.add(String(cmd.run));
           const inSpace = cmd.work ? { cwd: folderOf(cmd), work: String(cmd.work), repository: String(cmd.repository || ''), title: String(cmd.title || ''), after: afterOf(cmd.after) } : {};
           const run = session.startPrompt({ id: String(cmd.run || '') || null, prompt: cmd.prompt, ...inSpace });
           log(`runner: run ${run.id}: prompt "${run.task.title}" in ${run.cwd}`);
@@ -342,6 +350,7 @@ function startRunner({ server, token, machineId, log, warn, logFile, ai = true, 
       connected = false;
       if (abort) abort.abort();
       if (unwatch) unwatch();
+      offNoWindow();
     }
   };
 }
