@@ -10,7 +10,8 @@ import styles from "./space.module.css";
 // groupWorksByOrigin), { item } for a work and { item, repository } for a repository of it. Its
 // description comes first (this is where it is read), then what else it has: where it is in the
 // tree, its folders, its income, the machines that sync it (what is under it is in the tree, and not
-// repeated here). The pencil (i) goes on to its edit dialog.
+// repeated here). The pencil (i) goes on to its edit dialog. The urls in it are links (see
+// useTextLinks).
 export default function SpacePreviewModal({ entry, onClose, onEdit }) {
   const { t } = useTranslation();
   if (!entry) return null;
@@ -57,7 +58,7 @@ export default function SpacePreviewModal({ entry, onClose, onEdit }) {
         {rows.map(([label, value]) => (
           <div key={label} className={styles.detail}>
             <dt className="muted">{label}</dt>
-            <dd>{value}</dd>
+            <dd data-links>{value}</dd>
           </div>
         ))}
       </dl>
