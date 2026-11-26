@@ -36,7 +36,8 @@ function HeaderButton({ label, keys, dot, pressed, disabled, onClick, children }
 // subtask of that task, which the title says) and for an existing one (`task`: "Task", opened with
 // space or a double click on it). `isOpen` is separate so a closed dialog keeps its last text until it reopens.
 // Nothing is written until it is saved, with the button at the bottom right, which also closes the
-// dialog, or cmd/ctrl+s, which leaves it open (`keep`) and executes nothing:
+// dialog, or cmd/ctrl+s, which leaves it open (`keep`) and executes nothing (cmd/ctrl+s again, with
+// nothing typed since, closes it):
 // onSave({ text, files, prompt, execute, keep }), `files` the attachments added to a new task (kept until
 // then), `prompt` the Prompt area's text, or null while that is hidden (the prompt is left as it is).
 // The brain beside the title shows the Prompt area under the text, the task's prompt.txt (`prompt`:
@@ -106,6 +107,7 @@ export default function TaskEditorModal({
   const base = useRef({ text: "", prompt: "" }); // the texts as saved, to tell what was typed
   const textRef = useRef(null);
   const promptRef = useRef(null);
+  const keySaved = useRef(false); // saved with cmd/ctrl+s since the dialog opened (a new task's create too)
   const taskKey = task?.key ?? null;
 
   // Opened (or for another task): the saved texts, nothing chosen, and for a new task the caret in its text.
@@ -120,6 +122,10 @@ export default function TaskEditorModal({
     setSection(taskKey ? null : "task");
     if (!taskKey) textRef.current?.focus();
   }, [isOpen, taskKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isOpen) keySaved.current = false;
+  }, [isOpen]);
 
   // A saved text read later (the prompt, once the folder is read; a reload) is taken unless it was typed on.
   useEffect(() => {
@@ -161,6 +167,7 @@ export default function TaskEditorModal({
   function submit(e, keep = false) {
     e?.preventDefault();
     if (saving || blocked) return;
+    if (keep) keySaved.current = true;
     onSave({ text, files: pending, prompt: promptOpen ? prompt : null, execute: execute && !keep, keep, ...(task ? {} : { after }) });
   }
   // A new task's Execute: the prompt runs, and no task is created.
@@ -181,9 +188,10 @@ export default function TaskEditorModal({
     else onCancel();
   }
 
-  // cmd/ctrl+s saves wherever the caret is, in a text or out of it, and the dialog stays open.
+  // cmd/ctrl+s saves wherever the caret is, in a text or out of it, and the dialog stays open; once
+  // saved so, with nothing typed since (or the save failed: still dirty), it closes the dialog.
   const submitRef = useRef(submit);
-  submitRef.current = submit;
+  submitRef.current = (e, keep) => (keep && keySaved.current && !dirty ? onCancel() : submit(e, keep));
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e) => {

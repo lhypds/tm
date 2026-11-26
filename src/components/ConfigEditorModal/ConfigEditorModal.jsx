@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal, TextArea, showToast, hideToast } from "@ui";
 import * as api from "@utils/api";
 import { jsonTokens } from "@utils/highlight";
@@ -13,9 +13,11 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
   const [text, setText] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const keySaved = useRef(false); // saved with cmd/ctrl+s, and not typed on since
 
   useEffect(() => {
     if (!isOpen) return;
+    keySaved.current = false;
     setText(null);
     setError("");
     api
@@ -27,12 +29,14 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
       .catch((e) => setError(e.message));
   }, [isOpen]);
 
-  // `keep`: the dialog stays open (cmd/ctrl+s); Save closes it.
+  // `keep`: the dialog stays open (cmd/ctrl+s; again, with nothing typed since, it closes); Save closes it.
   async function save(keep = false) {
+    if (keep && keySaved.current) return onClose();
     setSaving(true);
     showToast(t("toast.saving"), null);
     try {
       onSaved(await api.saveConfig(text), keep);
+      if (keep) keySaved.current = true;
     } catch (e) {
       hideToast(); // the error is shown in the dialog
       setError(e.message);
@@ -57,7 +61,10 @@ export default function ConfigEditorModal({ isOpen, onClose, onSaved }) {
           placeholder={text === null ? t("common.loading") : ""}
           disabled={text === null}
           autoFocus
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            keySaved.current = false;
+            setText(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
               e.preventDefault();

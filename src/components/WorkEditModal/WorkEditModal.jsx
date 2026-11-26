@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Checkbox, Modal, TextArea } from "@ui";
 import * as api from "@utils/api";
 import IncomeFields, { useIncomeFields, readIncome } from "@components/IncomeFields";
@@ -21,10 +21,15 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
   const income = useIncomeFields();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // saved with cmd/ctrl+s, and not edited since; kept while the dialog is reset to what was saved
+  const keySaved = useRef(false);
 
   const { reset } = income;
   useEffect(() => {
-    if (!work && !origin) return;
+    if (!work && !origin) {
+      keySaved.current = false;
+      return;
+    }
     setName(origin ? origin.origin : work.work);
     setDescription((origin || work).description || "");
     setTasksPath(origin ? "" : work.shownPath || "");
@@ -34,8 +39,9 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
     setError("");
   }, [work, origin, reset]);
 
-  // `keep`: the dialog stays open (cmd/ctrl+s); Save closes it.
+  // `keep`: the dialog stays open (cmd/ctrl+s; again, with nothing edited since, it closes); Save closes it.
   async function save(keep = false) {
+    if (keep && keySaved.current) return onClose();
     const newName = name.trim();
     if (!newName) {
       setError(t("work.nameEmpty"));
@@ -52,6 +58,7 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
         ? await api.saveOrigin(origin.origin, { name: newName, income: read.income, color, description })
         : await api.saveWork(work.work, { name: newName, income: read.income, hidden, tasksPath, description });
       onSaved(spaces, newName, keep);
+      if (keep) keySaved.current = true;
     } catch (e) {
       setError(e.message);
     } finally {
@@ -67,7 +74,12 @@ export default function WorkEditModal({ work, origin, onClose, onSaved }) {
           e.preventDefault();
           if (!saving) save();
         }}
-        // cmd+s (ctrl+s) saves and leaves the dialog open
+        // any edit (a field typed in, a button such as a color or an income row) is unsaved again
+        onChange={() => (keySaved.current = false)}
+        onClick={(e) => {
+          if (e.target.closest("button[type=button]")) keySaved.current = false;
+        }}
+        // cmd+s (ctrl+s) saves and leaves the dialog open; again, with nothing edited since, closes it
         onKeyDown={(e) => {
           if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== "s") return;
           e.preventDefault();
