@@ -45,7 +45,7 @@ function HeaderButton({ label, keys, dot, pressed, disabled, onClick, children }
 // "Save & Execute" (`execute`): the task is saved and Claude Code runs on it; with it blank or
 // hidden, "Save". The button is greyed out while the task's text is blank. For a new task the
 // prompt starts hidden; for an existing one as it was last left (`promptDefault`, onPromptOpen(open)
-// keeps it).
+// keeps it), and shown whenever its prompt has text.
 // A new task's button reads "Create", and "Create & Execute" with a prompt typed. Under its prompt
 // are two checkboxes, what Claude does with its changes once the work is done: "Commit & push"
 // (ticked as the dialog opens) and "Create PR", one or the other or neither; onSave gets it as
@@ -126,6 +126,18 @@ export default function TaskEditorModal({
   useEffect(() => {
     if (!isOpen) keySaved.current = false;
   }, [isOpen]);
+
+  // An existing task whose prompt.txt has text opens with the prompt shown, once it is read (once
+  // per opening: g hides it again; not kept as the default, see promptDefault).
+  const autoShown = useRef(false);
+  useEffect(() => {
+    autoShown.current = false;
+  }, [isOpen, taskKey]);
+  useEffect(() => {
+    if (!isOpen || !taskKey || autoShown.current || !savedPrompt.trim()) return;
+    autoShown.current = true;
+    setPromptOpen(true);
+  }, [isOpen, taskKey, savedPrompt]);
 
   // A saved text read later (the prompt, once the folder is read; a reload) is taken unless it was typed on.
   useEffect(() => {

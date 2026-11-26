@@ -35,9 +35,11 @@ export function flattenTasks(tasks, depth = 0, through = []) {
 
 // The tasks that pass `keep`, each with its subtasks that do. A task that does not pass stays
 // when a subtask under it does, so a filter never hides a task that matches it.
-export function filterTasks(tasks, keep) {
+// `drop(t)`, when given, takes the task out with all its subtasks, whatever they are.
+export function filterTasks(tasks, keep, drop) {
   return tasks.flatMap((t) => {
-    const subtasks = filterTasks(t.subtasks || [], keep);
+    if (drop?.(t)) return [];
+    const subtasks = filterTasks(t.subtasks || [], keep, drop);
     return keep(t) || subtasks.length ? [{ ...t, subtasks }] : [];
   });
 }

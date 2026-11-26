@@ -146,5 +146,8 @@ export default function useTaskFiles(space, rel, version) {
   );
   const rows = useMemo(() => fileRows(files, open), [files, open]);
 
-  return { files, rows, open, toggleDir, prompt, lastPrompt, runs, uploading, add, remove, savePrompt, forgetRun };
+  // the render that first has another task still holds the last one's prompt (the effect above
+  // clears it after): it is not read yet
+  const ownPrompt = shown.current === taskKey ? prompt : undefined;
+  return { files, rows, open, toggleDir, prompt: ownPrompt, lastPrompt, runs, uploading, add, remove, savePrompt, forgetRun };
 }

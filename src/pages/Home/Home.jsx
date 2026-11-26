@@ -600,16 +600,17 @@ export default function Home({ all = false }) {
     const q = query.trim().toLowerCase();
     const keep = (t) =>
       inPeriod(t, monthKey) &&
-      (!q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.from.toLowerCase().includes(q) || t.fromPath.includes(q)) &&
-      (showAbort || t.status !== "aborted") &&
-      (view === "board" || ((showDone || t.status !== "done") && (showPending || t.status !== "pending")));
-    // A task stays when a subtask of it is kept, so a filter never hides a task that matches it.
-    // The list shows every task under its parent, and leaves the done, the pending and the aborted
-    // tasks out unless they are shown. The board always has its todo / done / pending columns, and
+      (!q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.from.toLowerCase().includes(q) || t.fromPath.includes(q));
+    const drop = (t) =>
+      (!showAbort && t.status === "aborted") ||
+      (view !== "board" && ((!showDone && t.status === "done") || (!showPending && t.status === "pending")));
+    // A task stays when a subtask of it is kept, so the search and the time never hide a task that
+    // matches them. The list shows every task under its parent, and leaves the done, the pending and
+    // the aborted tasks out, their subtasks with them, unless they are shown. The board always has its todo / done / pending columns, and
     // its aborted column while aborted tasks are shown; only the tasks at the top are its cards,
     // each in the column of its status (its subtasks are a board of their own, see enterTask), and
     // on it j / k go down a column and on into the next one.
-    const kept = filterTasks(tree, keep);
+    const kept = filterTasks(tree, keep, drop);
     if (view !== "board") return flattenTasks(kept);
     return boardStatuses.flatMap((s) => kept.filter((t) => boardStatus(t) === s));
   }, [tree, query, view, showDone, showPending, showAbort, boardStatuses, monthKey]);
