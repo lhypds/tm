@@ -74,6 +74,8 @@
     "saving": "保存中...",
     "saved": "保存しました",
     "created": "タスクを作成しました",
+    "uploading": "アップロード中...",
+    "uploaded": "「{{title}}」に {{count}} 件のファイルを追加しました",
     "createdUploadFailed": "タスクを作成しましたが、添付ファイルのアップロードに失敗しました：{{error}}",
     "deleted": "タスクを削除しました",
     "opened": "ファイルマネージャーで開きました",

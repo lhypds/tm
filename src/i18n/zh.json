@@ -74,6 +74,8 @@
     "saving": "保存中...",
     "saved": "已保存",
     "created": "任务已创建",
+    "uploading": "上传中...",
+    "uploaded": "已添加 {{count}} 个文件到“{{title}}”",
     "createdUploadFailed": "任务已创建，但附件上传失败：{{error}}",
     "deleted": "任务已删除",
     "opened": "已在文件管理器中打开",

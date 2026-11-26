@@ -1117,6 +1117,23 @@ export default function Home({ all = false }) {
     }
   }
 
+  // Files dropped on a row of the list (see TaskList): uploaded into that task's folder, one after
+  // another; those that got there stay when a later one fails. The attachments shown re-read after.
+  async function uploadToTask(task, files) {
+    showToast(t("toast.uploading"), null);
+    let done = 0;
+    try {
+      for (const f of files) {
+        await api.uploadFile(task.space, task.rel, f);
+        done++;
+      }
+      showToast(t("toast.uploaded", { count: done, title: task.title || task.id }));
+    } catch (e) {
+      showToast(e.message, 4000);
+    }
+    if (done) setLoads((n) => n + 1);
+  }
+
   // A drag in the list (see TaskList): `list` into `target`, as its subtasks, or with target null
   // out to the top of the list (this folder, or the space's root in a list of several), each with
   // its status and its own subtasks. The tasks stay selected (and chosen) in their new places.
@@ -2101,6 +2118,7 @@ export default function Home({ all = false }) {
           onPreview={setPeek}
           onToggleDone={toggleDone}
           onMove={moveTasks}
+          onDropFiles={uploadToTask}
           empty={empty}
         />
       </div>

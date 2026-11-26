@@ -74,6 +74,8 @@
     "saving": "Saving...",
     "saved": "Saved",
     "created": "Task created",
+    "uploading": "Uploading...",
+    "uploaded": "Added {{count}} file(s) to \"{{title}}\"",
     "createdUploadFailed": "Task created, but an attachment failed: {{error}}",
     "deleted": "Task deleted",
     "opened": "Opened in file manager",

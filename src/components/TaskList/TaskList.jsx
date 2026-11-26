@@ -67,10 +67,11 @@ export const keepFocus = (e) => {
 // the blank area of the list (or its header) takes it out to the top of the list
 // (`onMove(tasks, target)`, target null for the top); dragging one of the rows chosen together
 // takes them all along, each subtask among them going with its task. A row does not take a task
-// that is dragged, nor one under it.
+// that is dragged, nor one under it. Files dragged in from outside the page onto a row are
+// uploaded into that task's folder (`onDropFiles(task, files)`).
 // `hoveredKey` is the task the mouse is on in the scheduler at the right, and `markedKey` the one
 // chosen there: their rows are shown hovered.
-export default function TaskList({ tasks, selectedKey, hoveredKey, markedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, onMove, empty }) {
+export default function TaskList({ tasks, selectedKey, hoveredKey, markedKey, chosenKeys, focused, onSelect, onPreview, onToggleDone, onMove, onDropFiles, empty }) {
   const { t: tr } = useTranslation();
   const selectedRef = useRef(null);
   useEffect(() => {
@@ -87,8 +88,17 @@ export default function TaskList({ tasks, selectedKey, hoveredKey, markedKey, ch
       ? dragged.length > 0 && dragged.every((d) => d.key !== target.key && !under(target, d) && sameSpace(d, target))
       : dragged.some((d) => d.depth > 0);
 
+  // files dragged in from outside the page go into the row's task folder
+  const hasFiles = (e) => !dragged.length && Array.from(e.dataTransfer?.types || []).includes("Files");
+
   const dragOver = (e, target) => {
     e.stopPropagation();
+    if (hasFiles(e)) {
+      if (!target) return setOver(null);
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      return setOver(target.key);
+    }
     if (!dragged.length) return;
     if (!takes(target)) return setOver(null);
     e.preventDefault();
@@ -98,6 +108,12 @@ export default function TaskList({ tasks, selectedKey, hoveredKey, markedKey, ch
   const drop = (e, target) => {
     e.stopPropagation();
     e.preventDefault();
+    if (hasFiles(e)) {
+      setOver(null);
+      const files = Array.from(e.dataTransfer.files);
+      if (target && files.length) onDropFiles(target, files);
+      return;
+    }
     const ok = takes(target);
     const moving = dragged.filter((d) => !dragged.some((a) => under(d, a)));
     setDragKeys([]);
