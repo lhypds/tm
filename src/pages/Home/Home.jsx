@@ -963,8 +963,8 @@ export default function Home({ all = false }) {
     else setEmptyTask(!on);
     if (open) setDetailOpen(true);
   }
-  // The sundial in the header: the scheduler takes the right pane, and gives it back to the task
-  // on the next click.
+  // The scheduler takes the right pane, and gives it back to the task the next time. (The header
+  // has a button for each, see showScheduler.)
   function toggleScheduler() {
     showScheduler(!(scheduler && detailOpen));
   }
@@ -1506,7 +1506,7 @@ export default function Home({ all = false }) {
     else setEmptyTask(false);
   }
   // The view in the middle, and the keyboard on it. The calendar brings the scheduler to the right
-  // pane with it (c, v or the header's button): the days beside their month. A folded right pane
+  // pane with it (c, v or the header's buttons): the days beside their month. A folded right pane
   // stays folded, with the scheduler in it.
   function showView(next) {
     setView(next);
@@ -1516,7 +1516,7 @@ export default function Home({ all = false }) {
     }
     setPane(next === "board" ? (selected ? boardStatus(selected) : boardStatuses[0]) : "tasks");
   }
-  // v, and the header's button: the next view, list > progress > calendar > list.
+  // v: the next view, list > progress > calendar > list.
   function toggleView() {
     showView(VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.length]);
   }
@@ -1854,12 +1854,12 @@ export default function Home({ all = false }) {
       toggleView();
       return true;
     }
-    // t shows the task in the right pane and s the scheduler, as the sundial in the header swaps them
-    // (t also puts the task list back in the middle when the calendar is there; with no task
-    // selected there is none to show, and the scheduler stays in the right pane). s opens the
-    // right pane when it was folded; t does not: the task is in it when it is opened again
+    // t shows the task in the right pane and s the scheduler, as the header's buttons do (t also
+    // puts the task list back in the middle when the calendar is there; with no task selected the
+    // pane says so). s opens the right pane when it was folded; t does not: the task is in it when
+    // it is opened again
     if (name === "t" || name === "s") {
-      showScheduler(name === "s" || !selected, name === "s");
+      showScheduler(name === "s", name === "s");
       if (name === "t" && view === "calendar") showView("list");
       return true;
     }
@@ -2253,30 +2253,53 @@ export default function Home({ all = false }) {
         </div>
 
         <div className={styles.actions}>
-          <button
-            type="button"
-            className="btn"
-            onClick={(e) => {
-              e.currentTarget.blur();
-              toggleScheduler();
-            }}
-            title={withKey(t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show"), scheduler && detailOpen ? "t" : "s")}
-            aria-label={t(scheduler && detailOpen ? "scheduler.hide" : "scheduler.show")}
-          >
-            {scheduler && detailOpen ? <TaskIcon /> : <SundialIcon />}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            tabIndex={-1}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={toggleView}
-            // what the click shows: the next view
-            title={withKey(t({ list: "header.boardView", board: "header.calendarView", calendar: "header.listView" }[view]), "v")}
-            aria-label={t({ list: "header.boardView", board: "header.calendarView", calendar: "header.listView" }[view])}
-          >
-            {{ list: <BoardIcon />, board: <CalendarIcon />, calendar: <ListIcon /> }[view]}
-          </button>
+          {/* what the right pane shows, the task or the scheduler: neither chosen while it is folded */}
+          <div className="segmented" role="group">
+            {[
+              [false, "scheduler.hide", "t", <TaskIcon key="i" />],
+              [true, "scheduler.show", "s", <SundialIcon key="i" />],
+            ].map(([on, label, key, icon]) => {
+              const chosen = detailOpen && scheduler === on;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className="btn"
+                  aria-pressed={chosen}
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    if (!chosen) showScheduler(on);
+                  }}
+                  title={withKey(t(label), key)}
+                  aria-label={t(label)}
+                >
+                  {icon}
+                </button>
+              );
+            })}
+          </div>
+          {/* the view in the middle (v goes on to the next) */}
+          <div className="segmented" role="group">
+            {[
+              ["list", "header.listView", <ListIcon key="i" />],
+              ["board", "header.boardView", <BoardIcon key="i" />],
+              ["calendar", "header.calendarView", <CalendarIcon key="i" />],
+            ].map(([v, label, icon]) => (
+              <button
+                key={v}
+                type="button"
+                className="btn"
+                tabIndex={-1}
+                aria-pressed={view === v}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => view !== v && showView(v)}
+                title={withKey(t(label), "v")}
+                aria-label={t(label)}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
           <button type="button" className="btn" onClick={refresh} title={withKey(t("header.refresh"), "r")} aria-label={t("header.refresh")}>
             <RefreshIcon />
           </button>

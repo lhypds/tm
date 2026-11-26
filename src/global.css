@@ -146,6 +146,24 @@ p {
   background: currentColor;
 }
 
+/* Buttons side by side as one, a choice of one of them (the header's views, Task / Scheduler):
+   their borders shared, the chosen one (aria-pressed) filled. */
+.segmented {
+  display: inline-flex;
+}
+
+.segmented > .btn + .btn {
+  margin-left: calc(-1 * var(--line));
+}
+
+.segmented > .btn[aria-pressed="true"],
+.segmented > .btn[aria-pressed="true"]:hover:not(:disabled) {
+  position: relative; /* its border over its neighbours' */
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
 .input,
 .select {
   display: block;
